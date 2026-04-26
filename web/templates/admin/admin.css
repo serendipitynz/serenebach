@@ -1,0 +1,1699 @@
+/* === Serene Bach admin UI ===========================================
+   One stylesheet, no build step. Vanilla CSS variables drive the theme
+   so a dark mode can land later as a single [data-theme="dark"] block.
+   ==================================================================== */
+
+:root {
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: #dbeafe;
+  --text: #1f2937;
+  --text-muted: #6b7280;
+  --text-faint: #9ca3af;
+  --surface: #ffffff;
+  --surface-alt: #f9fafb;
+  --surface-sunken: #f3f4f6;
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
+  --success: #16a34a;
+  --success-soft: #dcfce7;
+  --warn: #d97706;
+  --warn-soft: #fef3c7;
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+  --radius: 6px;
+  --radius-sm: 4px;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  --topbar-h: 56px;
+  --sidebar-w: 232px;
+  --content-max: 72rem;
+}
+
+/* === dark theme ==================================================== */
+/* The whole admin style is variable-driven; the dark block simply
+   rewrites those variables. The runtime toggle sets data-theme="dark"
+   on <html>; when data-theme is missing or "auto" the prefers-color-
+   scheme query decides. */
+[data-theme="dark"] {
+  --accent: #60a5fa;
+  --accent-hover: #93c5fd;
+  --accent-soft: #1e3a8a;
+  --text: #e5e7eb;
+  --text-muted: #9ca3af;
+  --text-faint: #6b7280;
+  --surface: #1f2937;
+  --surface-alt: #111827;
+  --surface-sunken: #0f172a;
+  --border: #374151;
+  --border-strong: #4b5563;
+  --success: #4ade80;
+  --success-soft: #14532d;
+  --warn: #fbbf24;
+  --warn-soft: #78350f;
+  --danger: #f87171;
+  --danger-soft: #7f1d1d;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
+  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.45), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] {
+    --accent: #60a5fa;
+    --accent-hover: #93c5fd;
+    --accent-soft: #1e3a8a;
+    --text: #e5e7eb;
+    --text-muted: #9ca3af;
+    --text-faint: #6b7280;
+    --surface: #1f2937;
+    --surface-alt: #111827;
+    --surface-sunken: #0f172a;
+    --border: #374151;
+    --border-strong: #4b5563;
+    --success: #4ade80;
+    --success-soft: #14532d;
+    --warn: #fbbf24;
+    --warn-soft: #78350f;
+    --danger: #f87171;
+    --danger-soft: #7f1d1d;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
+    --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.45), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN", "Yu Gothic Medium", "Meiryo", sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--surface-sunken);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  padding: 0.375rem 0.875rem;
+  transition: background 120ms, border-color 120ms;
+}
+button:hover { background: var(--surface-alt); border-color: var(--text-muted); }
+button.primary {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+button.danger {
+  background: var(--surface); color: var(--danger); border-color: var(--danger);
+}
+button.danger:hover { background: var(--danger-soft); }
+button.link {
+  background: none; border: none; color: var(--accent); padding: 0;
+}
+button.link:hover { text-decoration: underline; background: none; }
+/* .copy-tag is a click-to-copy wrapper around a <code> token. Keep the
+   monospace colour neutral so the cell reads as code, not a link, but
+   signal interactivity on hover. */
+button.link.copy-tag {
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+button.link.copy-tag:hover { text-decoration: none; }
+button.link.copy-tag:hover code { text-decoration: underline; }
+button[disabled], button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Inline spinner used while AI requests are in flight. JS swaps the
+   button label for <span class="sb-spinner"></span>; the spin
+   inherits currentColor so it works on both default and .primary
+   buttons without theming care. */
+@keyframes sb-spinner-rotate { to { transform: rotate(360deg); } }
+.sb-spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  /* Lock the box dimensions so a flex parent can't shrink the
+     spinner asymmetrically — without this, .entry-title-ai (inline-
+     flex with align-self: stretch) squashes the 1em circle into an
+     ellipse mid-animation and the rotation looks wobbly. */
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: sb-spinner-rotate 0.7s linear infinite;
+  /* Rotate around the geometric centre regardless of inline-block
+     baseline quirks. */
+  transform-origin: 50% 50%;
+  vertical-align: middle;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-spinner { animation-duration: 2s; }
+}
+
+/* Compact monospace formatting for the AI audit-log Extra column —
+   reads as a single key=value line, never wraps mid-token. */
+.audit-log .col-detail { font-size: 0.8125rem; }
+.audit-log .audit-extra {
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+}
+
+input[type="text"], input[type="email"], input[type="url"], input[type="password"],
+input[type="datetime-local"], input[type="number"], select, textarea {
+  font: inherit;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 120ms, box-shadow 120ms;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; min-height: 10rem; }
+label { display: grid; gap: 0.25rem; font-size: 0.875rem; color: var(--text-muted); }
+label > input, label > select, label > textarea { color: var(--text); }
+form { display: grid; gap: 0.875rem; }
+form.inline { display: inline; }
+
+/* === layout ========================================================= */
+
+/* The admin shell is a 2-column grid (sidebar + content) that fills the
+   viewport. Both columns scroll internally; the document never scrolls.
+   On phones the sidebar collapses into an off-canvas drawer and a
+   slim mobile header appears with hamburger + logo. */
+
+.brand-logo {
+  height: 28px;
+  width: auto;
+  display: block;
+}
+/* Two logo images live in the DOM; CSS picks the one matching the
+   active theme so the runtime never has to swap <img> src. */
+.brand-logo-dark { display: none; }
+[data-theme="dark"] .brand-logo-light { display: none; }
+[data-theme="dark"] .brand-logo-dark { display: block; }
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] .brand-logo-light { display: none; }
+  [data-theme="auto"] .brand-logo-dark { display: block; }
+}
+
+/* Mobile-only header. Hidden on desktop; shown below 768px. Hamburger
+   on the left, centered logo. No account info — that lives in the
+   drawer's footer (alongside the logout button). */
+.mobile-header {
+  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: var(--topbar-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  padding: 0 0.75rem;
+}
+.mobile-menu-btn {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.mobile-menu-btn:hover { background: var(--surface-alt); }
+.mobile-logo {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  height: 100vh;
+}
+
+.sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  /* Flex column with three slots: logo (top, fixed) → nav (middle,
+     scroll) → footer (bottom, fixed). The sidebar itself doesn't
+     scroll; only .sidebar-nav does. */
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+.sidebar-logo {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--topbar-h);
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem 0.625rem;
+}
+.sidebar-top {
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-nav section + section { margin-top: 1.25rem; }
+.sidebar-nav h3 {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  margin: 0 0 0.375rem 0.625rem;
+  font-weight: 600;
+}
+.sidebar-nav ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.125rem; }
+
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.4rem 0.625rem;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.nav-item:hover {
+  background: var(--surface-alt);
+  text-decoration: none;
+}
+.nav-item .nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.nav-item .nav-label {
+  flex: 1;
+  min-width: 0;
+}
+.nav-item.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  font-weight: 500;
+}
+.nav-item.is-active .nav-icon { color: var(--accent-hover); }
+.nav-item.is-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.3rem;
+  bottom: 0.3rem;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+
+.sidebar-footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  padding: 0.625rem;
+}
+.sidebar-account {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.85rem;
+  text-decoration: none;
+  min-width: 0;
+}
+.sidebar-account:hover { background: var(--surface-alt); text-decoration: none; }
+.sidebar-account[aria-current="page"] { background: var(--accent-soft); color: var(--accent-hover); }
+.account-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+.account-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.account-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-role {
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-logout {
+  margin-top: 0.25rem;
+}
+.sidebar-logout button.link {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.4rem 0.625rem;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.sidebar-logout button.link .nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+.sidebar-logout button.link:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+.sidebar-logout button.link:hover .nav-icon { color: var(--text-muted); }
+
+.content {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow-y: auto;
+}
+.content-inner {
+  flex: 1;
+  padding: 1.5rem clamp(1rem, 2.5vw, 2rem);
+  max-width: var(--content-max);
+  width: 100%;
+}
+.content h1 {
+  font-size: 1.375rem;
+  margin: 0 0 1.5rem;
+  letter-spacing: -0.01em;
+}
+.content h2 { font-size: 1.05rem; margin: 1.5rem 0 0.75rem; }
+.content p.hint { color: var(--text-muted); font-size: 0.875rem; }
+
+.content-footer {
+  flex-shrink: 0;
+  padding: 0.875rem clamp(1rem, 2.5vw, 2rem);
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 0.8rem;
+}
+.content-footer .build-stamp {
+  margin-left: 0.5rem;
+  color: var(--text-faint);
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+/* === cards / tables ================================================= */
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.875rem;
+  margin: 0 0 1.5rem;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.875rem 1rem;
+}
+.card .label { color: var(--text-muted); font-size: 0.8rem; }
+.card .value { font-size: 1.5rem; font-weight: 600; margin-top: 0.25rem; }
+.card .sub { color: var(--text-faint); font-size: 0.8rem; margin-top: 0.25rem; }
+.card a.more { font-size: 0.8rem; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin: 0 0 1.25rem;
+  overflow: hidden;
+}
+.panel .panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-alt);
+}
+.panel .panel-head h2 { margin: 0; font-size: 0.95rem; }
+.panel .panel-body { padding: 0.875rem; }
+
+table.listing {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  font-size: 0.875rem;
+}
+table.listing th, table.listing td {
+  text-align: left;
+  padding: 0.5rem 0.625rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+table.listing thead th {
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+table.listing tbody tr:hover { background: var(--surface-alt); }
+table.listing td.body { max-width: 26rem; color: var(--text-muted); }
+table.listing td.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.listing td.actions { white-space: nowrap; }
+
+/* === shared inline icons ============================================ */
+
+.icon {
+  width: 1.05em;
+  height: 1.05em;
+  vertical-align: -0.15em;
+}
+/* Icon-only buttons (trash, etc.) — square hit target, no visible border
+   so they look like affordances rather than heavy secondary buttons. */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.btn-icon:hover { background: var(--surface-alt); color: var(--text); border-color: var(--border); }
+.btn-icon.danger { color: var(--danger); }
+.btn-icon.danger:hover { background: var(--danger-soft); border-color: var(--danger); }
+
+/* Column-width helpers — list tables all share these so the same
+   narrow metadata (ID / dates / actions) stays a predictable width and
+   the wide columns (title / body) get whatever's left. */
+.col-id { width: 3.5rem; white-space: nowrap; }
+.col-date { width: 9rem; white-space: nowrap; }
+.col-datetime { width: 11rem; white-space: nowrap; }
+.col-status { width: 6rem; white-space: nowrap; }
+.col-count { width: 5rem; white-space: nowrap; }
+.col-drag { width: 1.75rem; }
+.col-action { width: 3rem; white-space: nowrap; text-align: center; }
+/* col-actions = one cell carrying multiple action buttons inline, so
+   desktop stays compact and mobile card-reflow can group them with a
+   top divider without merging cells. */
+.col-actions { white-space: nowrap; text-align: right; }
+.col-actions > * + * { margin-left: 0.35rem; }
+.col-icon { width: 7rem; }
+.col-role { width: 7rem; white-space: nowrap; }
+
+/* MCP token list: name column shouldn't eat the whole row and push
+   the date / status / delete columns to single-character widths. */
+.mcp-token-list { table-layout: fixed; }
+.mcp-token-list th:nth-child(2),
+.mcp-token-list td:nth-child(2) { width: 14rem; }
+.mcp-token-list th:nth-child(3),
+.mcp-token-list td:nth-child(3) { width: auto; word-break: break-all; }
+
+.panel-subhead {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+/* User list: force a fixed layout so the flex columns share remaining
+   width evenly rather than letting long display names push siblings
+   into cramped single-line truncation. */
+table.listing.user-list { table-layout: fixed; }
+/* col-flex / col-flex-wide mark variable-width columns. They don't set
+   an explicit width — the browser distributes remaining space between
+   them after the fixed-width columns above. When content is long a
+   single-line overflow ellipsis kicks in. col-flex-wide still takes a
+   width hint so titles / bodies get more room than sibling flex cols. */
+.col-flex { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-flex-wide {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+/* Two-line clamp for body cells (comments). The clamp lives on a
+   nested <div>, not the <td> itself — otherwise display:-webkit-box
+   would disable the cell's vertical-align and break row alignment.
+   The enclosing <td> keeps col-flex-wide, and relaxes its
+   white-space:nowrap so the inner content can wrap before clamping. */
+table.listing td.cell-clamp-host {
+  white-space: normal;
+  max-width: 0; /* lets the clamp div pick up the cell's allotted width */
+}
+.cell-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  overflow: hidden;
+  white-space: normal;
+  word-break: break-word;
+  max-height: 3em;
+}
+.cell-clickable { cursor: pointer; color: var(--accent); }
+.cell-clickable:hover { background: var(--surface-alt); text-decoration: underline; }
+
+.badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+}
+.badge.published { background: var(--success-soft); color: var(--success); }
+.badge.draft { background: var(--warn-soft); color: var(--warn); }
+.badge.closed, .badge.hidden { background: var(--danger-soft); color: var(--danger); }
+.badge.approved { background: var(--success-soft); color: var(--success); }
+.badge.waiting { background: var(--warn-soft); color: var(--warn); }
+
+/* === forms specific ================================================= */
+
+.form-stack { display: grid; gap: 1rem; }
+/* Browser default [hidden] { display: none } loses the specificity
+   fight against .form-stack's display: grid, so anything tagged
+   `hidden` on a .form-stack container would stay visible without
+   this override. */
+.form-stack[hidden] { display: none; }
+
+/* field-stack: label-above-input layout. Used by forms that prefer
+   vertical stacking (category form) over the form-row sidebar-label
+   layout. field-head lets the row carry an inline counterweight like
+   a record count next to the label. */
+.field-stack { display: grid; gap: 0.35rem; }
+.field-stack > .label { padding: 0; }
+.field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+/* field-grid-3: three stacked fields side-by-side. Collapses to a
+   single column under 720px so mobile editors don't get shoulder-
+   squeezed. */
+.field-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .field-grid-3 { grid-template-columns: 1fr; }
+}
+.form-row {
+  display: grid;
+  grid-template-columns: 11rem 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+.form-row > .label { padding-top: 0.5rem; color: var(--text-muted); }
+.form-row .grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.625rem;
+}
+
+/* === date-format section (デザイン設定 > 設定 > 時刻表記設定) ======== */
+.date-format-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+.date-format-field input { width: 100%; }
+.date-format-preview {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  white-space: nowrap;
+}
+.form-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  margin-top: 1.5rem;
+}
+
+/* === alerts ========================================================= */
+
+.alert {
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  margin: 0 0 1rem;
+  border: 1px solid transparent;
+}
+.alert.error { background: var(--danger-soft); color: var(--danger); border-color: var(--danger); }
+.alert.success { background: var(--success-soft); color: var(--success); border-color: var(--success); }
+.alert.warning { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+
+/* Template-edit lint panel: per-body sections of unsupported / differs
+   findings, surfaced under the editor + asset table. The badge variant
+   leans on the existing .badge styling so dark-mode + colour tokens
+   come for free. */
+.badge.warning { background: var(--warn-soft); color: var(--warn); text-decoration: none; }
+/* When the body section has both the lint ⚠️ badge and the 利用中 /
+   approved badge, the panel-head's `justify-content: space-between`
+   would scatter the three children evenly (h2 — warn — approved).
+   Pull the warn badge to the right so it sits next to its sibling
+   instead of floating in the middle. The 0.4rem margin keeps the
+   two badges from butting against each other. */
+.panel-head .badge.warning { margin-left: auto; margin-right: 0.4rem; }
+.lint-section { margin-top: 0.75rem; }
+.lint-section h3 { margin: 0 0 0.5rem 0; font-size: 0.95rem; }
+.lint-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.4rem; }
+.lint-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 0.4rem 0.6rem;
+  align-items: baseline;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-sunken);
+}
+.lint-row.lint-unsupported { border-color: var(--danger); background: var(--danger-soft); }
+.lint-row.lint-differs { border-color: var(--warn); background: var(--warn-soft); }
+.lint-row code { background: transparent; }
+.lint-note { color: var(--text-muted); }
+.lint-lines { color: var(--text-muted); font-size: 0.85rem; white-space: nowrap; }
+
+/* === login ========================================================== */
+
+.login-wrap {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1rem;
+  background: var(--surface-sunken);
+}
+.login-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2rem;
+  width: min(24rem, 100%);
+  box-shadow: var(--shadow);
+}
+.login-card h1 { font-size: 1.25rem; margin: 0 0 1.25rem; text-align: center; }
+.login-card h1 img { width: auto; height: 2.5rem; }
+.login-card button { width: 100%; }
+
+/* Template edit: aesthetic breathing room between the form actions
+   and the asset panel that sits just below them. */
+.template-asset-panel { margin-top: 1.5rem; }
+
+/* === image upload =================================================== */
+
+.upload-form { gap: 0.5rem; }
+
+.drop-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 9rem;
+  padding: 1.5rem;
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 120ms, background 120ms, color 120ms;
+}
+.drop-zone:hover,
+.drop-zone.drag-over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+.drop-zone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  padding: 0;
+  border: none;
+  background: none;
+}
+.drop-zone { position: relative; }
+.drop-zone-text { pointer-events: none; font-size: 0.95rem; }
+.drop-zone-progress {
+  pointer-events: none;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.library-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.library-controls input[type="search"] {
+  width: 14rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+}
+.view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.view-toggle .view-btn {
+  padding: 0.25rem 0.625rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.95rem;
+  background: var(--surface);
+}
+.view-toggle .view-btn + .view-btn { border-left: 1px solid var(--border); }
+.view-toggle .view-btn:hover { background: var(--surface-alt); color: var(--text); }
+.view-toggle .view-btn.active { background: var(--accent-soft); color: var(--accent-hover); }
+
+.image-row-icon {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  display: block;
+  border-radius: var(--radius-sm);
+  cursor: zoom-in;
+}
+
+.pager {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 0 0;
+  font-size: 0.875rem;
+}
+.pager .pager-state { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.pager .disabled { color: var(--text-faint); pointer-events: none; }
+
+.image-gallery {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+.image-tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.image-tile figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.image-tile img {
+  display: block;
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  background: var(--surface-sunken);
+}
+.image-tile figcaption {
+  padding: 0.375rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+.image-tile .name {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.image-tile .dim { color: var(--text-faint); }
+.image-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface-alt);
+  font-size: 0.8rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* === code editor (Ace) ============================================== */
+/* The wrap replaces the hidden textarea; Ace renders its own DOM
+   inside. We give the wrap a border to match the rest of the form
+   inputs so the editor doesn't look stranded on the panel. */
+.ace-wrap {
+  border: 1px solid var(--border-strong);
+  border-top: none;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  overflow: hidden;
+}
+.ace-chrome:first-child .ace-wrap,
+.ace-chrome .ace-chrome-toolbar + .ace-wrap { border-top: 1px solid var(--border-strong); }
+.ace-wrap .ace_editor { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* === editor chrome (toolbar / search / resize / fullscreen) ========= */
+
+.ace-chrome {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-sm);
+  position: relative;
+}
+.ace-chrome .ace-wrap { border-radius: 0; border-top: none; }
+
+.ace-chrome-toolbar {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  padding: 0.25rem 0.375rem;
+  background: var(--surface-alt);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  border-bottom: 0;
+}
+.ace-chrome-toolbar .btn-icon {
+  font-size: 0.9rem;
+  padding: 0.1rem 0.35rem;
+  line-height: 1;
+}
+/* Flexible spacer so the fullscreen button at the end of the toolbar
+   is always pushed to the right edge — anything to the left of it
+   (search, AI buttons) stays flush-left. */
+.ace-chrome-spacer { flex: 1; }
+
+.ace-chrome-search {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  padding: 0.25rem 0.375rem;
+  background: var(--surface);
+  border-left: 1px solid var(--border-strong);
+  border-right: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border);
+}
+.ace-chrome-search[hidden] { display: none; }
+.ace-chrome-search-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.85rem;
+  padding: 0.15rem 0.4rem;
+}
+.ace-chrome-search-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  min-width: 2.5rem;
+  text-align: right;
+}
+
+.ace-chrome-resize {
+  height: 6px;
+  cursor: ns-resize;
+  background: var(--border);
+  border: 1px solid var(--border-strong);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  background-image: linear-gradient(to bottom, transparent 1px, var(--border-strong) 1px, var(--border-strong) 2px, transparent 2px,
+                                    transparent 3px, var(--border-strong) 3px, var(--border-strong) 4px, transparent 4px);
+  background-size: 100% 100%;
+}
+.ace-chrome-resize:hover { background-color: var(--surface-alt); }
+
+/* Fullscreen: fixed overlay, resize handle hidden since viewport
+   locks the bounds. Esc in the editor exits (see admin.js). */
+.ace-chrome--fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--surface);
+  padding: 0;
+  margin: 0;
+}
+.ace-chrome--fullscreen .ace-wrap { flex: 1; height: auto !important; }
+.ace-chrome--fullscreen .ace-chrome-resize { display: none; }
+
+/* SB template tag / block highlighting (data-code-editor=sbtemplate). */
+.ace_editor .ace_sb_tag { color: #b58900; font-weight: 600; } /* Solarized yellow */
+.ace_editor .ace_sb_block { color: #268bd2; font-weight: 600; } /* Solarized blue */
+
+/* Markdown headings — Ace's Solarized theme paints them the same
+   weight as body text, which reads flat. Keep font-size stable so
+   the monospace grid holds, but bold + accent-colour so the `#`
+   marker and title text read as headings. Ace tokens markdown H1-H6
+   as `markup.heading.<level>` → `.ace_markup.ace_heading`. */
+.ace_editor .ace_markup.ace_heading { color: #268bd2; font-weight: 700; }
+
+/* === entry form ====================================================== */
+
+.entry-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.entry-form-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.entry-form-title-label, .entry-form-body-label {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+.entry-form-updated {
+  font-size: 0.8rem;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.entry-form-head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+.entry-form-head-right .entry-form-sep {
+  color: var(--text-faint);
+}
+.entry-title-input {
+  font-size: 1.1rem;
+  padding: 0.625rem 0.75rem;
+}
+.entry-title-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+.entry-title-row .entry-title-input { flex: 1; }
+.entry-title-ai { align-self: stretch; padding: 0 0.75rem; }
+
+/* input-with-btn pairs an inline input and a small AI trigger so
+   the button hugs the input instead of wrapping below it. Used by
+   the keywords / tags suggest controls on the entry form;
+   reusable for any future "text input + one-shot ✨" UX. */
+.input-with-btn {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0.35rem;
+  width: 100%;
+}
+.input-with-btn > input { flex: 1; }
+.entry-form-subhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.entry-form-subhead-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* === rich description (profile / category edit forms) ================
+   Mirrors the entry form's subhead + picker layout: label on the left,
+   format select + "画像を挿入" button on the right, textarea below
+   that, then the hidden picker panel. */
+.rich-description {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.rich-description-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.rich-description-head .label {
+  margin-right: auto;
+  color: var(--text-muted);
+}
+.rich-description textarea {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.inline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.inline-field select { width: auto; }
+
+/* Radio-row in a form-row: align the baseline with the sibling label
+   (which has padding-top: 0.5rem) so the inline-field rows sit at the
+   same vertical position as single-line text inputs do. */
+.form-row > .radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  padding-top: 0.5rem;
+}
+
+/* MCP token scope picker — "label text then checkbox" rows that line
+   up vertically. The grid's first column sizes to the widest label so
+   the checkboxes in column 2 always sit at the same x offset. */
+.scope-options {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  column-gap: 0.75rem;
+  row-gap: 0.4rem;
+  align-items: center;
+  justify-content: start;
+  padding-top: 0.3rem;
+}
+.scope-options > .scope-text { color: var(--text); }
+.scope-options input[type="checkbox"] { margin: 0; }
+.scope-options input[type="checkbox"]:disabled { cursor: not-allowed; }
+
+/* OG background picker — a thumbnail preview and two link-style
+   buttons sit on one row; wraps cleanly on phones via the shared
+   flex-wrap in the mobile breakpoint. */
+.og-bg-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.og-bg-preview {
+  width: 160px;
+  height: auto;
+  max-height: 84px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+}
+
+.og-text-color-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.og-text-color-row input[type="color"] {
+  width: 3rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+.og-text-color-row input[type="color"]:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ============================================================
+   Help pages: two-column layout — local nav on the left, rendered
+   Markdown body on the right. Falls back to a single stack on
+   phones via the shared 720px breakpoint.
+   ============================================================ */
+.help-layout {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+.help-nav {
+  position: sticky;
+  top: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 0.5rem;
+  font-size: 0.875rem;
+}
+.help-nav-head {
+  margin: 0 0 0.5rem 0.5rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  font-weight: 600;
+}
+.help-nav ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.1rem; }
+.help-nav a {
+  display: block;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+}
+.help-nav a:hover { background: var(--surface-alt); text-decoration: none; }
+.help-nav a.active {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  font-weight: 500;
+}
+.help-nav li { display: flex; align-items: center; gap: 0.25rem; }
+.help-nav li > a { flex: 1; }
+.help-nav-fallback {
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--text-faint);
+  cursor: help;
+}
+.help-fallback-notice {
+  background: var(--surface-alt);
+  border-left: 3px solid var(--accent);
+  padding: 0.5rem 0.75rem;
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+/* Markdown body: tighten goldmark's default output so tables /
+   code / headings fit the surrounding admin chrome. The .markdown-
+   body class is attached server-side to the rendered block so the
+   selectors don't leak into other admin pages. */
+.markdown-body {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  line-height: 1.7;
+}
+.markdown-body h1 { font-size: 1.5rem; margin: 0 0 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; }
+.markdown-body h2 { font-size: 1.15rem; margin: 1.8rem 0 0.75rem; }
+.markdown-body h3 { font-size: 1rem; margin: 1.4rem 0 0.5rem; color: var(--text-muted); }
+.markdown-body p { margin: 0.5rem 0 0.9rem; }
+.markdown-body ul, .markdown-body ol { padding-left: 1.5rem; margin: 0.25rem 0 0.9rem; }
+.markdown-body li { margin: 0.15rem 0; }
+.markdown-body code {
+  background: var(--surface-alt);
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.2rem;
+  font-size: 0.87em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.markdown-body pre {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.9rem;
+  overflow-x: auto;
+  margin: 0.25rem 0 1rem;
+}
+.markdown-body pre code { background: transparent; padding: 0; }
+.markdown-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5rem 0 1rem;
+  font-size: 0.9rem;
+}
+.markdown-body th, .markdown-body td {
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+}
+.markdown-body th { background: var(--surface-alt); font-weight: 500; }
+.markdown-body blockquote {
+  margin: 0.5rem 0 0.9rem;
+  padding: 0.25rem 0.9rem;
+  border-left: 3px solid var(--border);
+  color: var(--text-muted);
+}
+.markdown-body a { color: var(--accent); }
+.markdown-body a:hover { color: var(--accent-hover); }
+
+@media (max-width: 720px) {
+  .help-layout { grid-template-columns: 1fr; }
+  .help-nav { position: static; }
+  .markdown-body { padding: 1rem; }
+}
+
+/* Link-list group rows: folder icon sits inline with the name and
+   shares the colour / weight so it reads as a single object rather
+   than a decoration. */
+.link-group-name { display: inline-flex; align-items: center; gap: 0.35rem; }
+.link-group-name .icon { opacity: 0.8; }
+
+/* Group-edit page: breathing room between the save/back row and the
+   "このグループのリンク" panel that follows. Without this the two
+   crash together visually even though technically separated by the
+   form-actions border. */
+.link-form { margin-bottom: 2rem; }
+.panel.link-members { margin-top: 0.5rem; }
+
+.entry-form-more {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+}
+.entry-form-more > summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  padding: 0.25rem 0;
+  user-select: none;
+}
+.entry-form-more[open] > summary { margin-bottom: 0.5rem; }
+.entry-form-more textarea {
+  display: block;
+  width: 100%;
+}
+
+.entry-form-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+@media (max-width: 600px) {
+  .entry-form-options { grid-template-columns: 1fr; }
+}
+
+.image-picker-filter {
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+}
+
+/* editor: "画像を挿入" panel that opens above the body textarea */
+.image-picker {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-top: 0.5rem;
+  max-height: 20rem;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+.image-picker[hidden] { display: none; }
+.image-picker .image-gallery { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+.image-picker img { height: 96px; cursor: pointer; }
+
+/* === tab bar (design settings etc.) ================================= */
+
+.tabbar {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  margin: 0 0 1.25rem;
+}
+.tabbar a {
+  padding: 0.5rem 0.875rem;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: -1px;
+  background: transparent;
+}
+.tabbar a:hover { background: var(--surface-alt); text-decoration: none; color: var(--text); }
+.tabbar a.active {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+  font-weight: 500;
+}
+
+/* === sortable list (drag-and-drop reorder) ========================== */
+
+table.sortable tbody tr { cursor: default; }
+table.sortable .drag-handle {
+  width: 1.75rem;
+  cursor: grab;
+  color: var(--text-faint);
+  user-select: none;
+  text-align: center;
+  font-size: 1rem;
+  padding-left: 0.5rem;
+}
+table.sortable .drag-handle:hover { color: var(--text-muted); }
+table.sortable tbody tr.dragging {
+  opacity: 0.4;
+}
+table.sortable tbody tr.drop-above td {
+  box-shadow: inset 0 2px 0 0 var(--accent);
+}
+table.sortable tbody tr.drop-below td {
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+}
+.reorder-status {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0.5rem 0 0;
+}
+.reorder-status.success { color: var(--success); }
+.reorder-status.error { color: var(--danger); }
+
+/* === toast ========================================================== */
+/* Little top-center notification for non-blocking confirmations like
+   "saved" or "copied to clipboard". Sits just below the sticky topbar
+   so it's in the operator's line of sight — save often triggers a
+   page reload that pulls the eye upward anyway. Fades in via
+   transform + opacity so a sequence of rapid clicks doesn't stack
+   jarringly. */
+.toast {
+  position: fixed;
+  left: 50%;
+  top: 1rem;
+  transform: translate(-50%, -0.5rem);
+  background: var(--text);
+  color: var(--surface);
+  padding: 0.5rem 0.875rem;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 50;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+.toast.visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+/* Error variant: tinted background + a firm left stripe so the
+   operator can tell at a glance that the save didn't go through.
+   Uses the shared --danger tokens so it tracks light/dark themes
+   without bespoke colours. */
+.toast.error {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-left: 3px solid var(--danger);
+}
+
+/* === modal ========================================================== */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  padding: 1rem;
+}
+.modal-overlay[hidden] { display: none; }
+.modal {
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  max-width: min(48rem, 100%);
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+/* `variant: 'wide'` gives the export modal more room — memo textareas
+   + name field read cramped at 48rem when paired together. */
+.modal.modal-wide { max-width: min(64rem, 100%); width: 100%; }
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.modal-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  flex: 1;
+}
+.modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-sm);
+}
+.modal-close:hover { background: var(--surface-alt); color: var(--text); }
+.modal-body {
+  padding: 1rem;
+  overflow: auto;
+}
+.modal-foot {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border);
+}
+/* Image preview variant — fit the image within the viewport without
+   letting it stretch beyond the modal's own size. */
+.modal.modal-image .modal-body {
+  padding: 0;
+  background: var(--surface-sunken);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal.modal-image .modal-body img {
+  display: block;
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+}
+
+/* Plain two-column definition list used in content modals (comment
+   details, template info) so labels and values align cleanly. */
+dl.kv {
+  display: grid;
+  grid-template-columns: 6rem 1fr;
+  gap: 0.5rem 1rem;
+  margin: 0;
+}
+dl.kv dt { color: var(--text-muted); font-size: 0.875rem; }
+dl.kv dd { margin: 0; word-break: break-word; white-space: pre-wrap; }
+
+/* === responsive (drawer) ============================================ */
+
+@media (max-width: 768px) {
+  .mobile-header { display: flex; }
+  .layout {
+    grid-template-columns: 1fr;
+    height: calc(100vh - var(--topbar-h));
+  }
+  .sidebar {
+    position: fixed;
+    top: var(--topbar-h);
+    left: 0;
+    width: var(--sidebar-w);
+    height: calc(100vh - var(--topbar-h));
+    transform: translateX(-100%);
+    transition: transform 180ms ease;
+    z-index: 15;
+    box-shadow: var(--shadow);
+  }
+  /* The drawer carries the same DOM as the desktop sidebar — but the
+     mobile header already shows the logo, so hide the in-drawer logo
+     to avoid duplication. */
+  .sidebar .sidebar-logo { display: none; }
+  body.nav-open .sidebar { transform: translateX(0); }
+  body.nav-open::after {
+    content: "";
+    position: fixed;
+    inset: var(--topbar-h) 0 0 var(--sidebar-w);
+    background: rgba(15, 23, 42, 0.3);
+    z-index: 14;
+  }
+  .content {
+    height: calc(100vh - var(--topbar-h));
+  }
+  .form-row { grid-template-columns: 1fr; }
+  .form-row > .label { padding-top: 0; }
+}
+
+/* Phone-class viewports: mobile polish (touch targets, horizontal-
+   scrollable tables, Ace toolbar breathing room). Lives in a single
+   720px breakpoint rather than two (720 / 600) so the interaction
+   fixes activate together. */
+@media (max-width: 720px) {
+  /* Trim outer chrome so more of the viewport is content. */
+  .content { padding: 1rem; }
+  .content h1 { font-size: 1.15rem; }
+  .card .value { font-size: 1.25rem; }
+
+  /* Mobile header is fixed-height and the toast is screen-fixed, so
+     drop the toast below the header to keep it visible. */
+  .toast { top: calc(var(--topbar-h) + 0.75rem); }
+  .content-inner { padding: 1rem; }
+
+  /* Tables: card reflow for wide tables, column hide for narrow
+     ones. Horizontal scroll remains the last-resort fallback
+     (.panel-body overflow-x: auto) for anything that's still too wide
+     after the per-column rules fire (e.g. analytics daily grid). */
+  .panel-body { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .listing { font-size: 0.9rem; }
+
+  /* --- Card reflow ----------------------------------------------------
+     `.listing-cards` tables drop their tabular shape on phones: each
+     <tr> becomes a bordered card, <thead> hides, and each <td> stacks
+     with its column label (attr data-label) rendered above. Cells
+     with data-label="" (or missing) render unlabeled — use that for
+     the primary identifier and action buttons. */
+  .listing-cards { display: block; border: none; font-size: 0.95rem; }
+  .listing-cards thead { display: none; }
+  .listing-cards tbody { display: block; }
+  .listing-cards tr {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 0.875rem;
+    margin-bottom: 0.6rem;
+    background: var(--surface);
+  }
+  .listing-cards tr:hover { background: var(--surface); }
+  .listing-cards td {
+    display: block;
+    padding: 0.25rem 0;
+    border: none;
+    width: auto !important;
+    min-width: 0 !important;
+    text-align: left !important;
+    white-space: normal;
+  }
+  .listing-cards td[data-label]:not([data-label=""])::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 0.15rem;
+  }
+  .listing-cards td.col-primary { font-size: 1rem; font-weight: 500; margin-bottom: 0.25rem; }
+  .listing-cards td.col-drag { display: none; }
+  /* Action buttons group on their own row, pushed apart from the meta
+     fields by a subtle rule so the card reads as meta → divider → actions. */
+  .listing-cards td.col-actions {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  /* --- Column hide ----------------------------------------------------
+     `.col-hide-mobile` drops a cell (both <th> and <td>) on phones.
+     Used for secondary metadata that doesn't earn its row on a narrow
+     viewport — id columns, sort-order, timestamps the primary row
+     label already implies. */
+  .col-hide-mobile { display: none !important; }
+
+  /* Touch-target baseline: 44×44 (iOS HIG) / 48dp (Material). The
+     2rem desktop size is too tight for a fingertip; bumping here so
+     the destructive / info / copy / preview actions aren't a
+     finger-roulette. */
+  .btn-icon { width: 2.75rem; height: 2.75rem; }
+  .col-action { width: auto; min-width: 3rem; }
+
+  /* Ace editor chrome — give the toolbar / search row real breathing
+     room so the icons sit at touch-target size. */
+  .ace-chrome-toolbar { padding: 0.35rem 0.5rem; gap: 0.35rem; }
+  .ace-chrome-search { padding: 0.35rem 0.5rem; gap: 0.4rem; }
+  .ace-chrome-toolbar .btn-icon,
+  .ace-chrome-search .btn-icon { width: 2.5rem; height: 2.5rem; }
+  .ace-chrome-search-input { font-size: 16px; } /* stops iOS focus zoom */
+
+  /* iOS zooms the viewport in when a form field's computed font-size
+     is under 16px — the UI is technically still usable but every tap
+     on an input jumps the layout. Raising the minimum across the
+     common form controls is a cheap one-liner that dramatically
+     improves the feel on iPhone. */
+  input, select, textarea { font-size: 16px; }
+
+  /* Tabbar: wrap multi-tab rows instead of forcing horizontal overflow,
+     and tighten the padding so three tabs fit on a 375px viewport. */
+  .tabbar { flex-wrap: wrap; gap: 0.25rem; }
+  .tabbar a { padding: 0.5rem 0.75rem; }
+
+  /* Entry form header: when Preview + View-public + updated-timestamp
+     don't fit on one line, wrap to the next row cleanly. */
+  .entry-form-head { flex-wrap: wrap; gap: 0.5rem; }
+  .entry-form-head-right { flex-wrap: wrap; gap: 0.4rem 0.6rem; }
+
+  /* Form-actions row (save / cancel / preview buttons) — let them
+     wrap to two rows rather than overflow the right edge. */
+  .form-actions { flex-wrap: wrap; gap: 0.5rem; }
+}

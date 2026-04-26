@@ -1,0 +1,123 @@
+{{define "content"}}
+<h1>{{T "templates.title"}}</h1>
+
+<nav class="tabbar">
+  <a href="/admin/templates">{{T "templates.tab.list"}}</a>
+  <a href="/admin/templates/settings" class="active">{{T "templates.tab.settings"}}</a>
+  <a href="/admin/templates/import">{{T "templates.tab.import"}}</a>
+  <a href="/admin/templates/og">{{T "templates.tab.og"}}</a>
+</nav>
+
+{{if eq .Flash "saved"}}<p class="alert success">{{T "flash.saved"}}</p>{{end}}
+{{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
+
+<form method="post" action="/admin/templates/settings" class="form-stack" data-unsaved-warn>
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+  <div class="panel">
+    <div class="panel-head"><h2>{{T "templates.settings.panelHeading"}}</h2></div>
+    <div class="panel-body form-stack">
+      <div class="form-row">
+        <div class="label">{{T "templates.settings.archive"}}</div>
+        <div>
+          <select name="archive_template_id">
+            <option value="0"{{if eq .Weblog.ArchiveTemplateID 0}} selected{{end}}>{{T "templates.settings.activeOption"}}</option>
+            {{range .Templates}}<option value="{{.ID}}"{{if eq $.Weblog.ArchiveTemplateID .ID}} selected{{end}}>{{.Name}}{{if .IsActive}} ★{{end}}</option>{{end}}
+          </select>
+          <p class="hint">{{T "templates.settings.archiveHint"}}</p>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "templates.settings.profile"}}</div>
+        <div>
+          <select name="profile_template_id">
+            <option value="0"{{if eq .Weblog.ProfileTemplateID 0}} selected{{end}}>{{T "templates.settings.activeOption"}}</option>
+            {{range .Templates}}<option value="{{.ID}}"{{if eq $.Weblog.ProfileTemplateID .ID}} selected{{end}}>{{.Name}}{{if .IsActive}} ★{{end}}</option>{{end}}
+          </select>
+          <p class="hint">{{T "templates.settings.profileHint"}}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" data-date-format-section data-lang="{{.Weblog.Lang}}">
+    <div class="panel-head"><h2>{{T "templates.settings.dateHeading"}}</h2></div>
+    <div class="panel-body form-stack">
+      <p class="hint">{{THTML "templates.settings.dateHint"}}</p>
+      <div class="form-row">
+        <div class="label">{{T "templates.settings.date.entry"}}</div>
+        <div class="date-format-field">
+          <input type="text" name="date_format_entry" value="{{.Weblog.DateFormatEntry}}" placeholder="{{.DateFormatDefaults.Entry}}" data-date-format-input>
+          <span class="hint date-format-preview" data-date-format-preview>{{.DateFormatPreview.Entry}}</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "templates.settings.date.entryTime"}}</div>
+        <div class="date-format-field">
+          <input type="text" name="time_format_entry" value="{{.Weblog.TimeFormatEntry}}" placeholder="{{.DateFormatDefaults.Time}}" data-date-format-input>
+          <span class="hint date-format-preview" data-date-format-preview>{{.DateFormatPreview.Time}}</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "templates.settings.date.comment"}}</div>
+        <div class="date-format-field">
+          <input type="text" name="date_format_comment" value="{{.Weblog.DateFormatComment}}" placeholder="{{.DateFormatDefaults.Comment}}" data-date-format-input>
+          <span class="hint date-format-preview" data-date-format-preview>{{.DateFormatPreview.Comment}}</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "templates.settings.date.list"}}</div>
+        <div class="date-format-field">
+          <input type="text" name="date_format_list" value="{{.Weblog.DateFormatList}}" placeholder="{{.DateFormatDefaults.List}}" data-date-format-input>
+          <span class="hint date-format-preview" data-date-format-preview>{{.DateFormatPreview.List}}</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "templates.settings.date.archive"}}</div>
+        <div class="date-format-field">
+          <input type="text" name="date_format_archive" value="{{.Weblog.DateFormatArchive}}" placeholder="{{.DateFormatDefaults.Archive}}" data-date-format-input>
+          <span class="hint date-format-preview" data-date-format-preview>{{.DateFormatPreview.Archive}}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>{{T "templates.settings.displayHeading"}}</h2></div>
+    <div class="panel-body form-stack">
+      <div class="form-row">
+        <div class="label">{{T "templates.settings.display.perPage"}}</div>
+        <div>
+          <input type="number" name="entries_per_page" value="{{if .Weblog.EntriesPerPage}}{{.Weblog.EntriesPerPage}}{{else}}10{{end}}" min="1" max="100">
+          <p class="hint">{{T "templates.settings.display.perPageHint"}}</p>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "templates.settings.display.entrySort"}}</div>
+        <div>
+          <select name="entry_sort_order">
+            <option value="desc"{{if ne .Weblog.EntrySortOrder "asc"}} selected{{end}}>{{T "templates.settings.display.entryDesc"}}</option>
+            <option value="asc"{{if eq .Weblog.EntrySortOrder "asc"}} selected{{end}}>{{T "templates.settings.display.entryAsc"}}</option>
+          </select>
+          <p class="hint">{{T "templates.settings.display.entrySortHint"}}</p>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "templates.settings.display.commentSort"}}</div>
+        <div>
+          <select name="comment_sort_order">
+            <option value="asc"{{if ne .Weblog.CommentSortOrder "desc"}} selected{{end}}>{{T "templates.settings.display.commentAsc"}}</option>
+            <option value="desc"{{if eq .Weblog.CommentSortOrder "desc"}} selected{{end}}>{{T "templates.settings.display.commentDesc"}}</option>
+          </select>
+          <p class="hint">{{T "templates.settings.display.commentSortHint"}}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <a href="/admin/templates">{{T "action.back"}}</a>
+    <button type="submit" class="primary">{{T "action.save"}}</button>
+  </div>
+</form>
+{{end}}

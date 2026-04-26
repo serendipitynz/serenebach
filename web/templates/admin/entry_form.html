@@ -1,0 +1,123 @@
+{{define "content"}}
+{{/* Map the stored format value (html / markdown / sbtext) to an Ace
+     mode so the editor starts with the right syntax highlighting. The
+     same mapping runs in admin.js when the user changes the format
+     select — kept in sync by hand (3 values). */}}
+{{- $aceMode := "html" -}}
+{{- if eq .CurrentFormat "markdown" -}}{{- $aceMode = "markdown" -}}{{- end -}}
+{{- if eq .CurrentFormat "sbtext" -}}{{- $aceMode = "text" -}}{{- end -}}
+
+{{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
+{{if eq .Flash "saved"}}<p class="alert success">{{T "flash.saved"}}</p>{{end}}
+
+<form method="post" action="{{.Action}}" class="entry-form" data-entry-form data-unsaved-warn>
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+  <div class="entry-form-head">
+    <label class="entry-form-title-label" for="entry-title">{{T "entries.form.titleLabel"}}</label>
+    <div class="entry-form-head-right">
+      {{if and .Entry.ID (not .Entry.UpdatedAt.IsZero)}}
+      <span class="entry-form-updated" aria-label="{{T `entries.form.lastUpdated`}}">{{Tf "entries.form.updatedAt" (fmtDate .Entry.UpdatedAt)}}</span>
+      {{end}}
+      {{if .Entry.ID}}
+      <span class="entry-form-sep" aria-hidden="true">|</span>
+      <a href="/entry/{{if .Entry.Slug}}{{.Entry.Slug}}{{else}}{{.Entry.ID}}{{end}}/?__sb_preview=1" target="_blank" rel="noopener">{{T "entries.form.preview"}}</a>
+      <span class="entry-form-sep" aria-hidden="true">|</span>
+      <a href="/entry/{{if .Entry.Slug}}{{.Entry.Slug}}{{else}}{{.Entry.ID}}{{end}}/" target="_blank" rel="noopener">{{T "entries.form.viewPublic"}}</a>
+      {{end}}
+    </div>
+  </div>
+  <div class="entry-title-row">
+    <input id="entry-title" type="text" name="title" value="{{.Entry.Title}}" class="entry-title-input" autofocus>
+    {{if aiEnabled .User}}<button type="button" class="btn-icon entry-title-ai" data-ai-suggest="title" title="{{T `js.ai.suggestTitle`}}" aria-label="{{T `js.ai.suggestTitle`}}">✨</button>{{end}}
+  </div>
+
+  <div class="entry-form-subhead">
+    <label for="entry-body" class="entry-form-body-label">{{T "entries.form.bodyLabel"}}</label>
+    <div class="entry-form-subhead-right">
+      <label class="inline-field">{{T "entries.form.formatLabel"}}
+        <select name="format" data-code-editor-format>
+          {{range .Formats}}<option value="{{.Value}}"{{if eq $.CurrentFormat .Value}} selected{{end}} title="{{.Hint}}">{{.Label}}</option>{{end}}
+        </select>
+      </label>
+      <button type="button" class="link" data-image-picker-open>{{T "entries.form.insertImage"}}</button>
+    </div>
+  </div>
+  <textarea id="entry-body" name="body" rows="14" spellcheck="false"
+            data-code-editor="{{$aceMode}}" data-code-editor-dynamic data-image-target>{{.Entry.Body}}</textarea>
+  <div class="image-picker" hidden data-image-picker>
+    <input type="search" class="image-picker-filter" placeholder="{{T `entries.form.imgFilter`}}" data-image-picker-filter aria-label="{{T `entries.form.imgFilterAria`}}">
+    <div data-image-picker-body></div>
+  </div>
+
+  <details class="entry-form-more" {{if .Entry.More}}open{{end}}>
+    <summary>{{T "entries.form.more"}}</summary>
+    <textarea name="more" rows="6" spellcheck="false"
+              data-code-editor="{{$aceMode}}" data-code-editor-dynamic data-image-target>{{.Entry.More}}</textarea>
+  </details>
+
+  <div class="entry-form-options">
+    <label>{{T "entries.form.category"}}
+      <select name="category_id">
+        <option value="-1"{{if eq .Entry.CategoryID -1}} selected{{end}}>{{T "entries.form.category.uncategorized"}}</option>
+        {{range .Categories}}<option value="{{.ID}}"{{if eq $.Entry.CategoryID .ID}} selected{{end}}>{{.Name}}</option>{{end}}
+      </select>
+    </label>
+    <label>{{T "entries.form.status"}}
+      <select name="status" data-entry-status>
+        <option value="0"{{if eq .StatusInt 0}} selected{{end}}>{{T "status.draft"}}</option>
+        <option value="1"{{if eq .StatusInt 1}} selected{{end}}>{{T "status.published"}}</option>
+        <option value="-1"{{if eq .StatusInt -1}} selected{{end}}>{{T "status.closed"}}</option>
+      </select>
+    </label>
+    <label>{{T "entries.form.postedAt"}}
+      <input type="datetime-local" name="posted_at" value="{{.PostedAtLocal}}">
+    </label>
+    <label>{{T "entries.form.slug"}}
+      <input type="text" name="slug" value="{{.Entry.Slug}}" placeholder="{{T `entries.form.slugOptional`}}" pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="100">
+    </label>
+    <label>{{T "entries.form.keywords"}}
+      {{if aiEnabled .User}}
+      <span class="input-with-btn">
+        <input type="text" name="keywords" value="{{.Entry.Keywords}}" placeholder="{{T `entries.form.keywordsOptional`}}" maxlength="200">
+        <button type="button" class="btn-icon" data-ai-suggest="keywords" title="{{T `js.ai.suggestKeywords`}}" aria-label="{{T `js.ai.suggestKeywords`}}">✨</button>
+      </span>
+      {{else}}
+      <input type="text" name="keywords" value="{{.Entry.Keywords}}" placeholder="{{T `entries.form.keywordsOptional`}}" maxlength="200">
+      {{end}}
+    </label>
+    <label>{{T "entries.form.tags"}}
+      {{if aiEnabled .User}}
+      <span class="input-with-btn">
+        <input type="text" name="tags" value="{{.TagsCSV}}" placeholder="{{T `entries.form.tagsOptional`}}" maxlength="500">
+        <button type="button" class="btn-icon" data-ai-suggest="tags" title="{{T `js.ai.suggestTags`}}" aria-label="{{T `js.ai.suggestTags`}}">✨</button>
+      </span>
+      {{else}}
+      <input type="text" name="tags" value="{{.TagsCSV}}" placeholder="{{T `entries.form.tagsOptional`}}" maxlength="500">
+      {{end}}
+    </label>
+  </div>
+
+
+  <div class="form-row" data-og-bg-field>
+    <div class="label">{{T "entries.form.ogBg"}}</div>
+    <div>
+      <input type="hidden" name="og_bg_image_path" value="{{.Entry.OGBGImagePath}}" data-og-bg-input>
+      <div class="og-bg-row">
+        <img class="og-bg-preview" data-og-bg-preview
+             {{if .Entry.OGBGImagePath}}src="/img/{{.Entry.OGBGImagePath}}"{{else}}hidden{{end}}
+             alt="">
+        <button type="button" class="link" data-og-bg-picker>{{T "entries.form.ogBg.pick"}}</button>
+        <button type="button" class="link" data-og-bg-clear>{{T "entries.form.ogBg.clear"}}</button>
+      </div>
+      <p class="hint">{{T "entries.form.ogBgHint"}}</p>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <a href="/admin/entries">{{T "action.back"}}</a>
+    <button type="submit" data-save-mode="draft">{{T "entries.form.saveDraft"}}</button>
+    <button type="submit" class="primary" data-save-mode="dynamic">{{T "entries.form.savePublish"}}</button>
+  </div>
+</form>
+{{end}}

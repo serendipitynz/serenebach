@@ -1,0 +1,41 @@
+{{define "content"}}
+<h1>{{T "rebuild.title"}}</h1>
+
+<div class="cards">
+  <div class="card">
+    <div class="label">{{T "rebuild.outDir"}}</div>
+    <div class="value" style="font-size:1rem;font-family:ui-monospace,monospace">{{.OutDir}}</div>
+  </div>
+  <div class="card">
+    <div class="label">{{T "rebuild.lastRun"}}</div>
+    <div class="value" style="font-size:1rem">{{humanTime .LastBuiltAt}}</div>
+  </div>
+</div>
+
+{{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
+
+{{if .Report}}
+<div class="panel">
+  <div class="panel-head"><h2>{{T "rebuild.reportHeading"}}</h2></div>
+  <div class="panel-body">
+    <table class="listing">
+      <tr><th>home</th><td>{{if .Report.Home}}✓{{else}}—{{end}}</td></tr>
+      <tr><th>{{T "rebuild.report.entries"}}</th><td class="num">{{.Report.Entries}}</td></tr>
+      <tr><th>{{T "rebuild.report.categories"}}</th><td class="num">{{.Report.Categories}}</td></tr>
+      <tr><th>{{T "rebuild.report.archiveYear"}}</th><td class="num">{{.Report.ArchiveYear}}</td></tr>
+      <tr><th>{{T "rebuild.report.archiveMonth"}}</th><td class="num">{{.Report.ArchiveMonth}}</td></tr>
+      <tr><th>{{T "rebuild.report.css"}}</th><td>{{if .Report.CSSWritten}}✓{{else}}—{{end}}</td></tr>
+    </table>
+  </div>
+</div>
+{{end}}
+
+<form method="post" action="/admin/rebuild">
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+  <button type="submit" class="primary"{{if .Running}} disabled{{end}}>
+    {{if .Running}}{{T "rebuild.running.button"}}{{else}}{{T "rebuild.trigger.button"}}{{end}}
+  </button>
+</form>
+
+<p class="hint" style="margin-top:1rem">{{THTMLf "rebuild.trailingHint" .OutDir}}</p>
+{{end}}

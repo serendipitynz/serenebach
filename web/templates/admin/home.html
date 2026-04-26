@@ -1,0 +1,58 @@
+{{define "content"}}
+<h1>{{T "home.title"}}</h1>
+
+<p>{{Tf "home.welcome" .DisplayName}}</p>
+
+<div class="cards">
+  <div class="card">
+    <div class="label">{{T "home.card.published"}}</div>
+    <div class="value">{{.Stats.PublishedEntries}}</div>
+    <div class="sub">{{Tf "home.card.drafts" .Stats.DraftEntries}}</div>
+    <a class="more" href="/admin/entries">{{T "home.card.entriesLink"}}</a>
+  </div>
+  <div class="card">
+    <div class="label">{{T "home.card.waiting"}}</div>
+    <div class="value">{{.Stats.WaitingComments}}</div>
+    <div class="sub">{{Tf "home.card.approved" .Stats.ApprovedComments}}</div>
+    <a class="more" href="/admin/comments?status=waiting">{{T "home.card.commentsLink"}}</a>
+  </div>
+  <div class="card">
+    <div class="label">{{T "home.card.pv"}}</div>
+    <div class="value">{{.Stats.RecentPV}}</div>
+    <div class="sub">{{Tf "home.card.unique" .Stats.RecentUniques}}</div>
+    <a class="more" href="/admin/analytics?days=7">{{T "home.card.analyticsLink"}}</a>
+  </div>
+  <div class="card">
+    <div class="label">{{T "home.card.lastBuild"}}</div>
+    <div class="value">{{if .Stats.LastBuildLabel}}{{.Stats.LastBuildLabel}}{{else}}—{{end}}</div>
+    <div class="sub">&nbsp;</div>
+    <a class="more" href="/admin/rebuild">{{T "home.card.rebuildLink"}}</a>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <h2>{{T "home.recent.heading"}}</h2>
+    <a href="/admin/entries/new" class="more">{{T "nav.entries.new"}} →</a>
+  </div>
+  <div class="panel-body">
+    {{if .RecentEntries}}
+    <table class="listing">
+      <thead><tr><th>{{T "home.recent.col.title"}}</th><th>{{T "home.recent.col.status"}}</th><th>{{T "home.recent.col.posted"}}</th><th></th></tr></thead>
+      <tbody>
+      {{range .RecentEntries}}
+        <tr>
+          <td><a href="/admin/entries/{{.ID}}/edit">{{if .Title}}{{.Title}}{{else}}{{T "home.recent.noTitle"}}{{end}}</a></td>
+          <td><span class="badge {{statusClass .Status}}">{{statusLabel .Status}}</span></td>
+          <td>{{fmtDate .PostedAt}}</td>
+          <td class="actions"><a href="/entry/{{.ID}}/" target="_blank" rel="noopener">{{T "home.recent.viewPublic"}}</a></td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+      <p class="hint">{{THTML "home.recent.empty"}}</p>
+    {{end}}
+  </div>
+</div>
+{{end}}

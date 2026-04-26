@@ -1,0 +1,70 @@
+{{define "content"}}
+<h1>{{T "templates.title"}}</h1>
+
+<nav class="tabbar">
+  <a href="/admin/templates" class="active">{{T "templates.tab.list"}}</a>
+  <a href="/admin/templates/settings">{{T "templates.tab.settings"}}</a>
+  <a href="/admin/templates/import">{{T "templates.tab.import"}}</a>
+  <a href="/admin/templates/og">{{T "templates.tab.og"}}</a>
+</nav>
+
+{{if eq .FlashSuccess "activated"}}<p class="alert success">{{T "templates.flash.activated"}}</p>{{end}}
+{{if eq .FlashSuccess "deleted"}}<p class="alert success">{{T "templates.flash.deleted"}}</p>{{end}}
+{{if eq .FlashError "active-template-cannot-delete"}}<p class="alert error">{{T "templates.flash.activeCannotDelete"}}</p>{{end}}
+
+<div class="panel">
+  <div class="panel-head">
+    <h2>{{Tf "templates.heading" (len .Templates)}}</h2>
+  </div>
+  <div class="panel-body">
+    {{if .Templates}}
+    <table class="listing sortable" data-template-sortable data-csrf="{{.CSRFToken}}">
+      <thead><tr>
+        <th class="col-drag col-hide-mobile"></th>
+        <th class="col-id col-hide-mobile">{{T "common.col.id"}}</th>
+        <th class="col-datetime col-hide-mobile">{{T "templates.col.updated"}}</th>
+        <th class="col-flex-wide">{{T "templates.col.name"}}</th>
+        <th class="col-status">{{T "templates.col.usage"}}</th>
+        <th class="col-actions">{{T "common.col.action"}}</th>
+      </tr></thead>
+      <tbody>
+      {{range .Templates}}
+        <tr data-template-id="{{.ID}}" draggable="true">
+          <td class="drag-handle col-drag col-hide-mobile" title="{{T `common.dragToReorder`}}" aria-label="{{T `common.dragToReorder`}}">≡</td>
+          <td class="num col-id col-hide-mobile">{{.ID}}</td>
+          <td class="col-datetime col-hide-mobile">{{fmtDate .UpdatedAt}}</td>
+          <td class="col-flex-wide"><a href="/admin/templates/{{.ID}}/edit">{{.Name}}</a></td>
+          <td class="col-status">{{if .IsActive}}<span class="badge approved">{{T "templates.label.inUse"}}</span>{{else}}
+            <form method="post" action="/admin/templates/{{.ID}}/activate" class="inline">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <button type="submit" class="link">{{T "templates.action.use"}}</button>
+            </form>
+          {{end}}</td>
+          <td class="col-actions">
+            <a href="/?__sb_template={{.ID}}" target="_blank" rel="noopener" class="btn-icon"
+               aria-label="{{T `action.preview`}}" title="{{T `action.preview`}}">{{iconEye}}</a>
+            <button type="button" class="btn-icon" data-template-info
+                    data-meta-name="{{.Meta.Name}}"
+                    data-meta-author="{{.Meta.Author}}"
+                    data-meta-address="{{.Meta.Address}}"
+                    data-meta-version="{{.Meta.Version}}"
+                    data-meta-memo="{{.Meta.Memo}}"
+                    aria-label="{{T `templates.action.infoTitle`}}" title="{{T `templates.col.info`}}">{{iconInfo}}</button>
+            {{if not .IsActive}}
+            <form method="post" action="/admin/templates/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `templates.delete.confirm`}}')">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{T `action.delete`}}">{{iconTrash}}</button>
+            </form>
+            {{end}}
+          </td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    <p class="reorder-status" data-reorder-status hidden></p>
+    {{else}}
+      <p class="hint">{{T "templates.list.empty"}}</p>
+    {{end}}
+  </div>
+</div>
+{{end}}

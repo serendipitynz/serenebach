@@ -1,0 +1,185 @@
+{{define "layout"}}<!doctype html>
+<html lang="{{Locale}}" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} | {{T "app.name"}}</title>
+<link rel="icon" type="image/png" href="/admin/static/favicon.png">
+<link rel="stylesheet" href="/admin/static/admin.css">
+<script>
+// Pre-init: read stored preferences before CSS paints so the user
+// never sees a flash. Kept inline and tiny on purpose; the proper
+// admin.js handles the rest of the UI.
+(function () {
+  try {
+    var pref = localStorage.getItem('sb_admin_appearance') || 'auto';
+    if (pref !== 'light' && pref !== 'dark' && pref !== 'auto') pref = 'auto';
+    document.documentElement.setAttribute('data-theme', pref);
+
+    // Image library view mode: if /admin/images was opened without an
+    // explicit ?view=, bounce to the stored choice before the page
+    // paints. This keeps the list / thumbnail toggle sticky across
+    // visits without flashing the default (grid) first.
+    var p = window.location.pathname;
+    if ((p === '/admin/images' || p === '/admin/images/') && !/[?&]view=/.test(window.location.search)) {
+      var view = localStorage.getItem('sb_admin_image_view');
+      if (view === 'list') {
+        window.location.replace('/admin/images?view=list');
+      }
+    }
+  } catch (e) { /* localStorage blocked — fall through to defaults */ }
+})();
+</script>
+</head>
+<body>
+<header class="mobile-header">
+  <button class="mobile-menu-btn" type="button" aria-label="menu" data-toggle-nav>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+  </button>
+  <a class="mobile-logo" href="/admin/" aria-label="{{T `app.name`}}">
+    <img class="brand-logo brand-logo-light" src="/admin/static/sb_logo_dark.svg" alt="{{T `app.name`}}">
+    <img class="brand-logo brand-logo-dark" src="/admin/static/sb_logo_light.svg" alt="{{T `app.name`}}">
+  </a>
+</header>
+<div class="layout">
+  <aside class="sidebar">
+    {{/* Menu visibility rules:
+         - Regular (role=3): no カテゴリー / テンプレート編集 / デザイン設定 / ユーザー
+         - Power   (role=2): all except ユーザー
+         - Admin   (role=1): all
+         .User.CanManageDesign returns true for admin + power,
+         .User.CanManageUsers  returns true for admin only. */}}
+    <a class="sidebar-logo" href="/admin/" aria-label="{{T `app.name`}}">
+      <img class="brand-logo brand-logo-light" src="/admin/static/sb_logo_dark.svg" alt="{{T `app.name`}}">
+      <img class="brand-logo brand-logo-dark" src="/admin/static/sb_logo_light.svg" alt="{{T `app.name`}}">
+    </a>
+    <nav class="sidebar-nav" aria-label="{{T `nav.group.edit`}}">
+      <div class="sidebar-top">
+        <a class="nav-item nav-public" href="/" target="_blank" rel="noopener">
+          <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg></span>
+          <span class="nav-label">{{T "topbar.public"}}</span>
+        </a>
+      </div>
+      <section>
+        <h3>{{T "nav.group.edit"}}</h3>
+        <ul>
+          <li><a class="nav-item{{if eq .ActiveMenu `entry-new`}} is-active{{end}}" href="/admin/entries/new"{{if eq .ActiveMenu `entry-new`}} aria-current="page"{{end}}>
+            <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg></span>
+            <span class="nav-label">{{T "nav.entries.new"}}</span>
+          </a></li>
+          <li><a class="nav-item{{if eq .ActiveMenu `entries`}} is-active{{end}}" href="/admin/entries"{{if eq .ActiveMenu `entries`}} aria-current="page"{{end}}>
+            <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></span>
+            <span class="nav-label">{{T "nav.entries.list"}}</span>
+          </a></li>
+          <li><a class="nav-item{{if eq .ActiveMenu `images`}} is-active{{end}}" href="/admin/images"{{if eq .ActiveMenu `images`}} aria-current="page"{{end}}>
+            <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg></span>
+            <span class="nav-label">{{T "nav.images"}}</span>
+          </a></li>
+          {{if .User.CanManageDesign}}
+          <li><a class="nav-item{{if eq .ActiveMenu `categories`}} is-active{{end}}" href="/admin/categories"{{if eq .ActiveMenu `categories`}} aria-current="page"{{end}}>
+            <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2Z"/></svg></span>
+            <span class="nav-label">{{T "nav.categories"}}</span>
+          </a></li>
+          {{end}}
+          <li><a class="nav-item{{if eq .ActiveMenu `tags`}} is-active{{end}}" href="/admin/tags"{{if eq .ActiveMenu `tags`}} aria-current="page"{{end}}>
+            <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z"/><circle cx="7" cy="7" r="1" fill="currentColor" stroke="none"/></svg></span>
+            <span class="nav-label">{{T "nav.tags"}}</span>
+          </a></li>
+          {{if .User.CanManageDesign}}
+          <li><a class="nav-item{{if eq .ActiveMenu `links`}} is-active{{end}}" href="/admin/links"{{if eq .ActiveMenu `links`}} aria-current="page"{{end}}>
+            <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
+            <span class="nav-label">{{T "nav.links"}}</span>
+          </a></li>
+          {{end}}
+          {{if .User.CanManageDesign}}
+          <li><a class="nav-item{{if eq .ActiveMenu `template-edit`}} is-active{{end}}" href="/admin/templates/active/edit"{{if eq .ActiveMenu `template-edit`}} aria-current="page"{{end}}>
+            <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg></span>
+            <span class="nav-label">{{T "nav.template.edit"}}</span>
+          </a></li>
+          {{end}}
+        </ul>
+      </section>
+      <section>
+        <h3>{{T "nav.group.manage"}}</h3>
+        <ul>
+          <li><a class="nav-item{{if eq .ActiveMenu `comments`}} is-active{{end}}" href="/admin/comments"{{if eq .ActiveMenu `comments`}} aria-current="page"{{end}}>
+            <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></svg></span>
+            <span class="nav-label">{{T "nav.comments"}}</span>
+          </a></li>
+          <li><a class="nav-item{{if eq .ActiveMenu `analytics`}} is-active{{end}}" href="/admin/analytics"{{if eq .ActiveMenu `analytics`}} aria-current="page"{{end}}>
+            <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 14 4-4 4 4 5-5"/></svg></span>
+            <span class="nav-label">{{T "nav.analytics"}}</span>
+          </a></li>
+          {{if .User.CanManageDesign}}
+          <li><a class="nav-item{{if eq .ActiveMenu `templates`}} is-active{{end}}" href="/admin/templates"{{if eq .ActiveMenu `templates`}} aria-current="page"{{end}}>
+            <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-.9-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4c2.5 0 4.6-2 4.6-4.4C22 6 17.5 2 12 2Z"/><circle cx="7.5" cy="10.5" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="7.5" r="1" fill="currentColor" stroke="none"/><circle cx="16.5" cy="10.5" r="1" fill="currentColor" stroke="none"/></svg></span>
+            <span class="nav-label">{{T "nav.templates"}}</span>
+          </a></li>
+          {{end}}
+          {{if .User.CanManageUsers}}
+          <li><a class="nav-item{{if eq .ActiveMenu `users`}} is-active{{end}}" href="/admin/users"{{if eq .ActiveMenu `users`}} aria-current="page"{{end}}>
+            <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+            <span class="nav-label">{{T "nav.users"}}</span>
+          </a></li>
+          {{end}}
+          <li><a class="nav-item{{if eq .ActiveMenu `rebuild`}} is-active{{end}}" href="/admin/rebuild"{{if eq .ActiveMenu `rebuild`}} aria-current="page"{{end}}>
+            <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 10 6-10 6L2 8l10-6Z"/><path d="m2 14 10 6 10-6"/><path d="m2 11 10 6 10-6"/></svg></span>
+            <span class="nav-label">{{T "nav.rebuild"}}</span>
+          </a></li>
+          <li><a class="nav-item{{if eq .ActiveMenu `settings`}} is-active{{end}}" href="/admin/settings"{{if eq .ActiveMenu `settings`}} aria-current="page"{{end}}>
+            <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.34.22.71.22 1.09 0 .76.43 1.45 1.09 1.78H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></span>
+            <span class="nav-label">{{T "nav.settings"}}</span>
+          </a></li>
+          <li><a class="nav-item{{if eq .ActiveMenu `help`}} is-active{{end}}" href="/admin/help"{{if eq .ActiveMenu `help`}} aria-current="page"{{end}}>
+            <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
+            <span class="nav-label">{{T "nav.help"}}</span>
+          </a></li>
+        </ul>
+      </section>
+    </nav>
+    {{if .User}}
+    <div class="sidebar-footer">
+      <a class="sidebar-account" href="/admin/profile" title="{{if .User.DisplayName}}{{.User.DisplayName}}{{else}}{{.User.Name}}{{end}}"{{if eq .ActiveMenu "profile"}} aria-current="page"{{end}}>
+        <span class="account-avatar" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </span>
+        <span class="account-text">
+          <span class="account-name">{{if .User.DisplayName}}{{.User.DisplayName}}{{else}}{{.User.Name}}{{end}}</span>
+          <span class="account-role">{{if eq .User.Role 1}}{{T "role.admin"}}{{else if eq .User.Role 2}}{{T "role.power"}}{{else}}{{T "role.regular"}}{{end}}</span>
+        </span>
+      </a>
+      <form method="post" action="/admin/logout" class="sidebar-logout">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <button type="submit" class="link">
+          <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg></span>
+          <span>{{T "topbar.logout"}}</span>
+        </button>
+      </form>
+    </div>
+    {{end}}
+  </aside>
+  <main class="content">
+    <div class="content-inner">
+      {{template "content" .}}
+    </div>
+    <footer class="content-footer">
+      Powered by <a href="https://github.com/serendipitynz/serenebach" target="_blank" rel="noopener">Serene Bach</a>
+      <span class="build-stamp">{{appVersion}}</span>
+    </footer>
+  </main>
+</div>
+<div class="modal-overlay" data-modal-host hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
+    <div class="modal-head">
+      <h2 id="modal-title" data-modal-title></h2>
+      <button type="button" class="modal-close" data-modal-close aria-label="{{T `action.close`}}">×</button>
+    </div>
+    <div class="modal-body" data-modal-body></div>
+    <div class="modal-foot" data-modal-foot hidden></div>
+  </div>
+</div>
+<script>window.__sbI18n = {{JSBundle}};</script>
+<script>window.__sbAIEnabled = {{if aiEnabled .User}}true{{else}}false{{end}};</script>
+<script src="/admin/static/admin.js" defer></script>
+</body>
+</html>{{end}}

@@ -1,0 +1,47 @@
+{{define "content"}}
+<h1>{{T "comments.title"}}</h1>
+
+<nav class="tabbar">
+  <a href="/admin/comments">{{T "comments.tab.list"}}</a>
+  <a href="/admin/comments/settings" class="active">{{T "comments.tab.settings"}}</a>
+</nav>
+
+{{if .FlashSuccess}}<p class="alert success">{{.FlashSuccess}}</p>{{end}}
+{{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
+
+<form method="post" action="/admin/comments/settings" class="form-stack" data-unsaved-warn>
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+  <div class="panel">
+    <div class="panel-head"><h2>{{T "comments.settings.heading"}}</h2></div>
+    <div class="panel-body form-stack">
+      <div class="form-row">
+        <div class="label">{{T "comments.settings.mode"}}</div>
+        <select name="comment_mode">
+          <option value="open"{{if eq (print .Weblog.CommentMode) "open"}} selected{{end}}>{{T "comments.settings.mode.open"}}</option>
+          <option value="moderated"{{if eq (print .Weblog.CommentMode) "moderated"}} selected{{end}}>{{T "comments.settings.mode.moderated"}}</option>
+          <option value="closed"{{if eq (print .Weblog.CommentMode) "closed"}} selected{{end}}>{{T "comments.settings.mode.closed"}}</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "comments.settings.spamWords"}}</div>
+        <div>
+          <textarea name="spam_words" rows="8" placeholder="{{T `comments.settings.spamPlaceholder`}}">{{.Weblog.SpamWords}}</textarea>
+          <p class="hint">{{T "comments.settings.spamWords.hint"}}</p>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "comments.settings.ipBlacklist"}}</div>
+        <div>
+          <textarea name="ip_blacklist" rows="6" spellcheck="false" placeholder="198.51.100.5&#10;198.51.100.0/24&#10;2001:db8::/48">{{.Weblog.IPBlacklist}}</textarea>
+          <p class="hint">{{THTML "comments.settings.ipBlacklist.hint"}}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="primary">{{T "action.save"}}</button>
+  </div>
+</form>
+{{end}}

@@ -1,0 +1,28 @@
+body { font-family: system-ui, sans-serif; max-width: 48rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+header h1 { margin-bottom: 0.25rem; }
+header .description { color: #666; margin-top: 0; }
+.entry { border-top: 1px solid #eee; padding-top: 1.5rem; margin-top: 1.5rem; }
+.entry h2 { margin-bottom: 0.25rem; }
+.entry h2 a { color: #111; text-decoration: none; }
+.entry h2 a:hover { text-decoration: underline; }
+.meta { color: #888; font-size: 0.9em; margin-bottom: 1rem; }
+.meta > * + *::before { content: " · "; margin: 0 0.25rem; }
+.body { word-wrap: break-word; }
+.sequel { margin-top: 1rem; color: #333; }
+.entry-nav { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px dotted #ddd; font-size: 0.9em; display: flex; gap: 1rem; justify-content: space-between; }
+.like-form { display: inline-block; margin-top: 1rem; }
+.like-btn { font: inherit; color: #c05; background: none; border: 1px solid #eaa; border-radius: 999px; padding: 0.2rem 0.8rem; cursor: pointer; }
+.like-btn:hover { background: #fee; }
+.comments { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid #eee; }
+.comments h3 { font-size: 1.05rem; }
+.comments .comment { border-top: 1px dotted #eee; padding: 0.75rem 0; }
+.comments .comment .meta { color: #888; font-size: 0.85em; margin: 0 0 0.25rem; }
+.comments .comment .body { white-space: pre-wrap; }
+.comment-form { display: grid; gap: 0.5rem; margin-top: 1.5rem; max-width: 34rem; }
+.comment-form label { display: grid; gap: 0.25rem; font-size: 0.9em; color: #555; }
+.comment-form input[type=text],.comment-form input[type=email],.comment-form input[type=url],.comment-form textarea { padding: 0.4rem; font-size: 0.95rem; border: 1px solid #ccc; border-radius: 4px; }
+.comment-form .form-error:empty { display: none; }
+.comment-form .form-error { color: #b00; margin: 0; font-size: 0.9em; }
+.comment-form .cookie-opt { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85em; color: #666; }
+.comment-form button { padding: 0.4rem 1rem; font-size: 0.95rem; cursor: pointer; justify-self: start; }
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #eee; color: #888; font-size: 0.9em; }

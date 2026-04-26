@@ -1,0 +1,73 @@
+{{define "content"}}
+<h1>{{T "analytics.title"}}</h1>
+
+{{if .Disabled}}
+<p class="alert warning">{{T "analytics.disabled"}}</p>
+{{else}}
+
+<nav class="filter-tabs" style="display:flex;gap:0.5rem;margin-bottom:1rem">
+  {{range .Windows}}<a href="/admin/analytics?days={{.Days}}"{{if eq .Days $.CurrentDays}} style="font-weight:600"{{end}}>{{.Label}}</a>{{end}}
+</nav>
+
+<div class="cards">
+  <div class="card">
+    <div class="label">{{T "analytics.card.pv"}}</div>
+    <div class="value">{{.Summary.PageViews}}</div>
+    <div class="sub">{{Tf "analytics.card.recentDays" .CurrentDays}}</div>
+  </div>
+  <div class="card">
+    <div class="label">{{T "analytics.card.unique"}}</div>
+    <div class="value">{{.Summary.UniqueVisitors}}</div>
+    <div class="sub">{{Tf "analytics.card.recentDays" .CurrentDays}}</div>
+  </div>
+  <div class="card">
+    <div class="label">{{T "analytics.card.returning"}}</div>
+    <div class="value">{{.Summary.ReturnVisitors}}</div>
+    <div class="sub">{{Tf "analytics.card.ofUniques" (percent .Summary.ReturnVisitors .Summary.UniqueVisitors)}}</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <h2>{{T "analytics.top.heading.label"}}</h2>
+    <span class="hint">{{T "analytics.top.sortHint"}}</span>
+  </div>
+  <div class="panel-body">
+    {{if .Top}}
+    <table class="listing">
+      <thead><tr>
+        <th class="col-flex-wide">{{T "analytics.top.col.entry"}}</th>
+        <th class="col-count"><a href="?days={{.CurrentDays}}&sort=views"{{if eq (print .CurrentSort) "views"}} style="font-weight:600"{{end}}>{{T "analytics.top.col.pv"}}</a></th>
+        <th class="col-count"><a href="?days={{.CurrentDays}}&sort=likes"{{if eq (print .CurrentSort) "likes"}} style="font-weight:600"{{end}}>{{T "analytics.top.col.likes"}}</a></th>
+        <th class="col-count"><a href="?days={{.CurrentDays}}&sort=stamps"{{if eq (print .CurrentSort) "stamps"}} style="font-weight:600"{{end}}>{{T "analytics.top.col.stamps"}}</a></th>
+      </tr></thead>
+      <tbody>
+      {{range .Top}}
+        <tr>
+          <td class="col-flex-wide"><a href="/entry/{{.EntryID}}/" target="_blank" rel="noopener">{{.Title}} ↗</a></td>
+          <td class="num col-count">{{.Views}}</td>
+          <td class="num col-count">{{.Likes}}</td>
+          <td class="num col-count">{{.Stamps}}</td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}<p class="hint">{{T "analytics.top.empty.label"}}</p>{{end}}
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><h2>{{T "analytics.daily.heading"}}</h2></div>
+  <div class="panel-body">
+    {{if .Daily}}
+    <table class="listing">
+      <thead><tr><th>{{T "analytics.daily.col.day"}}</th><th class="num">{{T "analytics.top.col.pv"}}</th></tr></thead>
+      <tbody>
+      {{range .Daily}}<tr><td>{{.Day}}</td><td class="num">{{.Views}}</td></tr>{{end}}
+      </tbody>
+    </table>
+    {{else}}<p class="hint">{{T "analytics.top.empty.label"}}</p>{{end}}
+  </div>
+</div>
+{{end}}
+{{end}}

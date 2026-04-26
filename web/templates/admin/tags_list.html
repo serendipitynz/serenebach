@@ -1,0 +1,53 @@
+{{define "content"}}
+<h1>{{T "tags.title"}}</h1>
+
+{{if eq .Flash "saved"}}<p class="alert success">{{T "flash.saved"}}</p>{{end}}
+{{if eq .Flash "deleted"}}<p class="alert success">{{T "flash.deleted"}}</p>{{end}}
+
+<div class="panel">
+  <div class="panel-head">
+    <h2>{{Tf "tags.heading" (len .Tags)}}</h2>
+    <span class="hint">{{T "tags.hint"}}</span>
+  </div>
+  <div class="panel-body">
+    {{if .Tags}}
+    <table class="listing">
+      <thead><tr>
+        <th class="col-id col-hide-mobile">{{T "common.col.id"}}</th>
+        <th class="col-flex-wide">{{T "tags.col.name"}}</th>
+        <th class="col-flex">{{T "tags.col.slug"}}</th>
+        <th class="col-count">{{T "tags.col.count"}}</th>
+        <th class="col-actions">{{T "common.col.action"}}</th>
+      </tr></thead>
+      <tbody>
+      {{range .Tags}}
+        <tr>
+          <td class="num col-id col-hide-mobile">{{.ID}}</td>
+          <td class="col-flex-wide">
+            <form method="post" action="/admin/tags/{{.ID}}/update" class="inline-edit">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <input type="text" name="name" value="{{.Name}}" maxlength="100" required>
+          </td>
+          <td class="col-flex">
+              <input type="text" name="slug" value="{{.Slug}}" pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="100" required>
+              <button type="submit" class="link" title="{{T `action.save`}}">{{T "action.save"}}</button>
+            </form>
+          </td>
+          <td class="num col-count">{{.EntryCount}}</td>
+          <td class="col-actions">
+            <a href="/tag/{{.Slug}}/" target="_blank" rel="noopener" class="btn-icon" aria-label="{{T `common.viewPublic`}}" title="{{T `common.viewPublic`}}">↗</a>
+            <form method="post" action="/admin/tags/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `tags.delete.confirm`}}')">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{T `action.delete`}}">{{iconTrash}}</button>
+            </form>
+          </td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+      <p class="hint">{{T "tags.empty"}}</p>
+    {{end}}
+  </div>
+</div>
+{{end}}

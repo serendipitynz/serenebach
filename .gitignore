@@ -1,0 +1,26 @@
+/bin/
+/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Local secrets loaded by Taskfile's dotenv directive. Keep
+# .env.example checked in as a template so new clones know which
+# vars to set.
+.env
+
+.DS_Store
+.idea/
+*.swp
+_base/
+_sandbox/
+
+# VS Code: share workspace settings, hide personal overrides
+.vscode/*
+!.vscode/settings.json
+
+# Claude Code: share team config, hide personal permissions +
+# runtime coordination state that's recreated per session.
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
