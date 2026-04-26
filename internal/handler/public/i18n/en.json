@@ -1,0 +1,11 @@
+{
+  "comment.error.parseForm": "Could not parse the form.",
+  "comment.error.tooFast": "Submission was too fast. Please wait a moment and try again.",
+  "comment.error.required": "Name and comment body are required.",
+  "comment.error.tooLong": "Comment is too long.",
+  "comment.error.badScheme": "URL must start with http://, https://, or mailto:.",
+  "comment.error.turnstileVerify": "Challenge verification failed. Please try again in a moment.",
+  "comment.error.turnstileFail": "Challenge was not passed. Please try again.",
+  "comment.error.rateLimit": "Too many submissions. Please wait a moment before posting again.",
+  "sidebar.recent.noName": "(no name)"
+}

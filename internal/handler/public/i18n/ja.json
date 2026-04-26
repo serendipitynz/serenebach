@@ -1,0 +1,11 @@
+{
+  "comment.error.parseForm": "フォームを解析できませんでした。",
+  "comment.error.tooFast": "送信が速すぎます。しばらく待ってから再送してください。",
+  "comment.error.required": "お名前とコメント本文は必須です。",
+  "comment.error.tooLong": "コメントが長すぎます。",
+  "comment.error.badScheme": "URL は http:// / https:// / mailto: のみ受け付けます。",
+  "comment.error.turnstileVerify": "チャレンジの検証に失敗しました。時間をおいて再送してください。",
+  "comment.error.turnstileFail": "チャレンジに通過できませんでした。もう一度お試しください。",
+  "comment.error.rateLimit": "投稿が多すぎます。しばらく待ってから再送してください。",
+  "sidebar.recent.noName": "(名前なし)"
+}

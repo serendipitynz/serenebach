@@ -1,0 +1,21 @@
+{{define "content"}}
+<div class="help-layout">
+  <aside class="help-nav" aria-label="{{T `help.nav.aria`}}">
+    <h2 class="help-nav-head">{{T "help.nav.heading"}}</h2>
+    <ul>
+      {{range .Nav}}
+      <li>
+        <a href="/admin/help/{{.Slug}}"{{if .Active}} class="active" aria-current="page"{{end}}>{{.Title}}</a>
+        {{if .Fallback}}<span class="help-nav-fallback" title="{{T `help.fallback.tooltip`}}">·</span>{{end}}
+      </li>
+      {{end}}
+    </ul>
+  </aside>
+  <article class="help-body markdown-body">
+    {{if .FallbackNotice}}
+    <div class="help-fallback-notice">{{THTML "help.fallback.notice"}}</div>
+    {{end}}
+    {{.Body}}
+  </article>
+</div>
+{{end}}

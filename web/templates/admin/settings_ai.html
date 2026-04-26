@@ -1,0 +1,227 @@
+{{define "content"}}
+<h1>{{T "settings.title"}}</h1>
+
+<nav class="tabbar">
+  {{if .CanManageDesign}}<a href="/admin/settings/basic"{{if eq .ActiveTab "basic"}} class="active"{{end}}>{{T "settings.tab.basic"}}</a>{{end}}
+  <a href="/admin/settings/ai"{{if eq .ActiveTab "ai"}} class="active"{{end}}>{{T "settings.tab.ai"}}</a>
+  <a href="/admin/settings/screen"{{if eq .ActiveTab "screen"}} class="active"{{end}}>{{T "settings.tab.screen"}}</a>
+</nav>
+
+{{if .AIFlash}}<p class="alert success">{{T (printf "profile.ai.flash.%s" .AIFlash)}}</p>{{end}}
+{{if .AIError}}<p class="alert error">{{T (printf "profile.ai.error.%s" .AIError)}}</p>{{end}}
+
+{{/* --- AI 執筆補助 (all users) --- */}}
+<section class="panel ai-config-panel" aria-labelledby="ai-panel-heading">
+  <div class="panel-head"><h2 id="ai-panel-heading">{{T "profile.ai.heading"}}</h2></div>
+  <div class="panel-body">
+    {{if not .AISecretConfigured}}
+      {{/* Env var not set on this box: the AI section stays
+           invisible. For admins we still render the MCP panel
+           below; regular users simply see an empty AI tab. */}}
+      <p class="hint">{{THTML "profile.ai.secretMissing"}}</p>
+    {{else}}
+      <p class="hint">{{T "profile.ai.hint"}}</p>
+
+      <form method="post" action="/admin/settings/ai" class="form-stack" data-ai-config-form>
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+        <div class="form-row">
+          <div class="label">{{T "profile.ai.enabled"}}</div>
+          <label class="inline-field">
+            <input type="checkbox" name="ai_enabled" {{if .Target.AIKind}}checked{{end}}>
+            <span>{{T "profile.ai.enabled.label"}}</span>
+          </label>
+        </div>
+
+        <div class="form-row">
+          <div class="label">{{T "profile.ai.provider"}}</div>
+          <div>
+            <select name="ai_kind" data-ai-provider-select>
+              <option value="openai-compat"{{if or (eq .Target.AIKind "openai-compat") (not .Target.AIKind)}} selected{{end}}>OpenAI 互換 (OpenAI / LM Studio / Ollama)</option>
+              <option value="claude"{{if eq .Target.AIKind "claude"}} selected{{end}}>Claude (Anthropic API)</option>
+            </select>
+            <p class="hint">{{T "profile.ai.providerHint"}}</p>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="label">{{T "profile.ai.baseURL"}}</div>
+          <input type="url" name="ai_base_url" value="{{.Target.AIBaseURL}}" placeholder="http://127.0.0.1:1234/v1">
+        </div>
+
+        <div class="form-row">
+          <div class="label">{{T "profile.ai.model"}}</div>
+          <input type="text" name="ai_model" value="{{.Target.AIModel}}" placeholder="gpt-4o-mini / claude-opus-4-5 / google/gemma-3-12b">
+        </div>
+
+        <div class="form-row">
+          <div class="label">{{T "profile.ai.apiKey"}}</div>
+          <div>
+            <input type="password" name="ai_api_key" autocomplete="new-password" placeholder="{{if .AIHasKey}}{{T `profile.ai.apiKeySaved`}}{{else}}{{T `profile.ai.apiKeyPlaceholder`}}{{end}}">
+            <p class="hint">{{T "profile.ai.apiKeyHint"}}</p>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="label">{{T "profile.ai.autoAlt"}}</div>
+          <label class="inline-field">
+            <input type="checkbox" name="ai_auto_alt" {{if .Target.AIAutoAlt}}checked{{end}}>
+            <span>{{T "profile.ai.autoAlt.label"}}</span>
+          </label>
+        </div>
+
+        <div class="form-row">
+          <div class="label">{{T "profile.ai.timeout"}}</div>
+          <div>
+            <input type="number" name="ai_timeout_seconds" min="0" max="600" step="1" value="{{if gt .Target.AITimeoutSeconds 0}}{{.Target.AITimeoutSeconds}}{{end}}" placeholder="{{T `profile.ai.timeoutPlaceholder`}}" style="max-width: 8em;">
+            <p class="hint">{{T "profile.ai.timeoutHint"}}</p>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="primary">{{T "profile.ai.save"}}</button>
+          <button type="button" class="secondary" data-ai-test-btn>{{T "profile.ai.test"}}</button>
+          <span class="hint" data-ai-test-result hidden></span>
+        </div>
+      </form>
+    {{end}}
+  </div>
+</section>
+
+{{if .CanManageUsers}}
+{{/* --- MCP サーバ (admin only) --- */}}
+{{if .NewRawToken}}
+<div class="panel new-token-panel">
+  <div class="panel-head"><h2>{{T "settings.ops.mcp.newHeading"}}</h2></div>
+  <div class="panel-body">
+    <p><strong>{{T "settings.ops.mcp.newWarn"}}</strong></p>
+    <div class="new-token-display">
+      <code data-mcp-new-token>{{.NewRawToken}}</code>
+      <button type="button" class="btn-icon" data-copy-text="{{.NewRawToken}}" aria-label="{{T `action.copy`}}" title="{{T `action.copy`}}">{{iconCopy}}</button>
+    </div>
+    <p class="hint">
+      <code>mcp.json</code>:
+      <code>{"url":"https://your-host/mcp","headers":{"Authorization":"Bearer {{.NewRawToken}}"}}</code>
+    </p>
+  </div>
+</div>
+{{end}}
+
+<div class="panel">
+  <div class="panel-head"><h2>{{T "settings.ops.mcp"}}</h2></div>
+  <div class="panel-body">
+    <p class="hint">{{THTML "settings.ops.mcp.hint"}}</p>
+
+    <form method="post" action="/admin/settings/mcp/new" class="form-stack mcp-new-token-form" data-unsaved-warn>
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="form-row">
+        <div class="label">{{T "settings.ops.mcp.name"}}</div>
+        <input type="text" name="name" placeholder="{{T `settings.ops.mcp.namePlaceholder`}}" maxlength="100" required>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "settings.ops.mcp.scope"}}</div>
+        <div>
+          <div class="scope-options">
+            <span class="scope-text">{{T "settings.ops.mcp.scope.read"}}</span>
+            <input type="checkbox" data-scope-read checked disabled>
+            <span class="scope-text">{{T "settings.ops.mcp.scope.write"}}</span>
+            <input type="checkbox" name="scope_write" value="1" data-scope-write>
+          </div>
+          <p class="hint">{{T "settings.ops.mcp.scope.hint"}}</p>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "settings.ops.mcp.author"}}</div>
+        <div>
+          <select name="author_id" required>
+            {{range .Users}}
+            <option value="{{.ID}}">{{if .DisplayName}}{{.DisplayName}} ({{.Name}}){{else}}{{.Name}}{{end}}</option>
+            {{end}}
+          </select>
+          <p class="hint">{{T "settings.ops.mcp.author.hint"}}</p>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="primary">{{T "settings.ops.mcp.submit"}}</button>
+      </div>
+    </form>
+
+    {{if .Tokens}}
+    <h3 class="panel-subhead">{{Tf "settings.ops.mcp.issuedHeading" (len .Tokens)}}</h3>
+    <table class="listing mcp-token-list listing-cards">
+      <thead><tr>
+        <th class="col-id col-hide-mobile">{{T "settings.ops.mcp.col.id"}}</th>
+        <th>{{T "settings.ops.mcp.col.name"}}</th>
+        <th>{{T "settings.ops.mcp.col.scope"}}</th>
+        <th>{{T "settings.ops.mcp.col.author"}}</th>
+        <th class="col-hide-mobile">{{T "settings.ops.mcp.col.prefix"}}</th>
+        <th class="col-datetime col-hide-mobile">{{T "settings.ops.mcp.col.createdAt"}}</th>
+        <th class="col-datetime col-hide-mobile">{{T "settings.ops.mcp.col.lastUsed"}}</th>
+        <th class="col-status">{{T "settings.ops.mcp.col.status"}}</th>
+        <th class="col-actions">{{T "settings.ops.mcp.col.delete"}}</th>
+      </tr></thead>
+      <tbody>
+      {{range .Tokens}}
+        <tr{{if not .Active}} class="revoked"{{end}}>
+          <td class="num col-id col-hide-mobile">{{.ID}}</td>
+          <td class="col-primary">{{.Name}}</td>
+          <td data-label="{{T `settings.ops.mcp.col.scope`}}">{{if eq (printf "%s" .Scope) "write"}}<span class="badge waiting">{{T "settings.ops.mcp.scope.write"}}</span>{{else}}<span class="badge approved">{{T "settings.ops.mcp.scope.read"}}</span>{{end}}</td>
+          <td data-label="{{T `settings.ops.mcp.col.author`}}">{{.AuthorLabel}}</td>
+          <td class="col-hide-mobile"><code>{{.Prefix}}…</code></td>
+          <td class="col-datetime col-hide-mobile">{{.CreatedAtFmt}}</td>
+          <td class="col-datetime col-hide-mobile">{{.LastUsedAtFmt}}</td>
+          <td class="col-status" data-label="{{T `settings.ops.mcp.col.status`}}">{{if .Active}}<span class="badge approved">{{T "status.active"}}</span>{{else}}<span class="badge hidden">{{T "status.revoked"}}</span>{{end}}</td>
+          <td class="col-actions">
+            {{if .Active}}
+            <form method="post" action="/admin/settings/mcp/{{.ID}}/revoke" class="inline" onsubmit="return confirm('{{T `settings.ops.mcp.revokeConfirm`}}')">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{T `action.delete`}}">{{iconTrash}}</button>
+            </form>
+            {{else}}
+            <span class="hint">—</span>
+            {{end}}
+          </td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+      <p class="hint">{{T "settings.ops.mcp.empty"}}</p>
+    {{end}}
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><h2>{{T "settings.ops.audit"}}</h2></div>
+  <div class="panel-body">
+    <p class="hint">{{THTML "settings.ops.audit.hint"}}</p>
+    {{if .Audit}}
+    <table class="listing audit-log">
+      <thead><tr>
+        <th class="col-datetime">{{T "settings.ops.audit.col.createdAt"}}</th>
+        <th>{{T "settings.ops.audit.col.tool"}}</th>
+        <th class="col-id">{{T "settings.ops.audit.col.target"}}</th>
+        <th>{{T "settings.ops.audit.col.token"}}</th>
+        <th>{{T "settings.ops.audit.col.author"}}</th>
+        <th>{{T "settings.ops.audit.col.detail"}}</th>
+      </tr></thead>
+      <tbody>
+      {{range .Audit}}
+        <tr>
+          <td class="col-datetime">{{.CreatedAtFmt}}</td>
+          <td data-label="{{T `settings.ops.audit.col.tool`}}"><code>{{.Tool}}</code></td>
+          <td class="num col-id" data-label="{{T `settings.ops.audit.col.target`}}">{{if gt .TargetID 0}}{{if or (eq .Tool "create_entry") (eq .Tool "update_entry") (eq .Tool "publish_entry")}}<a href="/admin/entries/{{.TargetID}}/edit">#{{.TargetID}}</a>{{else}}#{{.TargetID}}{{end}}{{else}}—{{end}}</td>
+          <td data-label="{{T `settings.ops.audit.col.token`}}">{{.TokenLabel}}</td>
+          <td data-label="{{T `settings.ops.audit.col.author`}}">{{.AuthorLabel}}</td>
+          <td class="col-detail" data-label="{{T `settings.ops.audit.col.detail`}}">{{if .Extra}}<code class="audit-extra">{{.Extra}}</code>{{else}}—{{end}}</td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+      <p class="hint">{{T "settings.ops.audit.empty"}}</p>
+    {{end}}
+  </div>
+</div>
+{{end}}{{/* end CanManageUsers */}}
+{{end}}

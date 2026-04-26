@@ -1,0 +1,165 @@
+{{define "content"}}
+<h1>{{Tf "templates.form.titleEdit" .Template.Name}}</h1>
+
+{{if eq .Flash "saved"}}<p class="alert success">{{T "templates.form.flash.saved"}}</p>{{end}}
+{{if eq .Flash "cloned"}}<p class="alert success">{{T "templates.form.flash.cloned"}}</p>{{end}}
+{{if eq .Flash "imported"}}<p class="alert success">{{T "templates.form.flash.imported"}}</p>{{end}}
+{{if eq .Flash "asset-uploaded"}}<p class="alert success">{{T "templates.form.flash.assetUploaded"}}</p>{{end}}
+{{if eq .Flash "asset-deleted"}}<p class="alert success">{{T "templates.form.flash.assetDeleted"}}</p>{{end}}
+{{if eq .Flash "rechecked"}}<p class="alert success">{{T "templates.form.flash.rechecked"}}</p>{{end}}
+{{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
+
+<form method="post" action="/admin/templates/{{.Template.ID}}/edit" class="form-stack" id="template-edit-form" data-unsaved-warn>
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+  {{/* Name + info are not edited from this page. They are preserved
+       server-side on save, and the save-as modal provides the only
+       path to assign a new name via the new_name hidden input. */}}
+  <input type="hidden" name="new_name" value="" data-template-new-name>
+
+  <div class="panel" id="main-body-panel">
+    <div class="panel-head">
+      <h2>{{T "templates.form.mainBody"}}</h2>
+      {{if .MainLint.HasUnsupported}}<a href="#template-status" class="badge warning" title="{{T `templates.form.lint.sectionWarn`}}">{{T "templates.form.lint.sectionBadge"}}</a>{{end}}
+      {{if .Template.IsActive}}<span class="badge approved">{{T "templates.label.inUse"}}</span>{{end}}
+    </div>
+    <div class="panel-body">
+      <textarea name="main_body" rows="20" spellcheck="false" data-code-editor="sbtemplate">{{.Template.MainBody}}</textarea>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>{{T "templates.form.css"}}</h2></div>
+    <div class="panel-body">
+      <textarea name="css" rows="14" spellcheck="false" data-code-editor="css">{{.Template.CSS}}</textarea>
+    </div>
+  </div>
+
+  <details class="entry-form-more" id="entry-body-panel" {{if .Template.EntryBody}}open{{end}}>
+    <summary>
+      {{T "templates.form.entryBody"}}
+      {{if .EntryLint.HasUnsupported}}<a href="#template-status" class="badge warning" title="{{T `templates.form.lint.sectionWarn`}}">{{T "templates.form.lint.sectionBadge"}}</a>{{end}}
+    </summary>
+    <textarea name="entry_body" rows="14" spellcheck="false" data-code-editor="sbtemplate">{{.Template.EntryBody}}</textarea>
+  </details>
+
+  <div class="form-actions">
+    <a href="/admin/templates">{{T "action.back"}}</a>
+    {{if .Template.ID}}
+    <a href="/?__sb_template={{.Template.ID}}" target="_blank" rel="noopener" class="button">{{T "action.preview"}}</a>
+    {{end}}
+    <button type="button" data-template-export
+            data-export-id="{{.Template.ID}}"
+            data-current-name="{{.Template.Name}}"
+            data-current-memo="{{.Template.Info}}">{{T "action.export"}}</button>
+    <button type="button" data-template-save-as
+            data-current-name="{{.Template.Name}}">{{T "action.saveAs"}}</button>
+    <button type="submit" class="primary">{{T "action.save"}}</button>
+  </div>
+</form>
+
+<div class="panel template-asset-panel">
+  <div class="panel-head">
+    <h2>{{Tf "templates.form.assetsHeading" (len .Assets)}}</h2>
+    <span class="hint">{{THTML "templates.form.assetsHint"}}</span>
+  </div>
+  <div class="panel-body">
+    <form method="post" action="/admin/templates/{{.Template.ID}}/assets" enctype="multipart/form-data"
+          class="upload-form" data-upload data-csrf="{{.CSRFToken}}">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <label class="drop-zone" data-drop-zone>
+        <span class="drop-zone-text">{{T "templates.form.dropZone"}}</span>
+        <span class="drop-zone-progress" hidden></span>
+        <input type="file" name="file" data-drop-input>
+      </label>
+      <noscript>
+        <div class="form-actions" style="justify-content:flex-start;padding-top:0.5rem;border:none;margin:0">
+          <button type="submit" class="primary">{{T "action.upload"}}</button>
+        </div>
+      </noscript>
+    </form>
+
+    {{if .Assets}}
+    <table class="listing">
+      <thead><tr>
+        <th>{{T "templates.form.assets.col.filename"}}</th>
+        <th>{{T "templates.form.assets.col.type"}}</th>
+        <th class="num">{{T "templates.form.assets.col.size"}}</th>
+        <th>{{T "templates.form.assets.col.added"}}</th>
+        <th>{{T "templates.form.assets.col.url"}}</th>
+        <th class="col-action">{{T "common.col.delete"}}</th>
+      </tr></thead>
+      <tbody>
+      {{range .Assets}}
+        <tr>
+          <td>{{.Filename}}</td>
+          <td>{{.MimeType}}</td>
+          <td class="num">{{.SizeBytes}}</td>
+          <td>{{fmtDate .CreatedAt}}</td>
+          <td><button type="button" class="link copy-tag" data-copy-text="{site_parts}{{.Filename}}" title="{{T `common.copyTitle`}}"><code>{site_parts}{{.Filename}}</code></button></td>
+          <td class="col-action">
+            <form method="post" action="/admin/templates/{{$.Template.ID}}/assets/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `templates.form.assets.deleteConfirm`}}')">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{T `action.delete`}}">{{iconTrash}}</button>
+            </form>
+          </td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+      <p class="hint">{{T "templates.form.assets.empty"}}</p>
+    {{end}}
+  </div>
+</div>
+
+{{/* Template status. The recheck button is associated with the edit
+     form via the `form="template-edit-form"` attribute so it still
+     submits the live editor textarea contents — even though the
+     panel itself sits outside the form so it can render below the
+     asset section. */}}
+<div class="panel" id="template-status">
+  <div class="panel-head">
+    <h2>{{T "templates.form.lint.heading"}}</h2>
+    <button type="submit" form="template-edit-form" formaction="/admin/templates/{{.Template.ID}}/recheck" formnovalidate>{{T "templates.form.lint.recheck"}}</button>
+  </div>
+  <div class="panel-body">
+    {{template "lintBlock" (lintCtx "main" .MainLint .LintRan .LintFromRecheck)}}
+    {{if .Template.EntryBody}}
+      {{template "lintBlock" (lintCtx "entry" .EntryLint .LintRan .LintFromRecheck)}}
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "lintBlock"}}
+  {{/* Initial page loads run lint silently to populate the body-
+       section ⚠️ badges, but suppress the green ✅ all-clear card
+       to keep the edit screen quiet. The success card surfaces
+       only when the operator pressed the recheck button (i.e.
+       LintFromRecheck = true). */}}
+  {{if and (not .Lint.Findings) (not .LintFromRecheck)}}
+    {{/* nothing to surface — section omitted entirely */}}
+  {{else}}
+  <section class="lint-section">
+    <h3>
+      {{if eq .Body "main"}}{{T "templates.form.mainBody"}}{{else}}{{T "templates.form.entryBody"}}{{end}}
+    </h3>
+    {{if not .LintRan}}
+      <p class="hint">{{T "templates.form.lint.notRun"}}</p>
+    {{else if not .Lint.Findings}}
+      <p class="alert success">{{T "templates.form.lint.allClear"}}</p>
+    {{else}}
+      <ul class="lint-list">
+      {{range .Lint.Findings}}
+        <li class="lint-row {{if eq (printf "%v" .Severity) "unsupported"}}lint-unsupported{{else}}lint-differs{{end}}">
+          <span class="lint-icon" aria-hidden="true">{{if eq (printf "%v" .Severity) "unsupported"}}{{T "templates.form.lint.iconUnsupported"}}{{else}}{{T "templates.form.lint.iconDiffers"}}{{end}}</span>
+          <code>{{if eq (printf "%v" .Kind) "block"}}&lt;!-- BEGIN {{.Name}} --&gt;{{else}}{{"{"}}{{.Name}}{{"}"}}{{end}}</code>
+          <span class="lint-note">{{.Note}}</span>
+          {{if .Lines}}<span class="lint-lines">{{Tf "templates.form.lint.lines" (joinInts .Lines)}}</span>{{end}}
+        </li>
+      {{end}}
+      </ul>
+    {{end}}
+  </section>
+  {{end}}
+{{end}}

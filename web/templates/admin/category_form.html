@@ -1,0 +1,65 @@
+{{define "content"}}
+{{- $aceMode := "html" -}}
+{{- if eq .Category.DescriptionFormat "markdown" -}}{{- $aceMode = "markdown" -}}{{- end -}}
+<h1>{{if .Category.ID}}{{Tf "categories.form.titleEdit" .Category.ID}}{{else}}{{T "categories.form.titleNew"}}{{end}}</h1>
+
+{{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
+
+<form method="post" action="{{.Action}}" class="form-stack category-form" data-rich-description data-unsaved-warn>
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+  <div class="field-stack">
+    <div class="field-head">
+      <div class="label">{{T "common.col.name"}}</div>
+      {{if .Category.ID}}<span class="hint">{{Tf "categories.form.entryCount" .EntryCount}}</span>{{end}}
+    </div>
+    <input type="text" name="name" value="{{.Category.Name}}" autofocus required>
+  </div>
+
+  <div class="field-grid-3">
+    <div class="field-stack">
+      <div class="label">{{T "categories.form.parentLabel"}}</div>
+      <select name="parent_id">
+        <option value="0"{{if eq .Category.ParentID 0}} selected{{end}}>{{T "categories.form.parent.top"}}</option>
+        {{range .Parents}}<option value="{{.ID}}"{{if eq $.Category.ParentID .ID}} selected{{end}}>{{.Name}}</option>{{end}}
+      </select>
+    </div>
+    <div class="field-stack">
+      <div class="label">{{T "categories.form.slugLabel"}}</div>
+      <input type="text" name="slug" value="{{.Category.Slug}}" placeholder="{{T `categories.form.slugPlaceholder`}}">
+    </div>
+    <div class="field-stack">
+      <div class="label">{{T "categories.form.templateLabel"}}</div>
+      <select name="template_id">
+        <option value="0"{{if eq .Category.TemplateID 0}} selected{{end}}>{{T "categories.form.templateDefault"}}</option>
+        {{range .Templates}}<option value="{{.ID}}"{{if eq $.Category.TemplateID .ID}} selected{{end}}>{{.Name}}{{if .IsActive}} ★{{end}}</option>{{end}}
+      </select>
+    </div>
+  </div>
+
+  <div class="rich-description">
+    <div class="rich-description-head">
+      <div class="label">{{T "categories.form.descriptionLabel"}}</div>
+      <label class="inline-field">{{T "entries.form.formatLabel"}}
+        <select name="description_format" data-code-editor-format>
+          <option value="html"{{if ne .Category.DescriptionFormat "markdown"}} selected{{end}}>HTML</option>
+          <option value="markdown"{{if eq .Category.DescriptionFormat "markdown"}} selected{{end}}>Markdown</option>
+        </select>
+      </label>
+      <button type="button" class="link" data-image-picker-open>{{T "entries.form.insertImage"}}</button>
+    </div>
+    <textarea name="description" rows="6" spellcheck="false"
+              data-code-editor="{{$aceMode}}" data-code-editor-dynamic data-image-target
+              placeholder="{{T `categories.form.descriptionPlaceholder`}}">{{.Category.Description}}</textarea>
+    <div class="image-picker" hidden data-image-picker>
+      <input type="search" class="image-picker-filter" placeholder="{{T `entries.form.imgFilter`}}" data-image-picker-filter aria-label="{{T `entries.form.imgFilterAria`}}">
+      <div data-image-picker-body></div>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <a href="/admin/categories">{{T "action.back"}}</a>
+    <button type="submit" class="primary">{{T "action.save"}}</button>
+  </div>
+</form>
+{{end}}

@@ -1,0 +1,37 @@
+{{define "content"}}
+<h1>{{T "settings.title"}}</h1>
+
+<nav class="tabbar">
+  {{if .CanManageDesign}}<a href="/admin/settings/basic"{{if eq .ActiveTab "basic"}} class="active"{{end}}>{{T "settings.tab.basic"}}</a>{{end}}
+  <a href="/admin/settings/ai"{{if eq .ActiveTab "ai"}} class="active"{{end}}>{{T "settings.tab.ai"}}</a>
+  <a href="/admin/settings/screen"{{if eq .ActiveTab "screen"}} class="active"{{end}}>{{T "settings.tab.screen"}}</a>
+</nav>
+
+<div class="panel">
+  <div class="panel-head"><h2>{{T "settings.admin"}}</h2></div>
+  <div class="panel-body form-stack">
+    <p class="hint">{{T "settings.admin.hint"}}</p>
+    <div class="form-row">
+      <div class="label">{{T "settings.admin.appearance"}}</div>
+      <div>
+        <select data-appearance-select>
+          <option value="auto">{{T "settings.admin.appearance.auto"}}</option>
+          <option value="light">{{T "settings.admin.appearance.light"}}</option>
+          <option value="dark">{{T "settings.admin.appearance.dark"}}</option>
+        </select>
+        <p class="hint">{{T "settings.admin.appearanceHint"}}</p>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="label">{{T "settings.admin.language"}}</div>
+      <div>
+        <select data-language-select>
+          <option value="ja">日本語</option>
+          <option value="en">English</option>
+        </select>
+        <p class="hint">{{T "settings.admin.languageHint"}}</p>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}

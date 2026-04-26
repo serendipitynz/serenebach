@@ -1,0 +1,47 @@
+{{define "content"}}
+<h1>{{T "entries.title"}}</h1>
+
+{{if eq .Flash "deleted"}}<p class="alert success">{{T "flash.deleted"}}</p>{{end}}
+
+<div class="panel">
+  <div class="panel-head">
+    <h2>{{Tf "entries.heading" (len .Entries)}}</h2>
+    <a href="/admin/entries/new" class="more">{{T "nav.entries.new"}} →</a>
+  </div>
+  <div class="panel-body">
+    {{if .Entries}}
+    <table class="listing listing-cards">
+      <thead><tr>
+        <th class="col-id col-hide-mobile">{{T "common.col.id"}}</th>
+        <th class="col-status">{{T "common.col.status"}}</th>
+        <th class="col-datetime">{{T "common.col.posted"}}</th>
+        <th class="col-flex-wide">{{T "common.col.title"}}</th>
+        <th class="col-flex">{{T "common.col.category"}}</th>
+        <th class="col-actions">{{T "common.col.action"}}</th>
+      </tr></thead>
+      <tbody>
+      {{range .Entries}}
+        <tr>
+          <td class="num col-id col-hide-mobile">{{.ID}}</td>
+          <td class="col-flex-wide col-primary"><a href="/admin/entries/{{.ID}}/edit">{{if .Title}}{{.Title}}{{else}}{{T "common.noTitle"}}{{end}}</a></td>
+          <td class="col-status" data-label="{{T `common.col.status`}}"><span class="badge {{statusClass .Status}}">{{statusLabel .Status}}</span></td>
+          <td class="col-datetime" data-label="{{T `common.col.posted`}}">{{fmtDate .PostedAt}}</td>
+          <td class="col-flex" data-label="{{T `common.col.category`}}">{{if .CategoryName}}{{.CategoryName}}{{else}}<span class="hint">{{T "common.dash"}}</span>{{end}}</td>
+          <td class="col-actions">
+            <a href="/entry/{{.ID}}/" target="_blank" rel="noopener" aria-label="{{T `common.viewPublic`}}" class="btn-icon" title="{{T `common.viewPublic`}}">↗</a>
+            {{- $canDeleteEntry := $.User.CanDeleteEntry .AuthorID -}}
+            <form method="post" action="/admin/entries/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `common.confirmDelete`}}')">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{if $canDeleteEntry}}{{T `action.delete`}}{{else}}{{T `action.delete.forbiddenOwner`}}{{end}}"{{if not $canDeleteEntry}} disabled{{end}}>{{iconTrash}}</button>
+            </form>
+          </td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+      <p class="hint">{{T "entries.empty"}}</p>
+    {{end}}
+  </div>
+</div>
+{{end}}

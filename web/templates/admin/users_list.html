@@ -1,0 +1,53 @@
+{{define "content"}}
+<h1>{{T "users.title"}}</h1>
+
+{{if eq .Flash "created"}}<p class="alert success">{{T "users.flash.created"}}</p>{{end}}
+{{if eq .Flash "deleted"}}<p class="alert success">{{T "users.flash.deleted"}}</p>{{end}}
+{{if eq .Flash "cannot-delete-self"}}<p class="alert error">{{T "users.flash.cannotDeleteSelf"}}</p>{{end}}
+{{if eq .Flash "cannot-delete-last-admin"}}<p class="alert error">{{T "users.flash.cannotDeleteLastAdmin"}}</p>{{end}}
+
+<div class="panel">
+  <div class="panel-head">
+    <h2>{{Tf "users.heading" (len .Users)}}</h2>
+    <a href="/admin/users/new" class="more">{{T "users.form.titleNew"}} →</a>
+  </div>
+  <div class="panel-body">
+    {{if .Users}}
+    <table class="listing sortable user-list" data-user-sortable data-csrf="{{.CSRFToken}}">
+      <thead><tr>
+        <th class="col-drag col-hide-mobile"></th>
+        <th class="col-id col-hide-mobile">{{T "common.col.id"}}</th>
+        <th class="col-flex">{{T "users.col.loginName"}}</th>
+        <th class="col-flex col-hide-mobile">{{T "users.col.displayName"}}</th>
+        <th class="col-flex col-hide-mobile">{{T "users.col.email"}}</th>
+        <th class="col-role">{{T "users.col.role"}}</th>
+        <th class="col-actions">{{T "common.col.delete"}}</th>
+      </tr></thead>
+      <tbody>
+      {{range .Users}}
+        <tr data-user-id="{{.ID}}" draggable="true">
+          <td class="drag-handle col-drag col-hide-mobile" title="{{T `common.dragToReorder`}}" aria-label="{{T `common.dragToReorder`}}">≡</td>
+          <td class="num col-id col-hide-mobile">{{.ID}}</td>
+          <td class="col-flex"><a href="/admin/users/{{.ID}}/edit">{{.Name}}</a></td>
+          <td class="col-flex col-hide-mobile">{{.DisplayName}}</td>
+          <td class="col-flex col-hide-mobile">{{if .Email}}{{.Email}}{{else}}<span class="hint">{{T "common.dash"}}</span>{{end}}</td>
+          <td class="col-role">
+            {{if eq .Role 1}}{{T "role.admin"}}
+            {{else if eq .Role 2}}{{T "role.power"}}
+            {{else}}{{T "role.regular"}}{{end}}
+          </td>
+          <td class="col-actions">
+            <form method="post" action="/admin/users/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `users.delete.confirm`}}')">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{T `action.delete`}}">{{iconTrash}}</button>
+            </form>
+          </td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    <p class="reorder-status" data-reorder-status hidden></p>
+    {{end}}
+  </div>
+</div>
+{{end}}

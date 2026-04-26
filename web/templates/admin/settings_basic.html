@@ -1,0 +1,76 @@
+{{define "content"}}
+<h1>{{T "settings.title"}}</h1>
+
+<nav class="tabbar">
+  {{if .CanManageDesign}}<a href="/admin/settings/basic"{{if eq .ActiveTab "basic"}} class="active"{{end}}>{{T "settings.tab.basic"}}</a>{{end}}
+  <a href="/admin/settings/ai"{{if eq .ActiveTab "ai"}} class="active"{{end}}>{{T "settings.tab.ai"}}</a>
+  <a href="/admin/settings/screen"{{if eq .ActiveTab "screen"}} class="active"{{end}}>{{T "settings.tab.screen"}}</a>
+</nav>
+
+{{if .FlashSuccess}}<p class="alert success">{{.FlashSuccess}}</p>{{end}}
+{{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
+
+<form method="post" action="/admin/settings/basic" class="form-stack" data-unsaved-warn>
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+  <div class="panel">
+    <div class="panel-head"><h2>{{T "settings.blog"}}</h2></div>
+    <div class="panel-body form-stack">
+      <div class="form-row">
+        <div class="label">{{T "settings.blog.title"}}</div>
+        <input type="text" name="title" value="{{.Weblog.Title}}" required autofocus>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "settings.blog.description"}}</div>
+        <textarea name="description" rows="3">{{.Weblog.Description}}</textarea>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "settings.blog.baseUrl"}}</div>
+        <div>
+          <input type="text" name="base_url" value="{{.Weblog.BaseURL}}" placeholder="https://example.com/">
+          <p class="hint">{{T "settings.blog.baseUrlHint"}}</p>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "settings.blog.lang"}}</div>
+        <div>
+          <input type="text" name="lang" value="{{.Weblog.Lang}}" placeholder="ja">
+          <p class="hint">{{THTML "settings.blog.langHint"}}</p>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "settings.blog.llms"}}</div>
+        <div class="radio-row">
+          <label class="inline-field"><input type="radio" name="llms_enabled" value="1"{{if .Weblog.LLMSEnabled}} checked{{end}}> {{T "settings.blog.llmsPublic"}}</label>
+          <label class="inline-field"><input type="radio" name="llms_enabled" value="0"{{if not .Weblog.LLMSEnabled}} checked{{end}}> {{T "settings.blog.llmsPrivate"}}</label>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="label"></div>
+        <p class="hint">{{THTML "settings.blog.llmsHint"}}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>{{T "settings.ops.env"}}</h2></div>
+    <div class="panel-body">
+      <p class="hint">{{THTML "settings.ops.env.hint"}}</p>
+      <table class="listing">
+        <tbody>
+          <tr><th>{{T "settings.ops.env.turnstile"}}</th><td>{{if .Ops.TurnstileEnabled}}{{T "settings.ops.env.turnstileOn"}}{{else}}{{T "settings.ops.env.turnstileOff"}}{{end}}</td></tr>
+          <tr><th>{{T "settings.ops.env.uploadMax"}}</th><td>{{.Ops.UploadMaxMB}} MB <code>(SB_UPLOAD_MAX_MB)</code></td></tr>
+          <tr><th>{{T "settings.ops.env.imageDir"}}</th><td><code>{{.Ops.ImageDir}}</code> <code>(SB_IMAGE_DIR)</code></td></tr>
+          <tr><th>{{T "settings.ops.env.rebuildOut"}}</th><td><code>{{.Ops.RebuildOutDir}}</code> <code>(SB_REBUILD_OUT)</code></td></tr>
+          <tr><th>{{T "settings.ops.env.analytics"}}</th><td>{{.Ops.AnalyticsState}}</td></tr>
+          <tr><th>{{T "settings.ops.env.mcpAudit"}}</th><td>{{.Ops.MCPAuditState}} <code>(SB_MCP_AUDIT_DB)</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="primary">{{T "action.save"}}</button>
+  </div>
+</form>
+{{end}}

@@ -1,0 +1,113 @@
+{{define "content"}}
+<h1>{{T "images.title"}}</h1>
+
+{{if .FlashSuccess}}<p class="alert success">{{T "images.flash.uploaded"}}</p>{{end}}
+{{if .FlashError}}<p class="alert error">{{.FlashError}}</p>{{end}}
+
+<div class="panel">
+  <div class="panel-head">
+    <h2>{{T "images.addPanel"}}</h2>
+    <span class="hint">{{Tf "images.limit" .UploadMaxMB}}</span>
+  </div>
+  <div class="panel-body">
+    <form method="post" action="/admin/images" enctype="multipart/form-data" class="upload-form"
+          data-upload data-csrf="{{.CSRFToken}}">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <label class="drop-zone" data-drop-zone>
+        <span class="drop-zone-text">{{T "images.dropZone"}}</span>
+        <span class="drop-zone-progress" hidden></span>
+        <input type="file" name="file" accept="image/jpeg,image/png,image/gif,image/webp" data-drop-input>
+      </label>
+      <noscript>
+        <div class="form-actions" style="justify-content:flex-start;padding-top:0.5rem;border:none;margin:0">
+          <button type="submit" class="primary">{{T "action.upload"}}</button>
+        </div>
+      </noscript>
+    </form>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <h2>{{Tf "images.libraryPanel" .TotalCount}}</h2>
+    <div class="library-controls">
+      <input type="search" placeholder="{{T `images.filterPlaceholder`}}" data-image-filter aria-label="{{T `images.filterPlaceholder`}}">
+      <div class="view-toggle" role="group" aria-label="{{T `images.viewMode`}}">
+        <a href="?page={{.Page}}&view=grid" class="view-btn {{if eq .ViewMode "grid"}}active{{end}}" aria-label="{{T `images.viewThumb`}}">⌗</a>
+        <a href="?page={{.Page}}&view=list" class="view-btn {{if eq .ViewMode "list"}}active{{end}}" aria-label="{{T `images.viewList`}}">≣</a>
+      </div>
+    </div>
+  </div>
+  <div class="panel-body">
+    {{if .Images}}
+    {{if eq .ViewMode "list"}}
+    <table class="listing listing-cards" data-image-filterable>
+      <thead><tr>
+        <th class="col-id col-hide-mobile">{{T "common.col.id"}}</th>
+        <th class="col-icon">{{T "images.col.icon"}}</th>
+        <th class="col-flex-wide">{{T "images.col.filename"}}</th>
+        <th class="col-flex">{{T "images.col.size"}}</th>
+        <th class="col-actions">{{T "common.col.action"}}</th>
+      </tr></thead>
+      <tbody>
+      {{range .Images}}
+        <tr class="image-row"
+            data-filename="{{.Filename}}"
+            data-image-url="{{$.ImagesPrefix}}{{.StoredPath}}"
+            data-image-alt="{{.Filename}}">
+          <td class="num col-id col-hide-mobile">{{.ID}}</td>
+          <td class="col-icon">
+            <img class="image-row-icon" src="{{if .ThumbPath}}{{$.ImagesPrefix}}{{.ThumbPath}}{{else}}{{$.ImagesPrefix}}{{.StoredPath}}{{end}}" alt="{{.Filename}}" loading="lazy">
+          </td>
+          <td class="col-flex-wide cell-clamp-host col-primary" title="{{.Filename}}"><div class="cell-clamp-2">{{.Filename}}</div></td>
+          <td class="col-flex" data-label="{{T `images.col.size`}}">{{if .Width}}{{.Width}}×{{.Height}} / {{end}}{{.SizeBytes}} B</td>
+          <td class="col-actions">
+            <button type="button" class="btn-icon" data-copy-url="{{$.ImagesPrefix}}{{.StoredPath}}" aria-label="{{T `images.copyUrl`}}" title="{{T `images.copyUrl`}}">{{iconCopy}}</button>
+            {{- $canDeleteImg := $.User.CanDeleteImage .UploadedBy -}}
+            <form method="post" action="/admin/images/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `images.delete.confirm`}}')">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{if $canDeleteImg}}{{T `action.delete`}}{{else}}{{T `action.delete.forbiddenOwner`}}{{end}}"{{if not $canDeleteImg}} disabled{{end}}>{{iconTrash}}</button>
+            </form>
+          </td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <ul class="image-gallery" data-gallery data-image-filterable>
+      {{range .Images}}
+      <li class="image-tile" data-filename="{{.Filename}}" data-image-url="{{$.ImagesPrefix}}{{.StoredPath}}" data-image-alt="{{.Filename}}">
+        <figure>
+          <img src="{{if .ThumbPath}}{{$.ImagesPrefix}}{{.ThumbPath}}{{else}}{{$.ImagesPrefix}}{{.StoredPath}}{{end}}"
+               alt="{{.Filename}}" loading="lazy">
+          <figcaption>
+            <span class="name" title="{{.Filename}}">{{.Filename}}</span>
+            <span class="dim">{{if .Width}}{{.Width}}×{{.Height}}{{end}}</span>
+          </figcaption>
+        </figure>
+        <div class="image-actions">
+          <button type="button" class="link" data-copy-url="{{$.ImagesPrefix}}{{.StoredPath}}">{{T "images.copyUrl"}}</button>
+          {{- $canDeleteImg := $.User.CanDeleteImage .UploadedBy -}}
+          <form method="post" action="/admin/images/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `images.delete.confirm`}}')">
+            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+            <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{if $canDeleteImg}}{{T `action.delete`}}{{else}}{{T `action.delete.forbiddenOwner`}}{{end}}"{{if not $canDeleteImg}} disabled{{end}}>{{iconTrash}}</button>
+          </form>
+        </div>
+      </li>
+      {{end}}
+    </ul>
+    {{end}}
+
+    {{if gt .TotalPages 1}}
+    <nav class="pager">
+      {{if .PrevPage}}<a href="?page={{.PrevPage}}&view={{.ViewMode}}">{{T "images.pager.prev"}}</a>{{else}}<span class="disabled">{{T "images.pager.prev"}}</span>{{end}}
+      <span class="pager-state">{{.Page}} / {{.TotalPages}}</span>
+      {{if .NextPage}}<a href="?page={{.NextPage}}&view={{.ViewMode}}">{{T "images.pager.next"}}</a>{{else}}<span class="disabled">{{T "images.pager.next"}}</span>{{end}}
+    </nav>
+    {{end}}
+    {{else}}
+      <p class="hint">{{T "images.empty"}}</p>
+    {{end}}
+  </div>
+</div>
+{{end}}

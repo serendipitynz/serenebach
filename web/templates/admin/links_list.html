@@ -1,0 +1,69 @@
+{{define "content"}}
+<h1>{{T "links.title"}}</h1>
+
+{{if eq .Flash "saved"}}<p class="alert success">{{T "flash.saved"}}</p>{{end}}
+{{if eq .Flash "deleted"}}<p class="alert success">{{T "flash.deleted"}}</p>{{end}}
+
+<div class="panel">
+  <div class="panel-head">
+    <h2>{{Tf "links.heading" (len .Links)}}</h2>
+    <a href="/admin/links/new" class="more">{{T "action.newItem"}}</a>
+  </div>
+  <div class="panel-body">
+    {{if .Links}}
+    <table class="listing sortable" data-link-sortable data-csrf="{{.CSRFToken}}">
+      <thead><tr>
+        <th class="col-drag col-hide-mobile"></th>
+        <th class="col-id col-hide-mobile">{{T "common.col.id"}}</th>
+        <th class="col-flex-wide">{{T "links.col.site"}}</th>
+        <th class="col-flex-wide col-hide-mobile">{{T "links.col.url"}}</th>
+        <th class="col-status">{{T "links.col.status"}}</th>
+        <th class="col-actions">{{T "common.col.delete"}}</th>
+      </tr></thead>
+      <tbody>
+      {{range .Links}}
+        <tr data-link-id="{{.ID}}" draggable="true" class="{{if .IsGroup}}link-group{{end}}">
+          <td class="drag-handle col-drag col-hide-mobile" title="{{T `common.dragToReorder`}}" aria-label="{{T `common.dragToReorder`}}">≡</td>
+          <td class="num col-id col-hide-mobile">{{.ID}}</td>
+          <td class="col-flex-wide">
+            {{- if .IsGroup -}}
+              <a href="/admin/links/{{.ID}}/edit" class="link-group-name">{{iconFolder}}<span>{{.Name}}</span></a>
+            {{- else -}}
+              <a href="/admin/links/{{.ID}}/edit">{{.Name}}</a>
+            {{- end -}}
+          </td>
+          <td class="col-flex-wide col-hide-mobile">
+            {{- if .IsGroup -}}
+              <span class="hint">{{Tf "links.group.childCount" .ChildCount}}</span>
+            {{- else if .URL -}}
+              <a href="{{.URL}}" target="_blank" rel="noopener">{{.URL}}</a>
+            {{- else -}}
+              <span class="hint">{{T "common.dash"}}</span>
+            {{- end -}}
+          </td>
+          <td class="col-status">
+            {{- if .IsGroup -}}
+              <span class="hint">{{T "links.group.status"}}</span>
+            {{- else if eq .Disp 0 -}}
+              {{T "status.visible"}}
+            {{- else -}}
+              <span class="hint">{{T "status.hidden"}}</span>
+            {{- end -}}
+          </td>
+          <td class="col-actions">
+            <form method="post" action="/admin/links/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{if .IsGroup}}{{T `links.delete.confirmGroup`}}{{else}}{{T `links.delete.confirmLink`}}{{end}}')">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{T `action.delete`}}">{{iconTrash}}</button>
+            </form>
+          </td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    <p class="reorder-status" data-reorder-status hidden></p>
+    {{else}}
+      <p class="hint">{{T "links.empty"}}</p>
+    {{end}}
+  </div>
+</div>
+{{end}}

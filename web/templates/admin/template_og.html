@@ -1,0 +1,71 @@
+{{define "content"}}
+<h1>{{T "templates.title"}}</h1>
+
+<nav class="tabbar">
+  <a href="/admin/templates">{{T "templates.tab.list"}}</a>
+  <a href="/admin/templates/settings">{{T "templates.tab.settings"}}</a>
+  <a href="/admin/templates/import">{{T "templates.tab.import"}}</a>
+  <a href="/admin/templates/og" class="active">{{T "templates.tab.og"}}</a>
+</nav>
+
+{{if eq .Flash "saved"}}<p class="alert success">{{T "flash.saved"}}</p>{{end}}
+{{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
+
+<form method="post" action="/admin/templates/og" class="form-stack" data-unsaved-warn>
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+  <div class="panel">
+    <div class="panel-head"><h2>{{T "templates.og.panelHeading"}}</h2></div>
+    <div class="panel-body form-stack">
+      <p class="hint">{{T "templates.og.hint"}}</p>
+
+      <div class="form-row" data-og-bg-field>
+        <div class="label">{{T "settings.blog.ogBg"}}</div>
+        <div>
+          <input type="hidden" name="og_bg_image_path" value="{{.Weblog.OGBGImagePath}}" data-og-bg-input>
+          <div class="og-bg-row">
+            <img class="og-bg-preview" data-og-bg-preview
+                 {{if .Weblog.OGBGImagePath}}src="/img/{{.Weblog.OGBGImagePath}}"{{else}}hidden{{end}}
+                 alt="">
+            <button type="button" class="link" data-og-bg-picker>{{T "settings.blog.ogBg.pick"}}</button>
+            <button type="button" class="link" data-og-bg-clear>{{T "settings.blog.ogBg.clear"}}</button>
+          </div>
+          <p class="hint">{{T "settings.blog.ogBgHint"}}</p>
+          <div class="image-picker" hidden data-image-picker>
+            <input type="search" class="image-picker-filter" placeholder="{{T `entries.form.imgFilter`}}" data-image-picker-filter aria-label="{{T `entries.form.imgFilterAria`}}">
+            <div data-image-picker-body></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row" data-og-text-color-field>
+        <div class="label">{{T "settings.blog.ogTextColor"}}</div>
+        <div>
+          {{- $transparent := eq .Weblog.OGTextColor "#00000000" -}}
+          {{- $color := .Weblog.OGTextColor -}}
+          {{- if or (eq $color "") $transparent -}}{{- $color = "#475569" -}}{{- end -}}
+          <div class="og-text-color-row">
+            <input type="color" name="og_text_color" value="{{$color}}"
+                   data-og-text-color-picker
+                   {{if $transparent}}disabled{{end}}>
+            <label class="inline-field">
+              <input type="checkbox" name="og_text_transparent" value="1"
+                     data-og-text-transparent
+                     {{if $transparent}}checked{{end}}>
+              {{T "settings.blog.ogTextColor.transparent"}}
+            </label>
+            <input type="hidden" name="og_text_color_unset" value="{{if eq .Weblog.OGTextColor ""}}1{{else}}0{{end}}" data-og-text-color-unset>
+            <button type="button" class="link" data-og-text-color-clear>{{T "settings.blog.ogTextColor.clear"}}</button>
+          </div>
+          <p class="hint">{{T "settings.blog.ogTextColorHint"}}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <a href="/admin/templates">{{T "action.back"}}</a>
+    <button type="submit" class="primary">{{T "action.save"}}</button>
+  </div>
+</form>
+{{end}}

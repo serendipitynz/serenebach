@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="{site_lang}">
+<head>
+<meta charset="{site_encoding}">
+<title>{site_title}</title>
+<link rel="stylesheet" href="{site_css}">
+<meta property="og:title" content="{entry_title}">
+<meta property="og:description" content="{blog_description}">
+<meta property="og:image" content="{entry_og_image}">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+<header>
+<!-- BEGIN title -->
+<h1>{blog_name}</h1>
+<p class="description">{blog_description}</p>
+<!-- END title -->
+</header>
+<main>
+<!-- BEGIN entry -->
+<article class="entry">
+<h2><a href="{entry_permalink}">{entry_title}</a></h2>
+<div class="meta">
+<time>{entry_date}</time>
+<span class="category">{category_name}</span>
+<span class="author">{user_disp_name}</span>
+</div>
+<div class="body">{entry_description}</div>
+<form method="post" action="{entry_like_url}" class="like-form">
+<input type="hidden" name="csrf_token" value="{csrf_token}">
+<button type="submit" class="like-btn" aria-label="いいね">❤ {entry_likes_count}</button>
+</form>
+<!-- BEGIN sequel -->
+<div class="sequel">{entry_sequel}</div>
+<nav class="entry-nav">{prev_entry} <a href="{site_top}">home</a> {next_entry}</nav>
+<!-- END sequel -->
+</article>
+<!-- END entry -->
+<!-- BEGIN comment_area -->
+<section class="comments">
+<h3>Comments</h3>
+<!-- BEGIN comment -->
+<div class="comment">
+<p class="meta"><strong>{comment_name}</strong> <time>{comment_time}</time></p>
+<div class="body">{comment_description}</div>
+</div>
+<!-- END comment -->
+<form method="post" action="{comment_post_url}" class="comment-form">
+<p class="form-error">{comment_error}</p>
+<label>Name <input type="text" name="name" value="{cookie_name}" required></label>
+<label>Email (optional) <input type="email" name="email" value="{cookie_email}"></label>
+<label>URL (optional) <input type="url" name="url" value="{cookie_url}"></label>
+<label>Comment <textarea name="description" rows="4" required></textarea></label>
+<label class="cookie-opt"><input type="checkbox" name="set_cookie" value="1"> 次回のために名前・メール・URL をブラウザに記憶する</label>
+{turnstile_widget}
+<input type="hidden" name="entry_id" value="{entry_id}">
+<input type="hidden" name="_ts" value="{form_ts}">
+<input type="hidden" name="csrf_token" value="{csrf_token}">
+<input type="text" name="website" value="" tabindex="-1" autocomplete="off" style="display:none" aria-hidden="true">
+<button type="submit">Post comment</button>
+</form>
+</section>
+<!-- END comment_area -->
+</main>
+<footer>
+<p>Powered by <a href="https://github.com/serendipitynz/serenebach">Serene Bach</a></p>
+</footer>
+</body>
+</html>

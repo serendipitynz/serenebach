@@ -1,0 +1,80 @@
+version: '3'
+
+# Dotenv files are loaded into every task's environment. `.env` is the
+# local-developer file (gitignored); `.env.example` is checked in as a
+# template. Existing shell env vars take precedence — dotenv never
+# overrides something the operator already set.
+dotenv: ['.env']
+
+vars:
+  PKG: ./cmd/serenebach
+  OUT: bin/serenebach
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  dev:
+    desc: Run serenebach on :8080 with dev database
+    cmds:
+      - go run {{.PKG}} --addr=:8080 --db=./data/dev.db
+
+  build:
+    desc: Build the native binary
+    cmds:
+      - go build -o {{.OUT}} {{.PKG}}
+
+  build-cgi:
+    desc: Cross-compile a Linux x86_64 CGI binary
+    env:
+      CGO_ENABLED: '0'
+      GOOS: linux
+      GOARCH: amd64
+    cmds:
+      - go build -ldflags="-s -w" -o {{.OUT}}.cgi {{.PKG}}
+
+  build-pi:
+    desc: Cross-compile a Linux arm64 binary for Raspberry Pi / ARM VPS
+    env:
+      CGO_ENABLED: '0'
+      GOOS: linux
+      GOARCH: arm64
+    cmds:
+      - go build -ldflags="-s -w" -o {{.OUT}}.arm64 {{.PKG}}
+
+  seed:
+    desc: Create the initial weblog + admin user (idempotent)
+    cmds:
+      - go run {{.PKG}} --db=./data/dev.db seed
+
+  migrate:
+    desc: Apply any pending migrations (runs on every startup anyway)
+    cmds:
+      - go run {{.PKG}} --db=./data/dev.db migrate
+
+  import:
+    desc: "Import from a legacy SB3 SQLite db. Usage: task import -- /path/to/sb3.db"
+    cmds:
+      - go run {{.PKG}} --db=./data/dev.db import {{.CLI_ARGS}}
+
+  build-site:
+    desc: Render the public site as static HTML under ./data/public
+    cmds:
+      - go run {{.PKG}} --db=./data/dev.db build --out=./data/public
+
+  test:
+    desc: Run the Go test suite
+    cmds:
+      - go test ./...
+
+  tidy:
+    desc: Sync go.mod / go.sum
+    cmds:
+      - go mod tidy
+
+  clean:
+    desc: Remove build output and the dev database
+    cmds:
+      - rm -rf bin data

@@ -1,0 +1,109 @@
+{{define "content"}}
+<h1>{{if .Link.ID}}{{if .Link.IsGroup}}{{Tf "links.form.titleEditGroup" .Link.ID}}{{else}}{{Tf "links.form.titleEditLink" .Link.ID}}{{end}}{{else}}{{if .Link.IsGroup}}{{T "links.form.titleNewGroup"}}{{else}}{{T "links.form.titleNewLink"}}{{end}}{{end}}</h1>
+
+{{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
+
+<form method="post" action="{{.Action}}" class="form-stack link-form" data-link-form data-unsaved-warn>
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+  <div class="form-row">
+    <div class="label">{{T "links.form.name"}}</div>
+    <input type="text" name="name" value="{{.Link.Name}}" autofocus required>
+  </div>
+
+  <div class="form-row">
+    <div class="label">{{T "links.form.description"}}</div>
+    <div>
+      <input type="text" name="description" value="{{.Link.Description}}" placeholder="{{T `links.form.descriptionPlaceholder`}}">
+    </div>
+  </div>
+
+  {{if and .IsNew (not .LockKind)}}
+  <div class="form-row">
+    <div class="label">{{T "links.form.kind"}}</div>
+    <div class="radio-row">
+      <label class="inline-field"><input type="radio" name="kind" value="link" data-link-kind{{if ne .Link.Kind "group"}} checked{{end}}> {{T "links.form.kind.link"}}</label>
+      <label class="inline-field"><input type="radio" name="kind" value="group" data-link-kind{{if eq .Link.Kind "group"}} checked{{end}}> {{T "links.form.kind.group"}}</label>
+    </div>
+  </div>
+  {{else if .LockKind}}
+  <input type="hidden" name="kind" value="{{.Link.Kind}}">
+  {{end}}
+
+  <div class="form-stack" data-link-fields{{if .Link.IsGroup}} hidden{{end}}>
+    <div class="form-row">
+      <div class="label">{{T "links.form.url"}}</div>
+      <input type="text" name="url" value="{{.Link.URL}}" placeholder="https://example.com/">
+    </div>
+
+    <div class="form-row">
+      <div class="label">{{T "links.form.target"}}</div>
+      <div>
+        <input type="text" name="target" value="{{.Link.Target}}" placeholder="{{T `links.form.targetPlaceholder`}}">
+        <p class="hint">{{T "links.form.targetHint"}}</p>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="label">{{T "links.form.parent"}}</div>
+      <select name="parent_id">
+        <option value="0"{{if eq .Link.ParentID 0}} selected{{end}}>{{T "links.form.parent.none"}}</option>
+        {{range .Groups}}<option value="{{.ID}}"{{if eq $.Link.ParentID .ID}} selected{{end}}>{{.Name}}</option>{{end}}
+      </select>
+    </div>
+
+    <div class="form-row">
+      <div class="label">{{T "links.form.dispLabel"}}</div>
+      <div class="radio-row">
+        <label class="inline-field"><input type="radio" name="disp" value="0"{{if eq .Link.Disp 0}} checked{{end}}> {{T "status.visible"}}</label>
+        <label class="inline-field"><input type="radio" name="disp" value="hidden"{{if ne .Link.Disp 0}} checked{{end}}> {{T "status.hidden"}}</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <a href="{{.BackURL}}">{{.BackLabel}}</a>
+    <button type="submit" class="primary">{{T "action.save"}}</button>
+  </div>
+</form>
+
+{{if and .Link.ID .Link.IsGroup}}
+<div class="panel link-members">
+  <div class="panel-head">
+    <h2>{{Tf "links.form.members" (len .Members)}}</h2>
+    <a href="/admin/links/new?parent={{.Link.ID}}" class="more">{{T "action.newLink"}}</a>
+  </div>
+  <div class="panel-body">
+    {{if .Members}}
+    <table class="listing">
+      <thead><tr>
+        <th class="col-id">{{T "common.col.id"}}</th>
+        <th class="col-flex-wide">{{T "links.col.site"}}</th>
+        <th class="col-flex-wide">{{T "links.col.url"}}</th>
+        <th class="col-status">{{T "links.col.status"}}</th>
+        <th class="col-action">{{T "common.col.delete"}}</th>
+      </tr></thead>
+      <tbody>
+      {{range .Members}}
+        <tr>
+          <td class="num col-id">{{.ID}}</td>
+          <td class="col-flex-wide"><a href="/admin/links/{{.ID}}/edit">{{.Name}}</a></td>
+          <td class="col-flex-wide">{{if .URL}}<a href="{{.URL}}" target="_blank" rel="noopener">{{.URL}}</a>{{else}}<span class="hint">{{T "common.dash"}}</span>{{end}}</td>
+          <td class="col-status">{{if eq .Disp 0}}{{T "status.visible"}}{{else}}<span class="hint">{{T "status.hidden"}}</span>{{end}}</td>
+          <td class="col-action">
+            <form method="post" action="/admin/links/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `links.delete.confirmLink`}}')">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{T `action.delete`}}">{{iconTrash}}</button>
+            </form>
+          </td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+      <p class="hint">{{T "links.form.membersEmpty"}}</p>
+    {{end}}
+  </div>
+</div>
+{{end}}
+{{end}}

@@ -1,0 +1,99 @@
+{{define "content"}}
+{{- $aceMode := "html" -}}
+{{- if eq .Target.DescriptionFormat "markdown" -}}{{- $aceMode = "markdown" -}}{{- end -}}
+<h1>{{if .IsNew}}{{T "users.form.titleNew"}}{{else}}{{Tf "users.form.titleEdit" .Target.ID}}{{end}}</h1>
+
+{{if eq .Flash "saved"}}<p class="alert success">{{T "flash.saved"}}</p>{{end}}
+{{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
+
+<form method="post" action="{{.Action}}" class="form-stack" data-rich-description data-unsaved-warn>
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+  <div class="panel">
+    <div class="panel-head"><h2>{{T "users.form.basicPanel"}}</h2></div>
+    <div class="panel-body form-stack">
+      <div class="form-row">
+        <div class="label">{{T "users.form.name"}}</div>
+        <div>
+          <input type="text" name="name" value="{{.Target.Name}}" required pattern="[A-Za-z0-9_.\-]+" maxlength="50"{{if .IsNew}} autofocus{{end}}>
+          <p class="hint">{{T "users.form.nameHint"}}</p>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "users.form.displayName"}}</div>
+        <input type="text" name="display_name" value="{{.Target.DisplayName}}" maxlength="100">
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "users.form.email"}}</div>
+        <input type="email" name="email" value="{{.Target.Email}}">
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "users.form.listVisible"}}</div>
+        <div class="radio-row">
+          <label class="inline-field"><input type="radio" name="list_visible" value="on"{{if .Target.ListVisible}} checked{{end}}> {{T "status.visible"}}</label>
+          <label class="inline-field"><input type="radio" name="list_visible" value="off"{{if not .Target.ListVisible}} checked{{end}}> {{T "status.hidden"}}</label>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "users.form.role"}}</div>
+        <div>
+          {{$selfAdmin := and (not .IsNew) (eq .User.ID .Target.ID) (eq .Target.Role 1)}}
+          <select name="role"{{if $selfAdmin}} disabled{{end}}>
+            <option value="3"{{if eq .Target.Role 3}} selected{{end}}>{{T "role.regular"}}</option>
+            <option value="2"{{if eq .Target.Role 2}} selected{{end}}>{{T "role.power"}}</option>
+            <option value="1"{{if eq .Target.Role 1}} selected{{end}}>{{T "role.admin"}}</option>
+          </select>
+          {{if $selfAdmin}}
+          <input type="hidden" name="role" value="1">
+          <p class="hint">{{T "users.form.selfDemoteHint"}}</p>
+          {{end}}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>{{if .IsNew}}{{T "users.form.passwordPanelNew"}}{{else}}{{T "users.form.passwordPanelEdit"}}{{end}}</h2></div>
+    <div class="panel-body form-stack">
+      {{if not .IsNew}}<p class="hint">{{T "users.form.passwordHint"}}</p>{{end}}
+      <div class="form-row">
+        <div class="label">{{if .IsNew}}{{T "users.form.passwordNew"}}{{else}}{{T "users.form.passwordEdit"}}{{end}}</div>
+        <input type="password" name="password"{{if .IsNew}} required{{end}}>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "users.form.passwordConfirm"}}</div>
+        <input type="password" name="password_confirm"{{if .IsNew}} required{{end}}>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>{{T "users.form.profilePanel"}}</h2></div>
+    <div class="panel-body form-stack">
+      <div class="rich-description">
+        <div class="rich-description-head">
+          <div class="label">{{T "users.form.descriptionLabel"}}</div>
+          <label class="inline-field">{{T "entries.form.formatLabel"}}
+            <select name="description_format" data-code-editor-format>
+              <option value="html"{{if ne .Target.DescriptionFormat "markdown"}} selected{{end}}>HTML</option>
+              <option value="markdown"{{if eq .Target.DescriptionFormat "markdown"}} selected{{end}}>Markdown</option>
+            </select>
+          </label>
+          <button type="button" class="link" data-image-picker-open>{{T "entries.form.insertImage"}}</button>
+        </div>
+        <textarea name="description" rows="8" spellcheck="false"
+                  data-code-editor="{{$aceMode}}" data-code-editor-dynamic data-image-target>{{.Target.Description}}</textarea>
+        <div class="image-picker" hidden data-image-picker>
+          <input type="search" class="image-picker-filter" placeholder="{{T `entries.form.imgFilter`}}" data-image-picker-filter aria-label="{{T `entries.form.imgFilterAria`}}">
+          <div data-image-picker-body></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <a href="/admin/users">{{T "action.back"}}</a>
+    <button type="submit" class="primary">{{if .IsNew}}{{T "users.form.addButton"}}{{else}}{{T "action.save"}}{{end}}</button>
+  </div>
+</form>
+{{end}}
