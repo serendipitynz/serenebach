@@ -136,7 +136,7 @@ tasks:
       - rm -rf bin data dist
 
   release:
-    desc: Cross-build all targets, package, checksum, tag, and create a draft GitHub release
+    desc: Cross-build all targets, package, checksum, and stage a draft GitHub release (tag is created when the draft is published)
     vars:
       VERSION:
         sh: awk -F'"' '/^const Public/ {print $2}' internal/version/version.go
@@ -148,10 +148,16 @@ tasks:
         set -euo pipefail
         TAG="{{.TAG}}"
 
-        # Pre-flight: refuse to release from a dirty tree or over an
-        # existing tag — both are irreversible if pushed.
+        # Pre-flight: refuse to release from a dirty tree, with
+        # unpushed local commits, or when the tag already exists.
+        # Tag creation itself is delegated to gh on draft publish,
+        # so there is no half-state to clean up if a later step fails.
         if [ -n "$(git status --porcelain)" ]; then
           echo "ERROR: working tree is dirty. Commit or stash before releasing." >&2
+          exit 1
+        fi
+        if [ -n "$(git log @{u}..HEAD --oneline 2>/dev/null)" ]; then
+          echo "ERROR: local HEAD has commits not pushed to origin. Push them first so gh can target this commit." >&2
           exit 1
         fi
         if git rev-parse --verify --quiet "$TAG" >/dev/null; then
@@ -160,6 +166,12 @@ tasks:
         fi
         if git ls-remote --tags --exit-code origin "$TAG" >/dev/null 2>&1; then
           echo "ERROR: tag $TAG already exists on origin." >&2
+          exit 1
+        fi
+        # Also catch a stale draft release for the same tag — gh would
+        # otherwise refuse to create a second one.
+        if gh release view "$TAG" >/dev/null 2>&1; then
+          echo "ERROR: a release for $TAG already exists on GitHub (possibly a leftover draft). Delete it first with: gh release delete $TAG" >&2
           exit 1
         fi
 
@@ -200,14 +212,16 @@ tasks:
         echo "==> Generating SHA256SUMS"
         (cd dist && shasum -a 256 *.tar.gz *.zip > SHA256SUMS)
 
-        echo "==> Tagging $TAG and pushing"
-        git tag "$TAG"
-        git push origin "$TAG"
-
-        echo "==> Creating draft GitHub release"
+        echo "==> Creating draft GitHub release for $TAG at $(git rev-parse --short HEAD)"
+        # --target tells gh which commit the eventual tag will point to.
+        # In draft mode the tag is NOT created server-side until the draft
+        # is published, so a failure here leaves no remote state to clean up.
         gh release create "$TAG" \
           dist/*.tar.gz dist/*.zip dist/SHA256SUMS \
-          --draft --generate-notes --title "$TAG"
+          --draft --generate-notes \
+          --title "$TAG" \
+          --target "$(git rev-parse HEAD)"
 
         echo
         echo "Done. Review and publish the draft on GitHub."
+        echo "Publishing creates tag $TAG; afterwards, run 'git fetch --tags' to sync locally."
