@@ -1,5 +1,6 @@
 /bin/
 /data/
+/dist/
 *.db
 *.db-journal
 *.db-wal

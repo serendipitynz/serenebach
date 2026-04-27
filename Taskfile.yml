@@ -26,23 +26,79 @@ tasks:
     cmds:
       - go build -o {{.OUT}} {{.PKG}}
 
-  build-cgi:
-    desc: Cross-compile a Linux x86_64 CGI binary
-    env:
-      CGO_ENABLED: '0'
-      GOOS: linux
-      GOARCH: amd64
-    cmds:
-      - go build -ldflags="-s -w" -o {{.OUT}}.cgi {{.PKG}}
+  # Cross-compilation targets are named by build configuration
+  # (GOOS-GOARCH) rather than by use case. Pure-Go SQLite
+  # (modernc.org/sqlite) keeps CGO_ENABLED=0 viable on every target.
+  # Output: bin/serenebach-{os}-{arch} (with .exe on windows).
 
-  build-pi:
-    desc: Cross-compile a Linux arm64 binary for Raspberry Pi / ARM VPS
+  build-linux-amd64:
+    desc: Cross-compile linux/amd64 (typical Linux servers, CGI hosts)
+    cmds:
+      - task: _cross
+        vars: {GOOS: linux, GOARCH: amd64}
+
+  build-linux-arm64:
+    desc: Cross-compile linux/arm64 (Raspberry Pi, ARM VPS)
+    cmds:
+      - task: _cross
+        vars: {GOOS: linux, GOARCH: arm64}
+
+  build-freebsd-amd64:
+    desc: Cross-compile freebsd/amd64
+    cmds:
+      - task: _cross
+        vars: {GOOS: freebsd, GOARCH: amd64}
+
+  build-freebsd-arm64:
+    desc: Cross-compile freebsd/arm64
+    cmds:
+      - task: _cross
+        vars: {GOOS: freebsd, GOARCH: arm64}
+
+  build-windows-amd64:
+    desc: Cross-compile windows/amd64
+    cmds:
+      - task: _cross
+        vars: {GOOS: windows, GOARCH: amd64}
+
+  build-windows-arm64:
+    desc: Cross-compile windows/arm64
+    cmds:
+      - task: _cross
+        vars: {GOOS: windows, GOARCH: arm64}
+
+  build-darwin-amd64:
+    desc: Cross-compile darwin/amd64 (Intel Mac)
+    cmds:
+      - task: _cross
+        vars: {GOOS: darwin, GOARCH: amd64}
+
+  build-darwin-arm64:
+    desc: Cross-compile darwin/arm64 (Apple Silicon)
+    cmds:
+      - task: _cross
+        vars: {GOOS: darwin, GOARCH: arm64}
+
+  build-all:
+    desc: Cross-compile all 8 targets into bin/ (deps run in parallel)
+    deps:
+      - build-linux-amd64
+      - build-linux-arm64
+      - build-freebsd-amd64
+      - build-freebsd-arm64
+      - build-windows-amd64
+      - build-windows-arm64
+      - build-darwin-amd64
+      - build-darwin-arm64
+
+  _cross:
+    internal: true
     env:
       CGO_ENABLED: '0'
-      GOOS: linux
-      GOARCH: arm64
+      GOOS: '{{.GOOS}}'
+      GOARCH: '{{.GOARCH}}'
     cmds:
-      - go build -ldflags="-s -w" -o {{.OUT}}.arm64 {{.PKG}}
+      - go build -ldflags="-s -w" -o {{.OUT}}-{{.GOOS}}-{{.GOARCH}}{{if eq .GOOS "windows"}}.exe{{end}} {{.PKG}}
 
   seed:
     desc: Create the initial weblog + admin user (idempotent)
@@ -77,4 +133,95 @@ tasks:
   clean:
     desc: Remove build output and the dev database
     cmds:
-      - rm -rf bin data
+      - rm -rf bin data dist
+
+  release:
+    desc: Cross-build all targets, package, checksum, and stage a draft GitHub release (tag is created when the draft is published)
+    vars:
+      VERSION:
+        sh: awk -F'"' '/^const Public/ {print $2}' internal/version/version.go
+      TAG: 'v{{.VERSION}}'
+      UNIX_TARGETS: linux-amd64 linux-arm64 freebsd-amd64 freebsd-arm64 darwin-amd64 darwin-arm64
+      WIN_TARGETS: windows-amd64 windows-arm64
+    cmds:
+      - |
+        set -euo pipefail
+        TAG="{{.TAG}}"
+
+        # Pre-flight: refuse to release from a dirty tree, with
+        # unpushed local commits, or when the tag already exists.
+        # Tag creation itself is delegated to gh on draft publish,
+        # so there is no half-state to clean up if a later step fails.
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "ERROR: working tree is dirty. Commit or stash before releasing." >&2
+          exit 1
+        fi
+        if [ -n "$(git log @{u}..HEAD --oneline 2>/dev/null)" ]; then
+          echo "ERROR: local HEAD has commits not pushed to origin. Push them first so gh can target this commit." >&2
+          exit 1
+        fi
+        if git rev-parse --verify --quiet "$TAG" >/dev/null; then
+          echo "ERROR: tag $TAG already exists locally. Bump internal/version/version.go first." >&2
+          exit 1
+        fi
+        if git ls-remote --tags --exit-code origin "$TAG" >/dev/null 2>&1; then
+          echo "ERROR: tag $TAG already exists on origin." >&2
+          exit 1
+        fi
+        # Also catch a stale draft release for the same tag — gh would
+        # otherwise refuse to create a second one.
+        if gh release view "$TAG" >/dev/null 2>&1; then
+          echo "ERROR: a release for $TAG already exists on GitHub (possibly a leftover draft). Delete it first with: gh release delete $TAG" >&2
+          exit 1
+        fi
+
+        rm -rf dist
+        mkdir -p dist
+
+        echo "==> Building $TAG for 8 targets"
+      - for: { var: UNIX_TARGETS, split: ' ' }
+        task: 'build-{{.ITEM}}'
+      - for: { var: WIN_TARGETS, split: ' ' }
+        task: 'build-{{.ITEM}}'
+      - |
+        set -euo pipefail
+        TAG="{{.TAG}}"
+
+        echo "==> Packaging tar.gz for unix targets"
+        for target in {{.UNIX_TARGETS}}; do
+          name="serenebach-${TAG}-${target}"
+          stage="dist/${name}"
+          mkdir -p "$stage"
+          cp "bin/serenebach-${target}" "${stage}/serenebach"
+          cp README.md README.ja.md LICENSE "$stage/"
+          tar -C dist -czf "dist/${name}.tar.gz" "$name"
+          rm -rf "$stage"
+        done
+
+        echo "==> Packaging zip for windows targets"
+        for target in {{.WIN_TARGETS}}; do
+          name="serenebach-${TAG}-${target}"
+          stage="dist/${name}"
+          mkdir -p "$stage"
+          cp "bin/serenebach-${target}.exe" "${stage}/serenebach.exe"
+          cp README.md README.ja.md LICENSE "$stage/"
+          (cd dist && zip -qr "${name}.zip" "$name")
+          rm -rf "$stage"
+        done
+
+        echo "==> Generating SHA256SUMS"
+        (cd dist && shasum -a 256 *.tar.gz *.zip > SHA256SUMS)
+
+        echo "==> Creating draft GitHub release for $TAG at $(git rev-parse --short HEAD)"
+        # --target tells gh which commit the eventual tag will point to.
+        # In draft mode the tag is NOT created server-side until the draft
+        # is published, so a failure here leaves no remote state to clean up.
+        gh release create "$TAG" \
+          dist/*.tar.gz dist/*.zip dist/SHA256SUMS \
+          --draft --generate-notes \
+          --title "$TAG" \
+          --target "$(git rev-parse HEAD)"
+
+        echo
+        echo "Done. Review and publish the draft on GitHub."
+        echo "Publishing creates tag $TAG; afterwards, run 'git fetch --tags' to sync locally."

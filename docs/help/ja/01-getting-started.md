@@ -48,9 +48,10 @@ SB_SEED_NO_SAMPLES=1 ./serenebach seed
 
 ## CGI として使う
 
-CGI 環境では、同じバイナリを CGI スクリプトとして配置できます。Web サーバ側で CGI 実行を有効にし、実行権限を付けてください。
+CGI 環境では、同じバイナリを CGI スクリプトとして配置できます。配布バイナリ（または `task build-linux-amd64` などでクロスコンパイルしたバイナリ）をサーバの種類に合わせて選び、CGI として動かしたい名前（慣例的には `serenebach.cgi`）にリネームしてアップロードします。Web サーバ側で CGI 実行を有効にし、実行権限を付けてください。
 
 ```bash
+mv serenebach-linux-amd64 serenebach.cgi
 chmod +x serenebach.cgi
 ```
 

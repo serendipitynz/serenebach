@@ -48,9 +48,10 @@ Use `--db` to point at a specific database file:
 
 ## Running as CGI
 
-The same binary can be deployed as a CGI program. Enable CGI on your web server and make the binary executable:
+The same binary can be deployed as a CGI program. Pick the distribution binary (or one cross-compiled with `task build-linux-amd64` etc.) that matches your host, rename it to whatever your web server expects (typically `serenebach.cgi`), upload it, enable CGI, and make it executable:
 
 ```bash
+mv serenebach-linux-amd64 serenebach.cgi
 chmod +x serenebach.cgi
 ```
 

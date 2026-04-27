@@ -32,12 +32,23 @@ GATEWAY_INTERFACE=CGI/1.1 SERVER_PROTOCOL=HTTP/1.1 \
   SB_DB=./data/dev.db ./bin/serenebach
 ```
 
-Cross-compile a static CGI binary:
+Cross-compile a static binary for the host. Build tasks are
+named by configuration (`GOOS-GOARCH`), not by use case — pick
+whichever matches the target host:
 
 ```bash
-task build-cgi   # Linux x86_64
-task build-pi    # Linux arm64 (Raspberry Pi / ARM VPS)
+task build-linux-amd64   # → bin/serenebach-linux-amd64
+task build-linux-arm64   # → bin/serenebach-linux-arm64 (Raspberry Pi / ARM VPS)
 ```
+
+Other targets are available too: `build-freebsd-amd64`,
+`build-freebsd-arm64`, `build-windows-amd64`, `build-windows-arm64`,
+`build-darwin-amd64`, `build-darwin-arm64`. Run `task --list` to
+see the full set.
+
+For CGI hosting, copy the appropriate binary to the host and
+rename it (typically to `serenebach.cgi`) to match the web server's
+CGI configuration.
 
 ### First-run setup over the browser
 

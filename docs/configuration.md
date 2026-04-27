@@ -51,8 +51,9 @@ the Taskfile is optional — use it if you like typing less.
 |---|---|
 | `task dev` | Run the server on `:8080` against `./data/dev.db` |
 | `task build` | Build a native binary at `./bin/serenebach` |
-| `task build-cgi` | Cross-compile a Linux x86_64 CGI binary |
-| `task build-pi` | Cross-compile a Linux arm64 binary (Raspberry Pi / ARM VPS) |
+| `task build-{os}-{arch}` | Cross-compile for a specific target. `{os}` ∈ `linux` / `freebsd` / `windows` / `darwin`, `{arch}` ∈ `amd64` / `arm64`. Output: `bin/serenebach-{os}-{arch}` (`.exe` on Windows). Run `task --list` for the full set. |
+| `task build-all` | Cross-compile all eight targets into `bin/` in parallel. |
+| `task release` | Cross-compile all 8 targets, package as `tar.gz` / `zip` with README + LICENSE, generate `SHA256SUMS`, and create a **draft** GitHub release via `gh` for `v{version}` (read from `internal/version/version.go`). The tag is created server-side only when the draft is published, so a failed run leaves no half-state. Refuses to run on a dirty tree, with unpushed commits, over an existing tag, or when a release already exists for the tag. |
 | `task seed` | Create / update the admin user, bundled template, and sample entries |
 | `task migrate` | Apply pending migrations (also runs on every startup) |
 | `task build-site` | Render the whole site to static HTML under `./data/public` |
