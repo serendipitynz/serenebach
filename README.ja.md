@@ -18,14 +18,12 @@
 
 ```bash
 go mod tidy
-task seed   # dev DB を作成、マイグレーション適用、管理ユーザとサンプル投入
-task dev    # :8080 でサーバ起動
+task dev    # :8080 でサーバ起動 (DB は最初のリクエストで自動作成)
 ```
 
-公開サイト: <http://localhost:8080/>
-管理画面: <http://localhost:8080/admin/login>
+ブラウザで <http://localhost:8080/> を開くと、管理者がまだ存在しない初回起動時は **`/setup`** に自動でリダイレクトされます。フォームから管理者ユーザ名・パスワード・サイトのタイトルを設定し、サンプル記事を投入するか選んだら完了です。以降は公開サイトが `/`、管理画面が `/admin/login` で動きます。
 
-`task seed` が作る初期認証情報は `admin` / `changeme`。シード前に `SB_ADMIN_NAME` / `SB_ADMIN_PASSWORD` で上書き可能です。
+CLI 派の方は `task seed` も従来通り使えます。dev DB を作って既定値 (`admin` / `changeme`、`SB_ADMIN_NAME` / `SB_ADMIN_PASSWORD` で上書き可) で管理者を作成し、ブラウザを介さずにセットアップを終えられます。
 
 `.env` のテンプレートは `.env.example` にあります。コピーして編集してください — AI 執筆補助を使う場合は `SB_AI_SECRET` の設定が必要です。
 
