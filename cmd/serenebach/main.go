@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -54,6 +55,14 @@ func main() {
 			spec.SampleEntries = false
 		}
 		if err := a.Seed(context.Background(), spec); err != nil {
+			// An admin already existing is the expected outcome of
+			// re-running seed against a populated DB with a new admin
+			// name — surface it as informational, not fatal, so CLI
+			// re-runs stay ergonomic.
+			if errors.Is(err, app.ErrAdminAlreadyExists) {
+				fmt.Fprintln(os.Stderr, "seed: admin already exists, skipping")
+				return
+			}
 			log.Fatalf("seed: %v", err)
 		}
 		fmt.Fprintln(os.Stderr, "seed: ok")
