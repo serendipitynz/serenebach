@@ -291,6 +291,95 @@ func TestSetupConcurrentSubmitCreatesOneAdmin(t *testing.T) {
 	}
 }
 
+// TestSetupConcurrentSubmitAcrossInstancesCreatesOneAdmin pins the
+// CGI cross-process race that the in-process mutex cannot close.
+// Each CGI request is its own process with its own App, its own
+// connection pool, and its own setupMu — so we simulate that by
+// spinning up two App instances pointing at the same SQLite file
+// and firing concurrent /setup POSTs through each. The atomic
+// `INSERT ... WHERE NOT EXISTS` in seedAdminUser is the synchronisation
+// point; SQLite serialises writes, so only one INSERT lands and the
+// loser surfaces ErrAdminAlreadyExists which the Setup callback
+// translates to ErrSetupAlreadyDone (404).
+func TestSetupConcurrentSubmitAcrossInstancesCreatesOneAdmin(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "shared.db")
+	a1 := newAppPointingAt(t, dbPath)
+	a2 := newAppPointingAt(t, dbPath)
+
+	const perInstance = 4
+	var (
+		wg      sync.WaitGroup
+		mu      sync.Mutex
+		winners int
+	)
+	start := make(chan struct{})
+
+	fire := func(a *app.App, namePrefix string, i int) {
+		defer wg.Done()
+		token, cookie := setupCSRFToken(t, a)
+		form := url.Values{
+			"csrf_token":       {token},
+			"name":             {fmt.Sprintf("%s%d", namePrefix, i)},
+			"password":         {"correcthorse"},
+			"password_confirm": {"correcthorse"},
+		}
+		<-start
+		req := httptest.NewRequest("POST", "/setup",
+			strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(cookie)
+		w := httptest.NewRecorder()
+		a.Handler().ServeHTTP(w, req)
+		if w.Code == http.StatusFound {
+			mu.Lock()
+			winners++
+			mu.Unlock()
+		}
+	}
+
+	for i := 0; i < perInstance; i++ {
+		wg.Add(2)
+		go fire(a1, "alpha", i)
+		go fire(a2, "beta", i)
+	}
+	close(start)
+	wg.Wait()
+
+	if winners != 1 {
+		t.Errorf("redirect winners across two instances = %d, want 1", winners)
+	}
+	var n int
+	if err := a1.DB.QueryRow(`SELECT COUNT(*) FROM users WHERE role = 1`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("admin row count = %d, want 1 across two-instance race", n)
+	}
+}
+
+// newAppPointingAt builds a fresh App whose SQLite file is the
+// caller-supplied path. Lets multiple instances share one DB so a
+// single test can exercise CGI-style cross-process behaviour.
+func newAppPointingAt(t *testing.T, dbPath string) *app.App {
+	t.Helper()
+	cfg := &config.Config{
+		Mode:                 config.ModeServer,
+		Addr:                 ":0",
+		DBPath:               dbPath,
+		RebuildOutDir:        filepath.Join(t.TempDir(), "public"),
+		ImageDir:             filepath.Join(t.TempDir(), "img"),
+		TemplateDir:          filepath.Join(t.TempDir(), "templates"),
+		UploadMaxBytes:       10 << 20,
+		PublicAllowedOrigins: []string{"http://example.com"},
+	}
+	a, err := app.New(cfg)
+	if err != nil {
+		t.Fatalf("app.New: %v", err)
+	}
+	t.Cleanup(func() { _ = a.Close() })
+	return a
+}
+
 // setupCSRFToken hits GET /setup, scrapes the csrf_token from the
 // rendered form, and returns it along with the sb_csrf cookie that
 // must accompany the matching POST.

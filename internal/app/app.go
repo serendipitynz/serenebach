@@ -193,7 +193,7 @@ func New(cfg *config.Config) (*App, error) {
 		} else if done {
 			return admin.ErrSetupAlreadyDone
 		}
-		return a.Seed(ctx, SeedSpec{
+		err := a.Seed(ctx, SeedSpec{
 			AdminName:     req.AdminName,
 			AdminPassword: req.AdminPassword,
 			AdminEmail:    req.AdminEmail,
@@ -204,6 +204,15 @@ func New(cfg *config.Config) (*App, error) {
 			TemplateName:  "default",
 			SampleEntries: req.SampleEntries,
 		})
+		// A different process beat us to the admin INSERT (CGI mode
+		// runs each request in its own process, so the mutex above
+		// can't span the race). Surface that to the handler so it
+		// renders 404 instead of redirecting to a login the user's
+		// freshly-typed credentials won't work against.
+		if errors.Is(err, ErrAdminAlreadyExists) {
+			return admin.ErrSetupAlreadyDone
+		}
+		return err
 	}
 
 	r := chi.NewRouter()
