@@ -308,11 +308,11 @@ func TestSetupConcurrentSubmitAcrossInstancesCreatesOneAdmin(t *testing.T) {
 
 	const perInstance = 4
 	var (
-		wg            sync.WaitGroup
-		mu            sync.Mutex
-		winners       int
-		winnerName    string
-		winnerTitle   string
+		wg          sync.WaitGroup
+		mu          sync.Mutex
+		winners     int
+		winnerName  string
+		winnerTitle string
 	)
 	start := make(chan struct{})
 
