@@ -18,6 +18,14 @@ import (
 // startup diagnostics reference the same name.
 const SecretEnvVar = "SB_AI_SECRET"
 
+// secretExampleDefault is the placeholder value committed in
+// .env.example. Anyone reading the public repo can derive the AES
+// key from it, so leaving it in production reduces the at-rest
+// encryption of saved API keys to plaintext-equivalent. Kept in
+// sync with .env.example by hand — the file lives outside the Go
+// build, so a constant is the cheapest way to share it.
+const secretExampleDefault = "change-me-to-a-long-random-string"
+
 // MasterKey returns the AES-256 key derived from SB_AI_SECRET. The
 // env value is hashed with SHA-256 so any length of passphrase maps
 // to a 32-byte key — operators can paste a password, a base64 blob,
@@ -38,6 +46,15 @@ func MasterKey() ([]byte, error) {
 // SB_AI_SECRET is unset or empty.
 func SecretConfigured() bool {
 	return strings.TrimSpace(os.Getenv(SecretEnvVar)) != ""
+}
+
+// SecretIsExampleDefault reports whether SB_AI_SECRET is still set to
+// the placeholder value committed in .env.example. The settings UI
+// surfaces a warning in that case because the example value is
+// public, which means the AES-256-GCM key derived from it is
+// effectively known to anyone who can read the repo.
+func SecretIsExampleDefault() bool {
+	return strings.TrimSpace(os.Getenv(SecretEnvVar)) == secretExampleDefault
 }
 
 // Encrypt produces ciphertext for plaintext using AES-256-GCM with
