@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/go-chi/chi/v5"
@@ -175,9 +176,18 @@ func New(cfg *config.Config) (*App, error) {
 		Public:    publicH,
 	}
 	// Wire the setup callback before mounting routes so MountSetup
-	// actually registers /setup. ErrSetupAlreadyDone short-circuits
-	// when someone races a second POST after the gate has flipped.
+	// actually registers /setup. The mutex serialises concurrent
+	// POSTs to /setup so a second request can't slip past the
+	// HasAdminUser check while the first is still mid-Seed —
+	// without it, two POSTs with different admin names would each
+	// pass the check and each insert a row, leaving the install
+	// with two administrators. setupMu is process-local; safe
+	// because /setup is a one-shot endpoint the gate disables for
+	// the rest of the lifetime once an admin exists.
+	var setupMu sync.Mutex
 	adminH.Setup = func(ctx context.Context, req admin.SetupRequest) error {
+		setupMu.Lock()
+		defer setupMu.Unlock()
 		if done, err := store.HasAdminUser(ctx); err != nil {
 			return err
 		} else if done {

@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/serendipitynz/serenebach/internal/app"
@@ -221,6 +223,71 @@ func TestSetupMismatchedPasswordRendersError(t *testing.T) {
 	}
 	if n != 0 {
 		t.Errorf("user count = %d, want 0; mismatched-pw POST must not create admin", n)
+	}
+}
+
+// TestSetupConcurrentSubmitCreatesOneAdmin pins the race the gate
+// must close: without serialisation, two POSTs that arrive between
+// the HasAdminUser check and the Seed insert would each pass the
+// check and each insert an admin row. The handler protects the
+// check+seed pair with a process-local mutex, so this test fires
+// several concurrent submissions with distinct usernames and
+// verifies exactly one admin lands and the rest see a non-200
+// response (302 to /admin/login for the winner, 404 for late
+// arrivals once the gate flips).
+func TestSetupConcurrentSubmitCreatesOneAdmin(t *testing.T) {
+	a := newUnseededTestApp(t)
+
+	const workers = 8
+	var (
+		wg      sync.WaitGroup
+		mu      sync.Mutex
+		winners int
+	)
+	start := make(chan struct{})
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			// Each goroutine needs its own CSRF token + cookie pair —
+			// the cookie value is deterministic per GET, but parallel
+			// GETs make sure we exercise the POST path with no
+			// inter-goroutine dependency.
+			token, cookie := setupCSRFToken(t, a)
+			form := url.Values{
+				"csrf_token":       {token},
+				"name":             {fmt.Sprintf("admin%d", i)},
+				"password":         {"correcthorse"},
+				"password_confirm": {"correcthorse"},
+				"weblog_title":     {"Race Test"},
+			}
+			<-start // line every goroutine up at the gate
+			req := httptest.NewRequest("POST", "/setup",
+				strings.NewReader(form.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.AddCookie(cookie)
+			w := httptest.NewRecorder()
+			a.Handler().ServeHTTP(w, req)
+			if w.Code == http.StatusFound {
+				mu.Lock()
+				winners++
+				mu.Unlock()
+			}
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	if winners != 1 {
+		t.Errorf("redirect winners = %d, want 1", winners)
+	}
+	var n int
+	if err := a.DB.QueryRow(`SELECT COUNT(*) FROM users WHERE role = 1`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("admin row count = %d, want 1", n)
 	}
 }
 
