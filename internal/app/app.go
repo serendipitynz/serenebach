@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -161,6 +163,58 @@ func New(cfg *config.Config) (*App, error) {
 		WID:        DefaultWID,
 	}
 
+	// Construct the App shell up front so the first-run install
+	// callback can close over it. The handler field is filled in once
+	// the router below is fully assembled.
+	a := &App{
+		Config:    cfg,
+		DB:        db,
+		Store:     store,
+		Sessions:  sessions,
+		Analytics: analyticsStore,
+		Audit:     auditStore,
+		Public:    publicH,
+	}
+	// Wire the setup callback before mounting routes so MountSetup
+	// actually registers /setup. The mutex serialises concurrent
+	// POSTs to /setup so a second request can't slip past the
+	// HasAdminUser check while the first is still mid-Seed —
+	// without it, two POSTs with different admin names would each
+	// pass the check and each insert a row, leaving the install
+	// with two administrators. setupMu is process-local; safe
+	// because /setup is a one-shot endpoint the gate disables for
+	// the rest of the lifetime once an admin exists.
+	var setupMu sync.Mutex
+	adminH.Setup = func(ctx context.Context, req admin.SetupRequest) error {
+		setupMu.Lock()
+		defer setupMu.Unlock()
+		if done, err := store.HasAdminUser(ctx); err != nil {
+			return err
+		} else if done {
+			return admin.ErrSetupAlreadyDone
+		}
+		err := a.Seed(ctx, SeedSpec{
+			AdminName:     req.AdminName,
+			AdminPassword: req.AdminPassword,
+			AdminEmail:    req.AdminEmail,
+			WeblogTitle:   req.WeblogTitle,
+			WeblogDesc:    "",
+			WeblogBaseURL: "",
+			WeblogLang:    "ja",
+			TemplateName:  "default",
+			SampleEntries: req.SampleEntries,
+		})
+		// A different process beat us to the admin INSERT (CGI mode
+		// runs each request in its own process, so the mutex above
+		// can't span the race). Surface that to the handler so it
+		// renders 404 instead of redirecting to a login the user's
+		// freshly-typed credentials won't work against.
+		if errors.Is(err, ErrAdminAlreadyExists) {
+			return admin.ErrSetupAlreadyDone
+		}
+		return err
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	// SB3 static-archive redirect must run before StripSlashes — its
@@ -212,6 +266,20 @@ func New(cfg *config.Config) (*App, error) {
 		if analyticsStore != nil {
 			r.Use(analyticsStore.Middleware)
 		}
+		// First-run setup gate: until an admin user exists, every
+		// request that isn't already heading to /setup or the admin
+		// asset bundle is bounced to /setup so a fresh deploy lands
+		// on the install screen automatically. Once an admin is
+		// created the gate flips to a no-op for the rest of the
+		// process lifetime.
+		r.Use(setupGate(store))
+
+		// /setup is mounted on the root router (not under /admin) so
+		// the URL stays short and so it is reachable before any admin
+		// session exists. MountSetup is a no-op when adminH.Setup is
+		// nil — i.e. when the caller deliberately disables the
+		// install flow.
+		adminH.MountSetup(r)
 
 		r.Route("/admin", func(r chi.Router) {
 			adminH.MountPublic(r)
@@ -241,19 +309,51 @@ func New(cfg *config.Config) (*App, error) {
 		}
 	})
 
-	return &App{
-		Config:    cfg,
-		DB:        db,
-		Store:     store,
-		Sessions:  sessions,
-		Analytics: analyticsStore,
-		Audit:     auditStore,
-		Public:    publicH,
-		handler:   r,
-	}, nil
+	a.handler = r
+	return a, nil
 }
 
 func (a *App) Handler() http.Handler { return a.handler }
+
+// setupGate redirects every request to /setup until an admin user has
+// been created. Once an admin exists the gate caches that fact in an
+// atomic bool and short-circuits without touching the DB on subsequent
+// requests. The allow-list intentionally stays tiny: only /setup
+// itself and the admin static bundle (so the install screen can
+// style itself) bypass the redirect. /admin/login is *not* allowlisted
+// — it would just fail with bad-credentials anyway when there are no
+// users, so sending the operator to /setup instead is friendlier.
+func setupGate(store *repo.Store) func(http.Handler) http.Handler {
+	var done atomic.Bool
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if done.Load() {
+				next.ServeHTTP(w, r)
+				return
+			}
+			p := r.URL.Path
+			if p == "/setup" || strings.HasPrefix(p, "/admin/static/") {
+				next.ServeHTTP(w, r)
+				return
+			}
+			ok, err := store.HasAdminUser(r.Context())
+			if err != nil {
+				// A DB error here would block every request.
+				// Log and fall through — the downstream handler
+				// will surface a clearer error.
+				log.Printf("app: setup gate: %v", err)
+				next.ServeHTTP(w, r)
+				return
+			}
+			if !ok {
+				http.Redirect(w, r, "/setup", http.StatusFound)
+				return
+			}
+			done.Store(true)
+			next.ServeHTTP(w, r)
+		})
+	}
+}
 
 // mcpHTTPHandler enforces bearer-token auth on /mcp before forwarding
 // into the shared MCP dispatch. We deliberately keep the token check

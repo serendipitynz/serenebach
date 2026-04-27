@@ -18,11 +18,12 @@ A self-hostable Go weblog engine — a lighter path between WordPress and Hugo. 
 
 ```bash
 go mod tidy
-task seed   # creates the dev DB, applies migrations, seeds admin user + samples
-task dev    # serves on :8080
+task dev    # serves on :8080 (auto-creates the dev DB on first request)
 ```
 
-Then open <http://localhost:8080/> for the public site or <http://localhost:8080/admin/login> for the admin UI. Default credentials from `task seed` are `admin` / `changeme` — override via `SB_ADMIN_NAME` / `SB_ADMIN_PASSWORD` before seeding.
+Open <http://localhost:8080/> in a browser. The first request to a database without an admin user redirects to **`/setup`**, where you create the administrator account and choose whether to insert a couple of sample entries. After that, the public site lives at `/` and the admin UI at `/admin/login`.
+
+Prefer the CLI? `task seed` still works — it creates the dev DB and seeds an admin (`admin` / `changeme` by default; override via `SB_ADMIN_NAME` / `SB_ADMIN_PASSWORD`) without going through the browser flow.
 
 A `.env` template ships at `.env.example`. Copy it to `.env` and fill in `SB_AI_SECRET` if you plan to enable the AI writing assists.
 

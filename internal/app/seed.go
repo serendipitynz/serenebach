@@ -12,6 +12,19 @@ import (
 	"github.com/serendipitynz/serenebach/web/templates"
 )
 
+// ErrAdminAlreadyExists signals that seed wanted to create the
+// bootstrap administrator but found one already present. The
+// in-process /setup gate uses a mutex to keep concurrent POSTs from
+// reaching this point twice, but in CGI mode each request is its
+// own process — the mutex doesn't span them — so the admin INSERT
+// itself has to be the synchronisation point. SQLite serialises
+// writes, and the conditional INSERT below is evaluated under that
+// write lock, so exactly one process commits the row and the rest
+// see RowsAffected == 0 and surface this error. /setup translates
+// it to admin.ErrSetupAlreadyDone (404); the CLI seed swallows it
+// because re-runs are expected to be idempotent.
+var ErrAdminAlreadyExists = errors.New("seed: admin already exists")
+
 type SeedSpec struct {
 	AdminName     string
 	AdminPassword string
@@ -48,10 +61,16 @@ func (a *App) Seed(ctx context.Context, spec SeedSpec) error {
 	now := time.Now().Unix()
 	wid := DefaultWID
 
-	if err := a.seedWeblog(ctx, wid, spec, now); err != nil {
+	// Admin INSERT runs first as the install-claim sentinel: its
+	// WHERE NOT EXISTS guard is the cross-process race winner. Only
+	// the winner proceeds to write the weblog / template / samples,
+	// so a CGI race loser cannot pollute durable initial settings
+	// (e.g. weblog title) with its submission before realising it
+	// lost the admin INSERT.
+	if err := a.seedAdminUser(ctx, wid, spec, now); err != nil {
 		return err
 	}
-	if err := a.seedAdminUser(ctx, wid, spec, now); err != nil {
+	if err := a.seedWeblog(ctx, wid, spec, now); err != nil {
 		return err
 	}
 	if err := a.seedDefaultTemplate(ctx, wid, spec, now); err != nil {
@@ -78,6 +97,11 @@ func (a *App) seedWeblog(ctx context.Context, wid int64, spec SeedSpec, now int6
 }
 
 func (a *App) seedAdminUser(ctx context.Context, wid int64, spec SeedSpec, now int64) error {
+	// Same-name re-runs of `task seed` stay fully idempotent: if a
+	// user with the requested admin name already exists, return nil
+	// without touching the row. Different-name re-runs (or a CGI
+	// race loser whose proposed name isn't in the DB yet) fall
+	// through to the atomic INSERT below.
 	var exists int
 	if err := a.DB.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM users WHERE name = ?`, spec.AdminName,
@@ -92,17 +116,29 @@ func (a *App) seedAdminUser(ctx context.Context, wid int64, spec SeedSpec, now i
 	if err != nil {
 		return fmt.Errorf("seed: hash password: %w", err)
 	}
-	// role=1 (RoleAdmin). The bootstrap admin must carry the admin role
+	// role=RoleAdmin. The bootstrap admin must carry the admin role
 	// explicitly so CanManageUsers / CanManageDesign pass on every
 	// request. description_format defaults to "html" for the profile
-	// renderer.
-	if _, err := a.DB.ExecContext(ctx, `
+	// renderer. The WHERE NOT EXISTS guard makes this insert
+	// atomic with respect to "any admin already exists" — see the
+	// ErrAdminAlreadyExists doc comment for why this matters under
+	// CGI deployments.
+	res, err := a.DB.ExecContext(ctx, `
 		INSERT INTO users (wid, name, display_name, email, password_hash, role,
 		                   list_visible, description_format,
 		                   created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, 1, 1, 'html', ?, ?)`,
-		wid, spec.AdminName, spec.AdminName, spec.AdminEmail, hash, now, now); err != nil {
+		SELECT ?, ?, ?, ?, ?, ?, 1, 'html', ?, ?
+		WHERE NOT EXISTS (SELECT 1 FROM users WHERE role = ?)`,
+		wid, spec.AdminName, spec.AdminName, spec.AdminEmail, hash, domain.RoleAdmin, now, now, domain.RoleAdmin)
+	if err != nil {
 		return fmt.Errorf("seed: insert admin: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("seed: rows affected: %w", err)
+	}
+	if n == 0 {
+		return ErrAdminAlreadyExists
 	}
 	return nil
 }

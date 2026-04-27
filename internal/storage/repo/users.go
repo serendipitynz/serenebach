@@ -56,6 +56,22 @@ func (s *Store) ListUsers(ctx context.Context, wid int64) ([]domain.User, error)
 	return out, rows.Err()
 }
 
+// HasAdminUser reports whether at least one admin (role=RoleAdmin) row
+// exists in any weblog. Used by the first-run setup gate to decide
+// whether the install still needs an initial administrator. Wid is
+// intentionally not part of the lookup — multi-blog is not implemented
+// yet, but even when it is the question "has *anyone* set this install
+// up" stays singular.
+func (s *Store) HasAdminUser(ctx context.Context) (bool, error) {
+	var n int
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM users WHERE role = ?`, domain.RoleAdmin,
+	).Scan(&n); err != nil {
+		return false, fmt.Errorf("repo: HasAdminUser: %w", err)
+	}
+	return n > 0, nil
+}
+
 // CreateUser inserts a new user row with a pre-hashed password. The
 // caller hashes with auth.HashPassword so the repo never sees the
 // plaintext. Returns ErrUserNameInUse on a name collision.
