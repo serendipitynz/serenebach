@@ -63,6 +63,11 @@ type Handler struct {
 	// OG owns Open Graph card generation. May be nil if OG is disabled —
 	// callers fall back to skipping card updates, not erroring the save.
 	OG *og.Renderer
+	// Setup runs the first-run install against the application. nil
+	// disables the /setup endpoint entirely (MountSetup becomes a
+	// no-op). app.New populates this with a closure around app.Seed
+	// to avoid a handler→app import cycle.
+	Setup SetupRunner
 }
 
 // MountPublic registers routes that do not require authentication (the

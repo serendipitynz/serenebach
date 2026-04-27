@@ -1,0 +1,45 @@
+{{define "setup"}}<!doctype html>
+<html lang="{{Locale}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{T "setup.title"}} | {{T "app.name"}}</title>
+<link rel="stylesheet" href="/admin/static/admin.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card setup-card">
+    <h1><img src="/admin/static/sb_logo_gray.svg" alt="{{T `app.name`}}"></h1>
+    <h2>{{T "setup.title"}}</h2>
+    <p class="setup-intro">{{T "setup.intro"}}</p>
+    {{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
+    <form method="post" action="/setup">
+      <label>{{T "setup.adminName"}}
+        <input type="text" name="name" value="{{.Name}}" autocomplete="username" autofocus required>
+        <small class="hint">{{T "setup.adminNameHint"}}</small>
+      </label>
+      <label>{{T "setup.email"}}
+        <input type="email" name="email" value="{{.Email}}" autocomplete="email">
+      </label>
+      <label>{{T "setup.password"}}
+        <input type="password" name="password" autocomplete="new-password" required>
+        <small class="hint">{{T "setup.passwordHint"}}</small>
+      </label>
+      <label>{{T "setup.passwordConfirm"}}
+        <input type="password" name="password_confirm" autocomplete="new-password" required>
+      </label>
+      <label>{{T "setup.weblogTitle"}}
+        <input type="text" name="weblog_title" value="{{.WeblogTitle}}">
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" name="sample_entries" value="1" {{if .SampleEntries}}checked{{end}}>
+        <span>{{T "setup.sampleEntries"}}</span>
+      </label>
+      <small class="hint">{{T "setup.sampleEntriesHint"}}</small>
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <button type="submit" class="primary">{{T "setup.submit"}}</button>
+    </form>
+  </div>
+</div>
+</body>
+</html>{{end}}

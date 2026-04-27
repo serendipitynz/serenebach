@@ -767,6 +767,29 @@ table.listing td.cell-clamp-host {
 .login-card h1 img { width: auto; height: 2.5rem; }
 .login-card button { width: 100%; }
 
+/* Setup card — wider than login because it has more fields. */
+.setup-card { width: min(32rem, 100%); }
+.setup-card h2 { font-size: 1rem; margin: 0 0 0.5rem; text-align: center; }
+.setup-card .setup-intro {
+  margin: 0 0 1.25rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+.setup-card label.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.setup-card label.checkbox input { width: auto; }
+.setup-card small.hint {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  margin-top: 0.25rem;
+}
+
 /* Template edit: aesthetic breathing room between the form actions
    and the asset panel that sits just below them. */
 .template-asset-panel { margin-top: 1.5rem; }

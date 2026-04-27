@@ -227,6 +227,7 @@ const (
 var (
 	mainTemplates = loadMainTemplates()
 	loginTemplate = loadLoginTemplate()
+	setupTemplate = loadSetupTemplate()
 	i18nBundle    = loadI18nBundle()
 )
 
@@ -263,6 +264,14 @@ func loadLoginTemplate() *template.Template {
 	t, err := template.New("").Funcs(tmplFuncs).ParseFS(admintpl.FS(), "login.html")
 	if err != nil {
 		panic("admin: parse login: " + err.Error())
+	}
+	return t
+}
+
+func loadSetupTemplate() *template.Template {
+	t, err := template.New("").Funcs(tmplFuncs).ParseFS(admintpl.FS(), "setup.html")
+	if err != nil {
+		panic("admin: parse setup: " + err.Error())
 	}
 	return t
 }
@@ -410,4 +419,17 @@ func renderLogin(w http.ResponseWriter, r *http.Request, data any) {
 	}
 	tmpl.Funcs(localeFuncs(r))
 	_ = tmpl.ExecuteTemplate(w, "login", data)
+}
+
+// renderSetup writes the first-run setup page. Like renderLogin it skips
+// the layout chrome — there is no session / sidebar yet.
+func renderSetup(w http.ResponseWriter, r *http.Request, data any) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	tmpl, err := setupTemplate.Clone()
+	if err != nil {
+		http.Error(w, "admin: clone setup template: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	tmpl.Funcs(localeFuncs(r))
+	_ = tmpl.ExecuteTemplate(w, "setup", data)
 }
