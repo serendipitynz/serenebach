@@ -39,6 +39,10 @@ task build-cgi   # Linux x86_64
 task build-pi    # Linux arm64 (Raspberry Pi / ARM VPS)
 ```
 
+### First-run setup over the browser
+
+A fresh deploy with no `users` row yet auto-redirects every request to **`/setup`**. Drop the binary + `.htaccess` onto the host, open the URL once, and the admin form lets you set a username, password, and site title without ever touching SSH or `task seed`. Once the admin row exists the gate flips off and `/setup` returns 404 for the rest of the install's life. The CLI `seed` subcommand still works and remains the recommended path for environments without browser access (FTP-only shared hosts, kiosk reinstalls, scripted provisioning).
+
 ## Static site generation
 
 ```bash
