@@ -38,6 +38,7 @@ type settingsAIPageData struct {
 	settingsPageBase
 	Target             domain.User
 	AISecretConfigured bool
+	AISecretIsDefault  bool
 	AIHasKey           bool
 	AIFlash            string
 	AIError            string
@@ -86,6 +87,7 @@ func (h *Handler) renderSettingsAI(w http.ResponseWriter, r *http.Request, newRa
 		settingsPageBase:   h.newSettingsBase(r, tr(r, "settings.tab.ai"), "ai"),
 		Target:             *fresh,
 		AISecretConfigured: ai.SecretConfigured(),
+		AISecretIsDefault:  ai.SecretIsExampleDefault(),
 		AIHasKey:           fresh.AIAPIKeyEnc != "",
 		AIFlash:            aiFlash,
 		AIError:            aiError,

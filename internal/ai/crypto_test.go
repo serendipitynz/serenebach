@@ -71,6 +71,27 @@ func TestEncryptRequiresSecret(t *testing.T) {
 	}
 }
 
+func TestSecretIsExampleDefault(t *testing.T) {
+	cases := []struct {
+		name string
+		env  string
+		want bool
+	}{
+		{"empty", "", false},
+		{"example default", secretExampleDefault, true},
+		{"example default with surrounding whitespace", "  " + secretExampleDefault + "\n", true},
+		{"rotated value", "correct horse battery staple", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(SecretEnvVar, tc.env)
+			if got := SecretIsExampleDefault(); got != tc.want {
+				t.Errorf("SecretIsExampleDefault() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestDecryptRejectsTamperedCiphertext(t *testing.T) {
 	t.Setenv(SecretEnvVar, "s")
 	enc, err := Encrypt("payload")

@@ -410,6 +410,8 @@
   "profile.ai.heading": "AI writing assist",
   "profile.ai.hint": "LLM configuration used by rewrite, title / tag suggest, and image alt-text generation.",
   "profile.ai.secretMissing": "AI features are disabled because the <code>SB_AI_SECRET</code> env var isn't set on this server. Ask your administrator to configure it.",
+  "profile.ai.secretIsDefault.admin": "<strong>Security warning:</strong> <code>SB_AI_SECRET</code> is still set to the placeholder value from <code>.env.example</code>. That value is public, so saved API keys are effectively decryptable by anyone. Replace it with a long random string and restart the server. Rotating the secret invalidates every saved API key, so users will need to re-enter theirs.",
+  "profile.ai.secretIsDefault.user": "<strong>Security warning:</strong> this server's <code>SB_AI_SECRET</code> is still the example default. Any API key you save here is not securely encrypted. Ask your administrator to rotate <code>SB_AI_SECRET</code>.",
   "profile.ai.enabled": "Enabled",
   "profile.ai.enabled.label": "Turn AI features on",
   "profile.ai.provider": "Provider",

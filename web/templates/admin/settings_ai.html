@@ -20,6 +20,21 @@
            below; regular users simply see an empty AI tab. */}}
       <p class="hint">{{THTML "profile.ai.secretMissing"}}</p>
     {{else}}
+      {{if .AISecretIsDefault}}
+        {{/* SB_AI_SECRET is still the placeholder shipped in
+             .env.example. The example value is public, so the
+             AES-256-GCM key it derives is effectively known —
+             saved API keys are no better than plaintext at rest.
+             Saving still works (operators can rotate the secret
+             at any time, which invalidates the saved keys), the
+             alert just makes the risk visible. */}}
+        {{if .CanManageUsers}}
+          <p class="alert error">{{THTML "profile.ai.secretIsDefault.admin"}}</p>
+        {{else}}
+          <p class="alert error">{{THTML "profile.ai.secretIsDefault.user"}}</p>
+        {{end}}
+      {{end}}
+
       <p class="hint">{{T "profile.ai.hint"}}</p>
 
       <form method="post" action="/admin/settings/ai" class="form-stack" data-ai-config-form>

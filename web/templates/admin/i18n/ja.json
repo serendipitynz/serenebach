@@ -410,6 +410,8 @@
   "profile.ai.heading": "AI 執筆補助",
   "profile.ai.hint": "記事の書き直し・タイトル提案・画像 alt 生成などで使う LLM の設定です。",
   "profile.ai.secretMissing": "このサーバでは <code>SB_AI_SECRET</code> 環境変数が未設定のため AI 機能は無効です。管理者に問い合わせてください。",
+  "profile.ai.secretIsDefault.admin": "<strong>セキュリティ警告：</strong> <code>SB_AI_SECRET</code> が <code>.env.example</code> のサンプル値のままです。この値は公開されており、保存済みの API キーは誰でも復号できる状態です。十分長いランダム文字列に変更してサーバを再起動してください。鍵を変更すると保存済みの API キーは無効になり、再入力が必要になります。",
+  "profile.ai.secretIsDefault.user": "<strong>セキュリティ警告：</strong> このサーバの <code>SB_AI_SECRET</code> がサンプルの既定値のままです。保存した API キーは安全に暗号化されません。管理者に <code>SB_AI_SECRET</code> の変更を依頼してください。",
   "profile.ai.enabled": "有効化",
   "profile.ai.enabled.label": "AI 機能を有効にする",
   "profile.ai.provider": "プロバイダ",
