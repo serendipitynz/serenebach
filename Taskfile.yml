@@ -121,4 +121,81 @@ tasks:
   clean:
     desc: Remove build output and the dev database
     cmds:
-      - rm -rf bin data
+      - rm -rf bin data dist
+
+  release:
+    desc: Cross-build all targets, package, checksum, tag, and create a draft GitHub release
+    vars:
+      VERSION:
+        sh: awk -F'"' '/^const Public/ {print $2}' internal/version/version.go
+      TAG: 'v{{.VERSION}}'
+      UNIX_TARGETS: linux-amd64 linux-arm64 freebsd-amd64 freebsd-arm64 darwin-amd64 darwin-arm64
+      WIN_TARGETS: windows-amd64 windows-arm64
+    cmds:
+      - |
+        set -euo pipefail
+        TAG="{{.TAG}}"
+
+        # Pre-flight: refuse to release from a dirty tree or over an
+        # existing tag — both are irreversible if pushed.
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "ERROR: working tree is dirty. Commit or stash before releasing." >&2
+          exit 1
+        fi
+        if git rev-parse --verify --quiet "$TAG" >/dev/null; then
+          echo "ERROR: tag $TAG already exists locally. Bump internal/version/version.go first." >&2
+          exit 1
+        fi
+        if git ls-remote --tags --exit-code origin "$TAG" >/dev/null 2>&1; then
+          echo "ERROR: tag $TAG already exists on origin." >&2
+          exit 1
+        fi
+
+        rm -rf dist
+        mkdir -p dist
+
+        echo "==> Building $TAG for 8 targets"
+      - for: { var: UNIX_TARGETS, split: ' ' }
+        task: 'build-{{.ITEM}}'
+      - for: { var: WIN_TARGETS, split: ' ' }
+        task: 'build-{{.ITEM}}'
+      - |
+        set -euo pipefail
+        TAG="{{.TAG}}"
+
+        echo "==> Packaging tar.gz for unix targets"
+        for target in {{.UNIX_TARGETS}}; do
+          name="serenebach-${TAG}-${target}"
+          stage="dist/${name}"
+          mkdir -p "$stage"
+          cp "bin/serenebach-${target}" "${stage}/serenebach"
+          cp README.md README.ja.md LICENSE "$stage/"
+          tar -C dist -czf "dist/${name}.tar.gz" "$name"
+          rm -rf "$stage"
+        done
+
+        echo "==> Packaging zip for windows targets"
+        for target in {{.WIN_TARGETS}}; do
+          name="serenebach-${TAG}-${target}"
+          stage="dist/${name}"
+          mkdir -p "$stage"
+          cp "bin/serenebach-${target}.exe" "${stage}/serenebach.exe"
+          cp README.md README.ja.md LICENSE "$stage/"
+          (cd dist && zip -qr "${name}.zip" "$name")
+          rm -rf "$stage"
+        done
+
+        echo "==> Generating SHA256SUMS"
+        (cd dist && shasum -a 256 *.tar.gz *.zip > SHA256SUMS)
+
+        echo "==> Tagging $TAG and pushing"
+        git tag "$TAG"
+        git push origin "$TAG"
+
+        echo "==> Creating draft GitHub release"
+        gh release create "$TAG" \
+          dist/*.tar.gz dist/*.zip dist/SHA256SUMS \
+          --draft --generate-notes --title "$TAG"
+
+        echo
+        echo "Done. Review and publish the draft on GitHub."
