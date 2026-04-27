@@ -61,10 +61,16 @@ func (a *App) Seed(ctx context.Context, spec SeedSpec) error {
 	now := time.Now().Unix()
 	wid := DefaultWID
 
-	if err := a.seedWeblog(ctx, wid, spec, now); err != nil {
+	// Admin INSERT runs first as the install-claim sentinel: its
+	// WHERE NOT EXISTS guard is the cross-process race winner. Only
+	// the winner proceeds to write the weblog / template / samples,
+	// so a CGI race loser cannot pollute durable initial settings
+	// (e.g. weblog title) with its submission before realising it
+	// lost the admin INSERT.
+	if err := a.seedAdminUser(ctx, wid, spec, now); err != nil {
 		return err
 	}
-	if err := a.seedAdminUser(ctx, wid, spec, now); err != nil {
+	if err := a.seedWeblog(ctx, wid, spec, now); err != nil {
 		return err
 	}
 	if err := a.seedDefaultTemplate(ctx, wid, spec, now); err != nil {

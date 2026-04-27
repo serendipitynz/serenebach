@@ -308,20 +308,24 @@ func TestSetupConcurrentSubmitAcrossInstancesCreatesOneAdmin(t *testing.T) {
 
 	const perInstance = 4
 	var (
-		wg      sync.WaitGroup
-		mu      sync.Mutex
-		winners int
+		wg            sync.WaitGroup
+		mu            sync.Mutex
+		winners       int
+		winnerName    string
+		winnerTitle   string
 	)
 	start := make(chan struct{})
 
-	fire := func(a *app.App, namePrefix string, i int) {
+	fire := func(a *app.App, namePrefix, title string, i int) {
 		defer wg.Done()
 		token, cookie := setupCSRFToken(t, a)
+		name := fmt.Sprintf("%s%d", namePrefix, i)
 		form := url.Values{
 			"csrf_token":       {token},
-			"name":             {fmt.Sprintf("%s%d", namePrefix, i)},
+			"name":             {name},
 			"password":         {"correcthorse"},
 			"password_confirm": {"correcthorse"},
+			"weblog_title":     {title},
 		}
 		<-start
 		req := httptest.NewRequest("POST", "/setup",
@@ -333,14 +337,16 @@ func TestSetupConcurrentSubmitAcrossInstancesCreatesOneAdmin(t *testing.T) {
 		if w.Code == http.StatusFound {
 			mu.Lock()
 			winners++
+			winnerName = name
+			winnerTitle = title
 			mu.Unlock()
 		}
 	}
 
 	for i := 0; i < perInstance; i++ {
 		wg.Add(2)
-		go fire(a1, "alpha", i)
-		go fire(a2, "beta", i)
+		go fire(a1, "alpha", fmt.Sprintf("Alpha %d", i), i)
+		go fire(a2, "beta", fmt.Sprintf("Beta %d", i), i)
 	}
 	close(start)
 	wg.Wait()
@@ -354,6 +360,24 @@ func TestSetupConcurrentSubmitAcrossInstancesCreatesOneAdmin(t *testing.T) {
 	}
 	if n != 1 {
 		t.Errorf("admin row count = %d, want 1 across two-instance race", n)
+	}
+	// The weblog title must come from the same submission that won
+	// the admin INSERT race — losers must not have polluted the
+	// weblog row before realising they lost. Without the reorder
+	// (admin INSERT before seedWeblog), a loser whose seedWeblog
+	// ran first would lock in their title via ON CONFLICT DO NOTHING.
+	var gotName, gotTitle string
+	if err := a1.DB.QueryRow(
+		`SELECT u.name, w.title FROM users u, weblogs w
+		 WHERE u.role = 1 AND w.id = ?`, app.DefaultWID,
+	).Scan(&gotName, &gotTitle); err != nil {
+		t.Fatalf("post-race state: %v", err)
+	}
+	if gotName != winnerName {
+		t.Errorf("admin name = %q, want %q (race winner)", gotName, winnerName)
+	}
+	if gotTitle != winnerTitle {
+		t.Errorf("weblog title = %q, want %q (race winner's submission)", gotTitle, winnerTitle)
 	}
 }
 
