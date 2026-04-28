@@ -6,7 +6,7 @@
 {{else}}
 
 <nav class="filter-tabs" style="display:flex;gap:0.5rem;margin-bottom:1rem">
-  {{range .Windows}}<a href="/admin/analytics?days={{.Days}}"{{if eq .Days $.CurrentDays}} style="font-weight:600"{{end}}>{{.Label}}</a>{{end}}
+  {{range .Windows}}<a href="{{Root}}/admin/analytics?days={{.Days}}"{{if eq .Days $.CurrentDays}} style="font-weight:600"{{end}}>{{.Label}}</a>{{end}}
 </nav>
 
 <div class="cards">
@@ -44,7 +44,7 @@
       <tbody>
       {{range .Top}}
         <tr>
-          <td class="col-flex-wide"><a href="/entry/{{.EntryID}}/" target="_blank" rel="noopener">{{.Title}} ↗</a></td>
+          <td class="col-flex-wide"><a href="{{Root}}/entry/{{.EntryID}}/" target="_blank" rel="noopener">{{.Title}} ↗</a></td>
           <td class="num col-count">{{.Views}}</td>
           <td class="num col-count">{{.Likes}}</td>
           <td class="num col-count">{{.Stamps}}</td>

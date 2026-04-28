@@ -313,7 +313,7 @@ func (h *Handler) linkCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to create link", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/links?ok=saved", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/links?ok=saved", http.StatusFound)
 }
 
 func (h *Handler) linkUpdate(w http.ResponseWriter, r *http.Request) {
@@ -352,7 +352,7 @@ func (h *Handler) linkUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to save link", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/links?ok=saved", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/links?ok=saved", http.StatusFound)
 }
 
 func (h *Handler) linkDelete(w http.ResponseWriter, r *http.Request) {
@@ -370,5 +370,5 @@ func (h *Handler) linkDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to delete link", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/links?ok=deleted", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/links?ok=deleted", http.StatusFound)
 }

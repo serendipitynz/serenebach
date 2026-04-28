@@ -6,7 +6,7 @@
 {{if eq .Flash "saved"}}<p class="alert success">{{T "flash.saved"}}</p>{{end}}
 {{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
 
-<form method="post" action="/admin/profile" class="form-stack" data-rich-description data-unsaved-warn>
+<form method="post" action="{{Root}}/admin/profile" class="form-stack" data-rich-description data-unsaved-warn>
   <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 
   <div class="panel">

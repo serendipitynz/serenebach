@@ -4,16 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{T "setup.title"}} | {{T "app.name"}}</title>
-<link rel="stylesheet" href="/admin/static/admin.css">
+<link rel="stylesheet" href="{{Root}}/admin/static/admin.css">
 </head>
 <body>
 <div class="login-wrap">
   <div class="login-card setup-card">
-    <h1><img src="/admin/static/sb_logo_gray.svg" alt="{{T `app.name`}}"></h1>
+    <h1><img src="{{Root}}/admin/static/sb_logo_gray.svg" alt="{{T `app.name`}}"></h1>
     <h2>{{T "setup.title"}}</h2>
     <p class="setup-intro">{{T "setup.intro"}}</p>
     {{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
-    <form method="post" action="/setup">
+    <form method="post" action="{{Root}}/setup">
       <label>{{T "setup.adminName"}}
         <input type="text" name="name" value="{{.Name}}" autocomplete="username" autofocus required>
         <small class="hint">{{T "setup.adminNameHint"}}</small>

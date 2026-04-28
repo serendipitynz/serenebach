@@ -263,7 +263,7 @@ func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	http.Redirect(w, r, "/admin/images?ok=1", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/images?ok=1", http.StatusFound)
 }
 
 // mimeSupportsVision whitelists the MIME types every provider we
@@ -308,7 +308,7 @@ func (h *Handler) imagesDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.imageStore().DeleteFiles(img.StoredPath, img.ThumbPath)
-	http.Redirect(w, r, "/admin/images?ok=deleted", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/images?ok=deleted", http.StatusFound)
 }
 
 // ---- helpers -----------------------------------------------------------

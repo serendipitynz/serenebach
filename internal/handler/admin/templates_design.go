@@ -131,7 +131,7 @@ func (h *Handler) templatesSettingsSave(w http.ResponseWriter, r *http.Request) 
 		h.renderTemplateSettings(w, r, tr(r, "templates.settings.error.displayCountSaveFailed"), "")
 		return
 	}
-	http.Redirect(w, r, "/admin/templates/settings?ok=saved", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/templates/settings?ok=saved", http.StatusFound)
 }
 
 // ---- OG card defaults tab ---------------------------------------------
@@ -193,7 +193,7 @@ func (h *Handler) templatesOGSave(w http.ResponseWriter, r *http.Request) {
 	if updated.OGBGImagePath != current.OGBGImagePath || updated.OGTextColor != current.OGTextColor {
 		go h.regenerateAllOGCards(r.Context())
 	}
-	http.Redirect(w, r, "/admin/templates/og?ok=saved", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/templates/og?ok=saved", http.StatusFound)
 }
 
 func (h *Handler) renderTemplateOG(w http.ResponseWriter, r *http.Request, errMsg, flash string) {
@@ -302,10 +302,10 @@ func (h *Handler) templatesActiveShortcut(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		// No active template yet → send the user to the list so they can
 		// pick / create one. The list page handles the empty state.
-		http.Redirect(w, r, "/admin/templates", http.StatusFound)
+		http.Redirect(w, r, root(r)+"/admin/templates", http.StatusFound)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/admin/templates/%d/edit", t.ID), http.StatusFound)
+	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/templates/%d/edit", t.ID), http.StatusFound)
 }
 
 // ---- edit form ---------------------------------------------------------
@@ -522,7 +522,7 @@ func (h *Handler) templatesSave(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to save template", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/admin/templates/%d/edit?ok=saved", id), http.StatusFound)
+	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/templates/%d/edit?ok=saved", id), http.StatusFound)
 }
 
 // templatesSaveAs clones the submitted payload into a new template row,
@@ -567,7 +567,7 @@ func (h *Handler) templatesSaveAs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to save template", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/admin/templates/%d/edit?ok=cloned", newID), http.StatusFound)
+	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/templates/%d/edit?ok=cloned", newID), http.StatusFound)
 }
 
 // ---- list --------------------------------------------------------------
@@ -676,7 +676,7 @@ func (h *Handler) templatesActivate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to activate template", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/templates?ok=activated", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/templates?ok=activated", http.StatusFound)
 }
 
 // ---- delete ------------------------------------------------------------
@@ -695,14 +695,14 @@ func (h *Handler) templatesDelete(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, repo.ErrTemplateActive):
 		// Active template can't be deleted — the site would have nothing
 		// to render. Redirect back with a flash so the UI explains why.
-		http.Redirect(w, r, "/admin/templates?err=active-template-cannot-delete", http.StatusFound)
+		http.Redirect(w, r, root(r)+"/admin/templates?err=active-template-cannot-delete", http.StatusFound)
 		return
 	case err != nil:
 		log.Printf("admin.templatesDelete: %v", err)
 		http.Error(w, "failed to delete template", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/templates?ok=deleted", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/templates?ok=deleted", http.StatusFound)
 }
 
 // ---- reorder -----------------------------------------------------------

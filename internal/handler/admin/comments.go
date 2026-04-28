@@ -70,7 +70,7 @@ func (h *Handler) commentSettingsSubmit(w http.ResponseWriter, r *http.Request) 
 		h.renderCommentSettingsWith(w, r, *current, tr(r, "flash.saveFailed"), false)
 		return
 	}
-	http.Redirect(w, r, "/admin/comments/settings?ok=1", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/comments/settings?ok=1", http.StatusFound)
 }
 
 func (h *Handler) renderCommentSettings(w http.ResponseWriter, r *http.Request, errMsg string, success bool) {

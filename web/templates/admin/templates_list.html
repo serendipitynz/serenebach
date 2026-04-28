@@ -2,10 +2,10 @@
 <h1>{{T "templates.title"}}</h1>
 
 <nav class="tabbar">
-  <a href="/admin/templates" class="active">{{T "templates.tab.list"}}</a>
-  <a href="/admin/templates/settings">{{T "templates.tab.settings"}}</a>
-  <a href="/admin/templates/import">{{T "templates.tab.import"}}</a>
-  <a href="/admin/templates/og">{{T "templates.tab.og"}}</a>
+  <a href="{{Root}}/admin/templates" class="active">{{T "templates.tab.list"}}</a>
+  <a href="{{Root}}/admin/templates/settings">{{T "templates.tab.settings"}}</a>
+  <a href="{{Root}}/admin/templates/import">{{T "templates.tab.import"}}</a>
+  <a href="{{Root}}/admin/templates/og">{{T "templates.tab.og"}}</a>
 </nav>
 
 {{if eq .FlashSuccess "activated"}}<p class="alert success">{{T "templates.flash.activated"}}</p>{{end}}
@@ -33,15 +33,15 @@
           <td class="drag-handle col-drag col-hide-mobile" title="{{T `common.dragToReorder`}}" aria-label="{{T `common.dragToReorder`}}">≡</td>
           <td class="num col-id col-hide-mobile">{{.ID}}</td>
           <td class="col-datetime col-hide-mobile">{{fmtDate .UpdatedAt}}</td>
-          <td class="col-flex-wide"><a href="/admin/templates/{{.ID}}/edit">{{.Name}}</a></td>
+          <td class="col-flex-wide"><a href="{{Root}}/admin/templates/{{.ID}}/edit">{{.Name}}</a></td>
           <td class="col-status">{{if .IsActive}}<span class="badge approved">{{T "templates.label.inUse"}}</span>{{else}}
-            <form method="post" action="/admin/templates/{{.ID}}/activate" class="inline">
+            <form method="post" action="{{Root}}/admin/templates/{{.ID}}/activate" class="inline">
               <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
               <button type="submit" class="link">{{T "templates.action.use"}}</button>
             </form>
           {{end}}</td>
           <td class="col-actions">
-            <a href="/?__sb_template={{.ID}}" target="_blank" rel="noopener" class="btn-icon"
+            <a href="{{Root}}/?__sb_template={{.ID}}" target="_blank" rel="noopener" class="btn-icon"
                aria-label="{{T `action.preview`}}" title="{{T `action.preview`}}">{{iconEye}}</a>
             <button type="button" class="btn-icon" data-template-info
                     data-meta-name="{{.Meta.Name}}"
@@ -51,7 +51,7 @@
                     data-meta-memo="{{.Meta.Memo}}"
                     aria-label="{{T `templates.action.infoTitle`}}" title="{{T `templates.col.info`}}">{{iconInfo}}</button>
             {{if not .IsActive}}
-            <form method="post" action="/admin/templates/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `templates.delete.confirm`}}')">
+            <form method="post" action="{{Root}}/admin/templates/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `templates.delete.confirm`}}')">
               <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
               <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{T `action.delete`}}">{{iconTrash}}</button>
             </form>

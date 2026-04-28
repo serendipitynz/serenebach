@@ -51,7 +51,7 @@ func (h *Handler) mountSettings(r chi.Router) {
 	// /settings/ai tab so admins who had the ops page pinned still
 	// land on a useful view.
 	r.Get("/settings/ops", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/admin/settings/ai", http.StatusMovedPermanently)
+		http.Redirect(w, r, root(r)+"/admin/settings/ai", http.StatusMovedPermanently)
 	})
 }
 
@@ -127,7 +127,7 @@ type settingsScreenPageData struct {
 func (h *Handler) settingsRoot(w http.ResponseWriter, r *http.Request) {
 	u := session.UserFrom(r.Context())
 	if u != nil && u.CanManageDesign() {
-		http.Redirect(w, r, "/admin/settings/basic", http.StatusFound)
+		http.Redirect(w, r, root(r)+"/admin/settings/basic", http.StatusFound)
 		return
 	}
 	h.settingsScreenForm(w, r)
@@ -193,7 +193,7 @@ func (h *Handler) settingsBasicSubmit(w http.ResponseWriter, r *http.Request) {
 		h.renderSettingsBasicWith(w, r, updated, tr(r, "flash.saveFailed"), false)
 		return
 	}
-	http.Redirect(w, r, "/admin/settings/basic?ok=1", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/settings/basic?ok=1", http.StatusFound)
 }
 
 // regenerateAllOGCards iterates every entry for the weblog and

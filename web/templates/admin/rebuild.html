@@ -30,7 +30,7 @@
 </div>
 {{end}}
 
-<form method="post" action="/admin/rebuild">
+<form method="post" action="{{Root}}/admin/rebuild">
   <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
   <button type="submit" class="primary"{{if .Running}} disabled{{end}}>
     {{if .Running}}{{T "rebuild.running.button"}}{{else}}{{T "rebuild.trigger.button"}}{{end}}

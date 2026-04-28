@@ -24,7 +24,7 @@
         <tr>
           <td class="num col-id col-hide-mobile">{{.ID}}</td>
           <td class="col-flex-wide">
-            <form method="post" action="/admin/tags/{{.ID}}/update" class="inline-edit">
+            <form method="post" action="{{Root}}/admin/tags/{{.ID}}/update" class="inline-edit">
               <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
               <input type="text" name="name" value="{{.Name}}" maxlength="100" required>
           </td>
@@ -35,8 +35,8 @@
           </td>
           <td class="num col-count">{{.EntryCount}}</td>
           <td class="col-actions">
-            <a href="/tag/{{.Slug}}/" target="_blank" rel="noopener" class="btn-icon" aria-label="{{T `common.viewPublic`}}" title="{{T `common.viewPublic`}}">↗</a>
-            <form method="post" action="/admin/tags/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `tags.delete.confirm`}}')">
+            <a href="{{Root}}/tag/{{.Slug}}/" target="_blank" rel="noopener" class="btn-icon" aria-label="{{T `common.viewPublic`}}" title="{{T `common.viewPublic`}}">↗</a>
+            <form method="post" action="{{Root}}/admin/tags/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `tags.delete.confirm`}}')">
               <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
               <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{T `action.delete`}}">{{iconTrash}}</button>
             </form>

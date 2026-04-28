@@ -9,7 +9,7 @@
 <div class="panel">
   <div class="panel-head">
     <h2>{{Tf "users.heading" (len .Users)}}</h2>
-    <a href="/admin/users/new" class="more">{{T "users.form.titleNew"}} →</a>
+    <a href="{{Root}}/admin/users/new" class="more">{{T "users.form.titleNew"}} →</a>
   </div>
   <div class="panel-body">
     {{if .Users}}
@@ -28,7 +28,7 @@
         <tr data-user-id="{{.ID}}" draggable="true">
           <td class="drag-handle col-drag col-hide-mobile" title="{{T `common.dragToReorder`}}" aria-label="{{T `common.dragToReorder`}}">≡</td>
           <td class="num col-id col-hide-mobile">{{.ID}}</td>
-          <td class="col-flex"><a href="/admin/users/{{.ID}}/edit">{{.Name}}</a></td>
+          <td class="col-flex"><a href="{{Root}}/admin/users/{{.ID}}/edit">{{.Name}}</a></td>
           <td class="col-flex col-hide-mobile">{{.DisplayName}}</td>
           <td class="col-flex col-hide-mobile">{{if .Email}}{{.Email}}{{else}}<span class="hint">{{T "common.dash"}}</span>{{end}}</td>
           <td class="col-role">
@@ -37,7 +37,7 @@
             {{else}}{{T "role.regular"}}{{end}}
           </td>
           <td class="col-actions">
-            <form method="post" action="/admin/users/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `users.delete.confirm`}}')">
+            <form method="post" action="{{Root}}/admin/users/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `users.delete.confirm`}}')">
               <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
               <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{T `action.delete`}}">{{iconTrash}}</button>
             </form>

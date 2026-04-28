@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{T "login.title"}} | {{T "app.name"}}</title>
-<link rel="stylesheet" href="/admin/static/admin.css">
+<link rel="stylesheet" href="{{Root}}/admin/static/admin.css">
 </head>
 <body>
 <div class="login-wrap">
   <div class="login-card">
-    <h1><img src="/admin/static/sb_logo_gray.svg" alt="{{T `app.name`}}"></h1>
+    <h1><img src="{{Root}}/admin/static/sb_logo_gray.svg" alt="{{T `app.name`}}"></h1>
     {{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
-    <form method="post" action="/admin/login{{if .Next}}?next={{.Next}}{{end}}">
+    <form method="post" action="{{Root}}/admin/login{{if .Next}}?next={{.Next}}{{end}}">
       <label>{{T "login.name"}}
         <input type="text" name="name" value="{{.Name}}" autofocus required>
       </label>

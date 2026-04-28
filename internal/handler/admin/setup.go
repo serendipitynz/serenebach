@@ -145,5 +145,5 @@ func (h *Handler) setupSubmit(w http.ResponseWriter, r *http.Request) {
 		echo(tr(r, "setup.errorInternal"))
 		return
 	}
-	http.Redirect(w, r, "/admin/login", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/login", http.StatusFound)
 }

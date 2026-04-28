@@ -107,7 +107,7 @@ func (h *Handler) rebuildPost(w http.ResponseWriter, r *http.Request) {
 
 	report, err := h.Rebuilder.Run(r.Context(), h.Store, h.wid())
 	if errors.Is(err, ErrRebuildBusy) {
-		http.Redirect(w, r, "/admin/rebuild?status=busy", http.StatusSeeOther)
+		http.Redirect(w, r, root(r)+"/admin/rebuild?status=busy", http.StatusSeeOther)
 		return
 	}
 	if err != nil {
@@ -124,7 +124,7 @@ func (h *Handler) rebuildPost(w http.ResponseWriter, r *http.Request) {
 	q.Set("archive_year", strconv.Itoa(report.ArchiveYear))
 	q.Set("archive_month", strconv.Itoa(report.ArchiveMonth))
 	q.Set("css", strconv.FormatBool(report.CSSWritten))
-	http.Redirect(w, r, "/admin/rebuild?"+q.Encode(), http.StatusSeeOther)
+	http.Redirect(w, r, root(r)+"/admin/rebuild?"+q.Encode(), http.StatusSeeOther)
 }
 
 func (h *Handler) buildRebuildPageData(r *http.Request) rebuildPageData {
@@ -167,7 +167,7 @@ func redirectToRebuild(w http.ResponseWriter, r *http.Request, status, msg strin
 	if msg != "" {
 		q.Set("msg", msg)
 	}
-	http.Redirect(w, r, "/admin/rebuild?"+q.Encode(), http.StatusSeeOther)
+	http.Redirect(w, r, root(r)+"/admin/rebuild?"+q.Encode(), http.StatusSeeOther)
 }
 
 func lastBuildTime(outDir string) time.Time {

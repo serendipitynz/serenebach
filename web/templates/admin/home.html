@@ -8,32 +8,32 @@
     <div class="label">{{T "home.card.published"}}</div>
     <div class="value">{{.Stats.PublishedEntries}}</div>
     <div class="sub">{{Tf "home.card.drafts" .Stats.DraftEntries}}</div>
-    <a class="more" href="/admin/entries">{{T "home.card.entriesLink"}}</a>
+    <a class="more" href="{{Root}}/admin/entries">{{T "home.card.entriesLink"}}</a>
   </div>
   <div class="card">
     <div class="label">{{T "home.card.waiting"}}</div>
     <div class="value">{{.Stats.WaitingComments}}</div>
     <div class="sub">{{Tf "home.card.approved" .Stats.ApprovedComments}}</div>
-    <a class="more" href="/admin/comments?status=waiting">{{T "home.card.commentsLink"}}</a>
+    <a class="more" href="{{Root}}/admin/comments?status=waiting">{{T "home.card.commentsLink"}}</a>
   </div>
   <div class="card">
     <div class="label">{{T "home.card.pv"}}</div>
     <div class="value">{{.Stats.RecentPV}}</div>
     <div class="sub">{{Tf "home.card.unique" .Stats.RecentUniques}}</div>
-    <a class="more" href="/admin/analytics?days=7">{{T "home.card.analyticsLink"}}</a>
+    <a class="more" href="{{Root}}/admin/analytics?days=7">{{T "home.card.analyticsLink"}}</a>
   </div>
   <div class="card">
     <div class="label">{{T "home.card.lastBuild"}}</div>
     <div class="value">{{if .Stats.LastBuildLabel}}{{.Stats.LastBuildLabel}}{{else}}—{{end}}</div>
     <div class="sub">&nbsp;</div>
-    <a class="more" href="/admin/rebuild">{{T "home.card.rebuildLink"}}</a>
+    <a class="more" href="{{Root}}/admin/rebuild">{{T "home.card.rebuildLink"}}</a>
   </div>
 </div>
 
 <div class="panel">
   <div class="panel-head">
     <h2>{{T "home.recent.heading"}}</h2>
-    <a href="/admin/entries/new" class="more">{{T "nav.entries.new"}} →</a>
+    <a href="{{Root}}/admin/entries/new" class="more">{{T "nav.entries.new"}} →</a>
   </div>
   <div class="panel-body">
     {{if .RecentEntries}}
@@ -42,10 +42,10 @@
       <tbody>
       {{range .RecentEntries}}
         <tr>
-          <td><a href="/admin/entries/{{.ID}}/edit">{{if .Title}}{{.Title}}{{else}}{{T "home.recent.noTitle"}}{{end}}</a></td>
+          <td><a href="{{Root}}/admin/entries/{{.ID}}/edit">{{if .Title}}{{.Title}}{{else}}{{T "home.recent.noTitle"}}{{end}}</a></td>
           <td><span class="badge {{statusClass .Status}}">{{statusLabel .Status}}</span></td>
           <td>{{fmtDate .PostedAt}}</td>
-          <td class="actions"><a href="/entry/{{.ID}}/" target="_blank" rel="noopener">{{T "home.recent.viewPublic"}}</a></td>
+          <td class="actions"><a href="{{Root}}/entry/{{.ID}}/" target="_blank" rel="noopener">{{T "home.recent.viewPublic"}}</a></td>
         </tr>
       {{end}}
       </tbody>

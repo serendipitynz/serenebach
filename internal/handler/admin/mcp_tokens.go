@@ -25,7 +25,7 @@ func (h *Handler) mountMCPTokens(r chi.Router) {
 	r.Group(func(gr chi.Router) {
 		gr.Use(h.requireAdmin)
 		gr.Get("/settings/mcp", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/admin/settings/ai", http.StatusMovedPermanently)
+			http.Redirect(w, r, root(r)+"/admin/settings/ai", http.StatusMovedPermanently)
 		})
 		gr.Post("/settings/mcp/new", h.mcpTokensCreate)
 		gr.Post("/settings/mcp/{id}/revoke", h.mcpTokensRevoke)
@@ -135,7 +135,7 @@ func (h *Handler) mcpTokensRevoke(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to revoke", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/settings/ai", http.StatusSeeOther)
+	http.Redirect(w, r, root(r)+"/admin/settings/ai", http.StatusSeeOther)
 }
 
 // generateRawToken returns a 32-byte random token encoded as hex and

@@ -135,13 +135,13 @@ func (h *Handler) templateImportSubmit(w http.ResponseWriter, r *http.Request) {
 
 	if r.MultipartForm == nil {
 		if err := r.ParseMultipartForm(h.uploadMaxBytes()); err != nil {
-			http.Redirect(w, r, "/admin/templates/import?err="+urlEscape(tr(r, "templates.import.error.uploadParse")), http.StatusFound)
+			http.Redirect(w, r, root(r)+"/admin/templates/import?err="+urlEscape(tr(r, "templates.import.error.uploadParse")), http.StatusFound)
 			return
 		}
 	}
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		http.Redirect(w, r, "/admin/templates/import?err="+urlEscape(tr(r, "templates.import.error.fileMissing")), http.StatusFound)
+		http.Redirect(w, r, root(r)+"/admin/templates/import?err="+urlEscape(tr(r, "templates.import.error.fileMissing")), http.StatusFound)
 		return
 	}
 	defer file.Close()
@@ -149,11 +149,11 @@ func (h *Handler) templateImportSubmit(w http.ResponseWriter, r *http.Request) {
 	pack, err := templatepack.Parse(file)
 	if err != nil {
 		log.Printf("admin.templateImport: parse: %v", err)
-		http.Redirect(w, r, "/admin/templates/import?err="+urlEscape(tr(r, "templates.import.error.parseFailed")), http.StatusFound)
+		http.Redirect(w, r, root(r)+"/admin/templates/import?err="+urlEscape(tr(r, "templates.import.error.parseFailed")), http.StatusFound)
 		return
 	}
 	if pack.MainBody == "" {
-		http.Redirect(w, r, "/admin/templates/import?err="+urlEscape(tr(r, "templates.import.error.baseRequired")), http.StatusFound)
+		http.Redirect(w, r, root(r)+"/admin/templates/import?err="+urlEscape(tr(r, "templates.import.error.baseRequired")), http.StatusFound)
 		return
 	}
 
@@ -171,7 +171,7 @@ func (h *Handler) templateImportSubmit(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Printf("admin.templateImport: create: %v", err)
-		http.Redirect(w, r, "/admin/templates/import?err="+urlEscape(tr(r, "templates.import.error.saveFailed")), http.StatusFound)
+		http.Redirect(w, r, root(r)+"/admin/templates/import?err="+urlEscape(tr(r, "templates.import.error.saveFailed")), http.StatusFound)
 		return
 	}
 
@@ -203,7 +203,7 @@ func (h *Handler) templateImportSubmit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	http.Redirect(w, r, fmt.Sprintf("/admin/templates/%d/edit?ok=imported", newID), http.StatusFound)
+	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/templates/%d/edit?ok=imported", newID), http.StatusFound)
 }
 
 // safeFilenameFallback returns name when it's printable-ASCII-and-safe,

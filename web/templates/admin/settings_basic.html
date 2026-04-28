@@ -2,15 +2,15 @@
 <h1>{{T "settings.title"}}</h1>
 
 <nav class="tabbar">
-  {{if .CanManageDesign}}<a href="/admin/settings/basic"{{if eq .ActiveTab "basic"}} class="active"{{end}}>{{T "settings.tab.basic"}}</a>{{end}}
-  <a href="/admin/settings/ai"{{if eq .ActiveTab "ai"}} class="active"{{end}}>{{T "settings.tab.ai"}}</a>
-  <a href="/admin/settings/screen"{{if eq .ActiveTab "screen"}} class="active"{{end}}>{{T "settings.tab.screen"}}</a>
+  {{if .CanManageDesign}}<a href="{{Root}}/admin/settings/basic"{{if eq .ActiveTab "basic"}} class="active"{{end}}>{{T "settings.tab.basic"}}</a>{{end}}
+  <a href="{{Root}}/admin/settings/ai"{{if eq .ActiveTab "ai"}} class="active"{{end}}>{{T "settings.tab.ai"}}</a>
+  <a href="{{Root}}/admin/settings/screen"{{if eq .ActiveTab "screen"}} class="active"{{end}}>{{T "settings.tab.screen"}}</a>
 </nav>
 
 {{if .FlashSuccess}}<p class="alert success">{{.FlashSuccess}}</p>{{end}}
 {{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
 
-<form method="post" action="/admin/settings/basic" class="form-stack" data-unsaved-warn>
+<form method="post" action="{{Root}}/admin/settings/basic" class="form-stack" data-unsaved-warn>
   <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 
   <div class="panel">

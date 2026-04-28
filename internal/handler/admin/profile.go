@@ -35,7 +35,7 @@ type profileFormPageData struct {
 func (h *Handler) profileForm(w http.ResponseWriter, r *http.Request) {
 	u := session.UserFrom(r.Context())
 	if u == nil {
-		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		http.Redirect(w, r, root(r)+"/admin/login", http.StatusFound)
 		return
 	}
 	// Reload from DB so a freshly-saved description / name shows up
@@ -66,7 +66,7 @@ func (h *Handler) renderProfileForm(w http.ResponseWriter, r *http.Request, u do
 func (h *Handler) profileSave(w http.ResponseWriter, r *http.Request) {
 	actor := session.UserFrom(r.Context())
 	if actor == nil {
-		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		http.Redirect(w, r, root(r)+"/admin/login", http.StatusFound)
 		return
 	}
 	existing, err := h.Store.UserByID(r.Context(), actor.ID)
@@ -130,5 +130,5 @@ func (h *Handler) profileSave(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	http.Redirect(w, r, "/admin/profile?ok=saved", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/profile?ok=saved", http.StatusFound)
 }

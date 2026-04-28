@@ -7,7 +7,7 @@
 <div class="panel">
   <div class="panel-head">
     <h2>{{Tf "links.heading" (len .Links)}}</h2>
-    <a href="/admin/links/new" class="more">{{T "action.newItem"}}</a>
+    <a href="{{Root}}/admin/links/new" class="more">{{T "action.newItem"}}</a>
   </div>
   <div class="panel-body">
     {{if .Links}}
@@ -27,9 +27,9 @@
           <td class="num col-id col-hide-mobile">{{.ID}}</td>
           <td class="col-flex-wide">
             {{- if .IsGroup -}}
-              <a href="/admin/links/{{.ID}}/edit" class="link-group-name">{{iconFolder}}<span>{{.Name}}</span></a>
+              <a href="{{Root}}/admin/links/{{.ID}}/edit" class="link-group-name">{{iconFolder}}<span>{{.Name}}</span></a>
             {{- else -}}
-              <a href="/admin/links/{{.ID}}/edit">{{.Name}}</a>
+              <a href="{{Root}}/admin/links/{{.ID}}/edit">{{.Name}}</a>
             {{- end -}}
           </td>
           <td class="col-flex-wide col-hide-mobile">
@@ -51,7 +51,7 @@
             {{- end -}}
           </td>
           <td class="col-actions">
-            <form method="post" action="/admin/links/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{if .IsGroup}}{{T `links.delete.confirmGroup`}}{{else}}{{T `links.delete.confirmLink`}}{{end}}')">
+            <form method="post" action="{{Root}}/admin/links/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{if .IsGroup}}{{T `links.delete.confirmGroup`}}{{else}}{{T `links.delete.confirmLink`}}{{end}}')">
               <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
               <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{T `action.delete`}}">{{iconTrash}}</button>
             </form>

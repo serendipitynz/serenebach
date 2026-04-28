@@ -2,14 +2,14 @@
 <h1>{{T "comments.title"}}</h1>
 
 <nav class="tabbar">
-  <a href="/admin/comments">{{T "comments.tab.list"}}</a>
-  <a href="/admin/comments/settings" class="active">{{T "comments.tab.settings"}}</a>
+  <a href="{{Root}}/admin/comments">{{T "comments.tab.list"}}</a>
+  <a href="{{Root}}/admin/comments/settings" class="active">{{T "comments.tab.settings"}}</a>
 </nav>
 
 {{if .FlashSuccess}}<p class="alert success">{{.FlashSuccess}}</p>{{end}}
 {{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
 
-<form method="post" action="/admin/comments/settings" class="form-stack" data-unsaved-warn>
+<form method="post" action="{{Root}}/admin/comments/settings" class="form-stack" data-unsaved-warn>
   <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 
   <div class="panel">
