@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -71,6 +72,11 @@ type Config struct {
 	// SB_PUBLIC_ALLOWED_ORIGINS, comma-separated, e.g.
 	// "https://static.example.net".
 	PublicAllowedOrigins []string
+	// BasePath is the URL prefix under which the app is mounted (e.g.
+	// "/sb4"). Empty means the app is at the root. Configured via
+	// SB_BASE_PATH; in CGI mode it is auto-detected from SCRIPT_NAME
+	// when SB_BASE_PATH is not set.
+	BasePath string
 }
 
 // Load parses top-level flags and returns the resulting Config, the name of
@@ -123,6 +129,18 @@ func Load(args []string) (*Config, string, []string, error) {
 		}
 	default:
 		cfg.Mode = ModeServer
+	}
+
+	// BasePath: explicit env var wins; in CGI mode fall back to the
+	// directory component of SCRIPT_NAME (/sb4/serenebach.cgi → /sb4).
+	cfg.BasePath = os.Getenv("SB_BASE_PATH")
+	if cfg.BasePath == "" && cfg.Mode == ModeCGI {
+		if sn := os.Getenv("SCRIPT_NAME"); sn != "" {
+			dir := path.Dir(sn)
+			if dir != "/" && dir != "." {
+				cfg.BasePath = dir
+			}
+		}
 	}
 
 	subcmd := ""

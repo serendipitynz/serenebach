@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/serendipitynz/serenebach/internal/basepath"
 	"github.com/serendipitynz/serenebach/internal/domain"
 )
 
@@ -41,11 +42,14 @@ func (m *Manager) LoadUser(next http.Handler) http.Handler {
 
 // RequireUser rejects unauthenticated access with a 302 to loginPath,
 // preserving the original target in ?next= for post-login redirection.
+// loginPath is the bare path without the base path prefix (e.g. "/admin/login");
+// the deployment base path is prepended automatically from context.
 func RequireUser(loginPath string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if UserFrom(r.Context()) == nil {
-				dest := loginPath
+				base := basepath.FromContext(r.Context())
+				dest := base + loginPath
 				if r.URL.Path != "" && r.URL.Path != loginPath {
 					dest += "?next=" + url.QueryEscape(r.URL.RequestURI())
 				}

@@ -15,6 +15,7 @@ import (
 
 	"github.com/serendipitynz/serenebach/internal/analytics"
 	"github.com/serendipitynz/serenebach/internal/auth"
+	"github.com/serendipitynz/serenebach/internal/basepath"
 	"github.com/serendipitynz/serenebach/internal/clientip"
 	"github.com/serendipitynz/serenebach/internal/csrf"
 	"github.com/serendipitynz/serenebach/internal/domain"
@@ -68,6 +69,13 @@ type Handler struct {
 	// no-op). app.New populates this with a closure around app.Seed
 	// to avoid a handler→app import cycle.
 	Setup SetupRunner
+}
+
+// root returns the deployment base path for the current request (e.g. "/sb4").
+// Used to prefix all generated redirect URLs so the app works when mounted
+// under a sub-directory (shared hosting CGI, reverse-proxy sub-path, etc.).
+func root(r *http.Request) string {
+	return basepath.FromContext(r.Context())
 }
 
 // MountPublic registers routes that do not require authentication (the
@@ -171,7 +179,7 @@ type loginData struct {
 
 func (h *Handler) loginForm(w http.ResponseWriter, r *http.Request) {
 	if session.UserFrom(r.Context()) != nil {
-		http.Redirect(w, r, safeNext(r.URL.Query().Get("next")), http.StatusFound)
+		http.Redirect(w, r, root(r)+safeNext(r.URL.Query().Get("next")), http.StatusFound)
 		return
 	}
 	renderLogin(w, r, loginData{
@@ -239,14 +247,14 @@ func (h *Handler) loginSubmit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, safeNext(nextParam), http.StatusFound)
+	http.Redirect(w, r, root(r)+safeNext(nextParam), http.StatusFound)
 }
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	if err := h.Sessions.Destroy(r.Context(), w, r); err != nil {
 		log.Printf("admin.logout: %v", err)
 	}
-	http.Redirect(w, r, "/admin/login", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/login", http.StatusFound)
 }
 
 // ---- dashboard ---------------------------------------------------------
@@ -271,7 +279,7 @@ type homePageData struct {
 func (h *Handler) home(w http.ResponseWriter, r *http.Request) {
 	u := session.UserFrom(r.Context())
 	if u == nil {
-		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		http.Redirect(w, r, root(r)+"/admin/login", http.StatusFound)
 		return
 	}
 	name := u.DisplayName

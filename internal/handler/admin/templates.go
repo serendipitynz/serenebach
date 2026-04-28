@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/serendipitynz/serenebach/internal/ai"
+	"github.com/serendipitynz/serenebach/internal/basepath"
 	"github.com/serendipitynz/serenebach/internal/domain"
 	"github.com/serendipitynz/serenebach/internal/i18n"
 	"github.com/serendipitynz/serenebach/internal/version"
@@ -92,6 +93,9 @@ var tmplFuncs = template.FuncMap{
 	"THTMLf":   func(key string, args ...any) template.HTML { return template.HTML(key) },
 	"JSBundle": func() template.JS { return template.JS(`{}`) },
 	"Locale":   func() string { return "" },
+	// Root returns the deployment base path (e.g. "/sb4"). Stub only;
+	// real implementation bound per-request in localeFuncs.
+	"Root": func() string { return "" },
 	// aiEnabled reports whether the writing-assist features should
 	// surface their UI affordances. True only when both the server
 	// has SB_AI_SECRET configured AND the given user has picked a
@@ -352,6 +356,7 @@ func localeFuncs(r *http.Request) template.FuncMap {
 			return template.JS(i18nBundle.JSCatalogueJSON(locale, "js."))
 		},
 		"Locale": func() string { return locale },
+		"Root":   func() string { return basepath.FromContext(r.Context()) },
 		// statusLabel / humanTime are registered as static stubs in
 		// tmplFuncs (so parse-time strict checks pass). Re-bind them
 		// here so the rendered text picks up the active locale rather

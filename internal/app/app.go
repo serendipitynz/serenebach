@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/serendipitynz/serenebach/internal/analytics"
+	"github.com/serendipitynz/serenebach/internal/basepath"
 	"github.com/serendipitynz/serenebach/internal/config"
 	"github.com/serendipitynz/serenebach/internal/csrf"
 	"github.com/serendipitynz/serenebach/internal/handler/admin"
@@ -216,6 +217,14 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	r := chi.NewRouter()
+	// Inject the deployment base path into every request context so
+	// handlers and templates can generate correct URLs without knowing
+	// where the app is mounted.
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			next.ServeHTTP(w, r.WithContext(basepath.NewContext(r.Context(), cfg.BasePath)))
+		})
+	})
 	r.Use(middleware.Recoverer)
 	// SB3 static-archive redirect must run before StripSlashes — its
 	// category dir match depends on the trailing slash, which
@@ -346,7 +355,7 @@ func setupGate(store *repo.Store) func(http.Handler) http.Handler {
 				return
 			}
 			if !ok {
-				http.Redirect(w, r, "/setup", http.StatusFound)
+				http.Redirect(w, r, basepath.FromContext(r.Context())+"/setup", http.StatusFound)
 				return
 			}
 			done.Store(true)
