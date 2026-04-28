@@ -103,7 +103,13 @@ func serve(a *app.App, cfg *config.Config) error {
 		return cgi.Serve(a.Handler())
 	}
 	log.Printf("serenebach: listening on %s (db=%s)", cfg.Addr, cfg.DBPath)
-	srv := &http.Server{Addr: cfg.Addr, Handler: a.Handler()}
+	h := a.Handler()
+	if cfg.BasePath != "" {
+		// Strip the base path prefix before the router sees the request so
+		// routes registered as /admin/... also match /sb4/admin/... etc.
+		h = http.StripPrefix(cfg.BasePath, h)
+	}
+	srv := &http.Server{Addr: cfg.Addr, Handler: h}
 	return srv.ListenAndServe()
 }
 
