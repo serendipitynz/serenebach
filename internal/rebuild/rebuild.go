@@ -69,19 +69,28 @@ type Options struct {
 
 // Build generates the full static snapshot.
 //
-// The per-page subtrees the rebuilder fully owns
-// (entry/, category/, tag/, archive/) are wiped at the start so a
-// deleted entry, an unpublished post, a slug change, or a removed
-// category/tag does not leave a stale `*/index.html` file behind for
-// the static host to keep serving. Top-level files (index.html,
-// style.css, rss.xml, atom.xml, llms*.txt) are always rewritten so
-// they don't go stale either; llms.txt + llms-full.txt are removed
-// when the weblog has opted out so toggling the switch off cleans up.
+// Output is produced via a stage-then-swap strategy: every managed
+// subtree (entry/, category/, tag/, archive/) and every top-level
+// file (index.html, style.css, rss.xml, atom.xml, llms*.txt) is
+// first written into a hidden staging directory under OutDir. Only
+// after every render + write succeeds are the staged subtrees swapped
+// in (rename-based, replacing the previous output). If any earlier
+// step fails — DB lookup, template load, render, or write — Build
+// returns the error and the existing static snapshot stays intact.
+// This matters for the auto-rebuild trigger, which only logs failures
+// and lets the underlying save still succeed: a transient failure
+// must never tear the live static site apart.
+//
+// Stale-removal semantics: the swap deletes deleted/unpublished/slug-
+// changed entries and removed categories/tags/archive months because
+// those paths simply do not appear in the freshly-built staging tree.
+// llms.txt + llms-full.txt are also removed when the weblog has opted
+// out of LLMS publishing so toggling the switch off cleans up.
 //
 // img/ and template/ are mirrors of external directories with their
-// own lifecycles and are NOT pruned here — copyImageTree only adds
-// files. Operators who manage those dirs separately are responsible
-// for cleaning them.
+// own lifecycles and are NOT staged — copyImageTree only adds files.
+// Operators who manage those dirs separately are responsible for
+// cleaning them.
 func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error) {
 	if opts.OutDir == "" {
 		return nil, fmt.Errorf("rebuild: OutDir is required")
@@ -89,21 +98,9 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 	if opts.WID == 0 {
 		opts.WID = 1
 	}
-	if err := cleanManagedSubtrees(opts.OutDir); err != nil {
-		return nil, err
-	}
 	weblog, err := store.WeblogByID(ctx, opts.WID)
 	if err != nil {
 		return nil, fmt.Errorf("rebuild: load weblog: %w", err)
-	}
-	if !weblog.LLMSEnabled {
-		// Toggle was just flipped off — drop the previously-published
-		// agent-discovery files so the static host stops serving them.
-		for _, name := range []string{"llms.txt", "llms-full.txt"} {
-			if err := os.Remove(filepath.Join(opts.OutDir, name)); err != nil && !os.IsNotExist(err) {
-				return nil, fmt.Errorf("rebuild: remove %s: %w", name, err)
-			}
-		}
 	}
 	// Page size: explicit opts.EntryListLimit wins (tests / callers
 	// that want a deterministic value); otherwise honour the author's
@@ -154,26 +151,47 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 	}
 
 	site := content.NewSite(*weblog).WithBasePath(opts.BasePath)
-	rep := &Report{OutDir: opts.OutDir}
+	finalOut := opts.OutDir
+	rep := &Report{OutDir: finalOut}
 
-	if err := writeHome(ctx, store, opts.OutDir, site, tmpl, all, cats, users, profileUsers, sidebar, opts.EntryListLimit); err != nil {
+	// Stage every page write under OutDir/.sb-rebuild-XXXX/ so a
+	// later failure leaves the live snapshot untouched. Same-FS
+	// guarantee comes from putting staging *inside* OutDir, which
+	// keeps later rename(2) calls atomic.
+	if err := os.MkdirAll(finalOut, 0o755); err != nil {
+		return nil, fmt.Errorf("rebuild: mkdir out: %w", err)
+	}
+	staging, err := os.MkdirTemp(finalOut, ".sb-rebuild-")
+	if err != nil {
+		return nil, fmt.Errorf("rebuild: create staging dir: %w", err)
+	}
+	// Always best-effort clean staging on exit. promoteStaging removes
+	// it on the happy path; this defer covers every error return.
+	defer os.RemoveAll(staging)
+
+	// Redirect writers to staging via a copy of opts so the original
+	// (used for rep.OutDir + image/template copies) keeps the real path.
+	stagedOpts := opts
+	stagedOpts.OutDir = staging
+
+	if err := writeHome(ctx, store, staging, site, tmpl, all, cats, users, profileUsers, sidebar, opts.EntryListLimit); err != nil {
 		return nil, err
 	}
 	rep.Home = true
 
-	if err := writeEntries(ctx, store, opts, site, tmpl, weblog, all, cats, users, profileUsers, sidebar, rep); err != nil {
+	if err := writeEntries(ctx, store, stagedOpts, site, tmpl, weblog, all, cats, users, profileUsers, sidebar, rep); err != nil {
 		return nil, err
 	}
 
-	if err := writeCategories(ctx, store, opts, site, archiveTmpl, cats, users, profileUsers, sidebar, rep); err != nil {
+	if err := writeCategories(ctx, store, stagedOpts, site, archiveTmpl, cats, users, profileUsers, sidebar, rep); err != nil {
 		return nil, err
 	}
 
-	if err := writeTags(ctx, store, opts, site, archiveTmpl, cats, users, profileUsers, sidebar, rep); err != nil {
+	if err := writeTags(ctx, store, stagedOpts, site, archiveTmpl, cats, users, profileUsers, sidebar, rep); err != nil {
 		return nil, err
 	}
 
-	if err := writeArchives(ctx, store, opts, site, archiveTmpl, cats, users, profileUsers, sidebar, rep); err != nil {
+	if err := writeArchives(ctx, store, stagedOpts, site, archiveTmpl, cats, users, profileUsers, sidebar, rep); err != nil {
 		return nil, err
 	}
 
@@ -182,21 +200,13 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 		// values instead of dead literals — mirrors the dynamic
 		// /style.css handler.
 		body := content.RenderTemplateCSS(site, tmpl)
-		if err := writeFile(filepath.Join(opts.OutDir, "style.css"), []byte(body)); err != nil {
+		if err := writeFile(filepath.Join(staging, "style.css"), []byte(body)); err != nil {
 			return nil, fmt.Errorf("rebuild: write css: %w", err)
 		}
 		rep.CSSWritten = true
 	}
-	// Per-template stylesheets. Category / archive / profile pages
-	// that pin a non-active template emit <link href="/template/<id>/
-	// style.css"> so the reader loads the right CSS — mirror every
-	// weblog template to disk so the static snapshot supports the
-	// same behaviour as the dev server.
-	if err := writeTemplateCSS(ctx, store, site, opts.WID, opts.OutDir); err != nil {
-		return nil, err
-	}
 
-	if err := writeFeeds(opts.OutDir, site, all, cats, users, rep); err != nil {
+	if err := writeFeeds(staging, site, all, cats, users, rep); err != nil {
 		return nil, err
 	}
 
@@ -204,21 +214,34 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 	// opted in — the static snapshot mirrors whatever the dynamic
 	// routes would serve.
 	if weblog.LLMSEnabled {
-		if err := writeLLMsTxt(opts.OutDir, *weblog, all, rep); err != nil {
+		if err := writeLLMsTxt(staging, *weblog, all, rep); err != nil {
 			return nil, err
 		}
 	}
 
+	// Every render + write succeeded. Swap the staged tree into
+	// place; failures inside promoteStaging leave the previous
+	// snapshot intact thanks to the rename-via-backup pattern.
+	if err := promoteStaging(finalOut, staging, weblog.LLMSEnabled); err != nil {
+		return nil, err
+	}
+
+	// Per-template stylesheets, image mirror, and template-asset
+	// mirror are NOT part of the staging swap: they are additive
+	// copies whose lifecycle is decoupled from the page tree, and a
+	// partial copy is recoverable on the next rebuild.
+	if err := writeTemplateCSS(ctx, store, site, opts.WID, finalOut); err != nil {
+		return nil, err
+	}
 	if opts.ImageDir != "" {
-		n, err := copyImageTree(opts.ImageDir, filepath.Join(opts.OutDir, "img"))
+		n, err := copyImageTree(opts.ImageDir, filepath.Join(finalOut, "img"))
 		if err != nil {
 			return nil, fmt.Errorf("rebuild: copy images: %w", err)
 		}
 		rep.ImagesCopied = n
 	}
-
 	if opts.TemplateDir != "" {
-		n, err := copyImageTree(opts.TemplateDir, filepath.Join(opts.OutDir, "template"))
+		n, err := copyImageTree(opts.TemplateDir, filepath.Join(finalOut, "template"))
 		if err != nil {
 			return nil, fmt.Errorf("rebuild: copy templates: %w", err)
 		}
@@ -662,23 +685,96 @@ func writeLLMsTxt(outDir string, weblog domain.Weblog, all []domain.Entry, rep *
 	return nil
 }
 
-// cleanManagedSubtrees wipes the per-page output directories that
-// Build fully owns. Run at the top of Build so deleted, unpublished,
-// or slug-changed entries (and removed categories / tags) don't leave
-// stale `*/index.html` files for the static host to serve.
+// promoteStaging atomically (per-subtree) replaces the live page
+// output under finalOut with the freshly-rendered tree under staging.
 //
-// img/ and template/ are mirrors of external dirs and are NOT cleaned
-// here — they have separate lifecycles. Top-level files (index.html,
-// style.css, rss.xml, atom.xml) are always rewritten so they don't
-// need pre-cleaning either; llms*.txt are handled inline by Build
-// when the LLMS toggle is off.
-func cleanManagedSubtrees(outDir string) error {
+// The flow for each managed subtree (entry/, category/, tag/,
+// archive/):
+//
+//   1. If staging has it, rename the existing finalOut/<sub> aside
+//      to finalOut/<sub>.old (rename within the same dir is atomic
+//      and reversible), rename staging/<sub> into finalOut/<sub>,
+//      then remove .old.
+//   2. If staging does NOT have it (e.g. the DB has zero entries
+//      this run), remove finalOut/<sub> so deleted-everything is
+//      tracked.
+//
+// On rename failure we restore the .old backup so the live snapshot
+// keeps the previous content. Once subtree promotion is done, the
+// top-level files (index.html, style.css, rss.xml, atom.xml,
+// llms*.txt) are renamed file-by-file — file rename overwrites are
+// atomic on POSIX, so each file flips in place. Finally, when the
+// LLMS toggle is off any leftover llms*.txt are removed so flipping
+// the switch off cleans up after itself.
+func promoteStaging(finalOut, staging string, llmsEnabled bool) error {
 	for _, sub := range []string{"entry", "category", "tag", "archive"} {
-		if err := os.RemoveAll(filepath.Join(outDir, sub)); err != nil {
-			return fmt.Errorf("rebuild: clean %s: %w", sub, err)
+		stagedPath := filepath.Join(staging, sub)
+		finalPath := filepath.Join(finalOut, sub)
+		backupPath := finalPath + ".old"
+		// Drop any leftover backup from a prior interrupted run so
+		// the rename below has a clean target.
+		_ = os.RemoveAll(backupPath)
+
+		stagedExists := dirExists(stagedPath)
+		finalExists := dirExists(finalPath)
+
+		if !stagedExists {
+			// Staging didn't render this subtree — usually means
+			// the DB has no rows of this type. Remove the live
+			// copy so deletes propagate.
+			if finalExists {
+				if err := os.RemoveAll(finalPath); err != nil {
+					return fmt.Errorf("rebuild: prune %s: %w", finalPath, err)
+				}
+			}
+			continue
+		}
+
+		if finalExists {
+			if err := os.Rename(finalPath, backupPath); err != nil {
+				return fmt.Errorf("rebuild: backup %s: %w", finalPath, err)
+			}
+		}
+		if err := os.Rename(stagedPath, finalPath); err != nil {
+			// Restore previous output so the live snapshot is
+			// not left partially overwritten.
+			if finalExists {
+				_ = os.Rename(backupPath, finalPath)
+			}
+			return fmt.Errorf("rebuild: promote %s: %w", finalPath, err)
+		}
+		if finalExists {
+			_ = os.RemoveAll(backupPath)
+		}
+	}
+
+	for _, name := range []string{"index.html", "style.css", "rss.xml", "atom.xml", "llms.txt", "llms-full.txt"} {
+		stagedPath := filepath.Join(staging, name)
+		finalPath := filepath.Join(finalOut, name)
+		if _, err := os.Stat(stagedPath); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return fmt.Errorf("rebuild: stat staged %s: %w", name, err)
+		}
+		if err := os.Rename(stagedPath, finalPath); err != nil {
+			return fmt.Errorf("rebuild: promote %s: %w", finalPath, err)
+		}
+	}
+
+	if !llmsEnabled {
+		for _, name := range []string{"llms.txt", "llms-full.txt"} {
+			if err := os.Remove(filepath.Join(finalOut, name)); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("rebuild: remove %s: %w", name, err)
+			}
 		}
 	}
 	return nil
+}
+
+func dirExists(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && fi.IsDir()
 }
 
 func writeFile(path string, data []byte) error {

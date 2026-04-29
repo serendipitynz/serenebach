@@ -309,5 +309,76 @@ func TestBuildRemovesStaleLLMSFilesWhenDisabled(t *testing.T) {
 	}
 }
 
+// TestBuildPreservesExistingOutputOnFailure verifies the staging
+// contract: a build that fails after a previous successful run must
+// leave the live snapshot intact. Auto-rebuild swallows errors and
+// lets the underlying save still succeed, so a transient failure
+// must not tear the public site down.
+func TestBuildPreservesExistingOutputOnFailure(t *testing.T) {
+	a := newSeededApp(t)
+	out := filepath.Join(t.TempDir(), "public")
+
+	// First build succeeds and populates the live snapshot.
+	if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("initial Build: %v", err)
+	}
+	for _, p := range []string{"index.html", "entry/1/index.html", "entry/2/index.html", "category/1/index.html"} {
+		if _, err := os.Stat(filepath.Join(out, p)); err != nil {
+			t.Fatalf("first build: missing %s: %v", p, err)
+		}
+	}
+	// Snapshot the bytes so we can prove the live files are untouched
+	// after the failed second build.
+	wantHome, err := os.ReadFile(filepath.Join(out, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantEntry, err := os.ReadFile(filepath.Join(out, "entry/1/index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Force the next Build to fail by removing the active template
+	// — same trick TestBuildSurfacesMissingTemplate uses. This breaks
+	// rendering after the staging dir is created, exercising the
+	// "fail mid-flight" path the staging swap is designed to survive.
+	if _, err := a.DB.ExecContext(context.Background(),
+		`DELETE FROM templates WHERE is_active = 1`); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{OutDir: out, WID: 1}); err == nil {
+		t.Fatal("expected Build to fail without an active template")
+	}
+
+	// Live snapshot must still match the first build byte-for-byte.
+	if got, err := os.ReadFile(filepath.Join(out, "index.html")); err != nil {
+		t.Errorf("home page disappeared after failed rebuild: %v", err)
+	} else if string(got) != string(wantHome) {
+		t.Errorf("home page mutated by failed rebuild")
+	}
+	if got, err := os.ReadFile(filepath.Join(out, "entry/1/index.html")); err != nil {
+		t.Errorf("entry/1 disappeared after failed rebuild: %v", err)
+	} else if string(got) != string(wantEntry) {
+		t.Errorf("entry/1 mutated by failed rebuild")
+	}
+	for _, p := range []string{"entry/2/index.html", "category/1/index.html"} {
+		if _, err := os.Stat(filepath.Join(out, p)); err != nil {
+			t.Errorf("%s disappeared after failed rebuild: %v", p, err)
+		}
+	}
+
+	// Staging dir must not leak into the output tree.
+	dirEntries, err := os.ReadDir(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, de := range dirEntries {
+		if strings.HasPrefix(de.Name(), ".sb-rebuild-") {
+			t.Errorf("staging dir leaked: %s", de.Name())
+		}
+	}
+}
+
 // silence unused import lint when test-only helpers drift
 var _ = sql.Open
