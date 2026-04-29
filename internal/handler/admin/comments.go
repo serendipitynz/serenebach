@@ -190,7 +190,7 @@ func (h *Handler) commentDelete(w http.ResponseWriter, r *http.Request) {
 // redirectBackToCommentList preserves the ?status= filter the admin was
 // viewing when they clicked an action.
 func redirectBackToCommentList(w http.ResponseWriter, r *http.Request) {
-	target := "/admin/comments"
+	target := root(r) + "/admin/comments"
 	if s := r.Referer(); strings.Contains(s, "/admin/comments") {
 		target = s
 	}
