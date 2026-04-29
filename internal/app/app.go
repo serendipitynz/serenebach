@@ -88,10 +88,20 @@ func New(cfg *config.Config) (*App, error) {
 	// startup. A failure here (missing embedded asset, bad font) logs
 	// and skips the feature rather than refusing to boot — the card
 	// generation is nice-to-have, not load-bearing.
-	ogRenderer, err := og.New()
-	if err != nil {
-		log.Printf("app: OG renderer disabled: %v", err)
-		ogRenderer = nil
+	// OG card generation is skipped in CGI mode: cgi.Serve buffers the
+	// entire response before writing to stdout, so heavy image processing
+	// (1200×630 RGBA + CatmullRom scale + PNG encode) inside the handler
+	// runs before any response bytes reach Apache. On memory-constrained
+	// shared hosting this causes the process to be OOM-killed mid-handler,
+	// leaving stdout empty and producing Apache's "End of script output
+	// before headers" error. Cards generated in server mode persist on
+	// disk and are served as static files by Apache in CGI deployments.
+	var ogRenderer *og.Renderer
+	if cfg.Mode != config.ModeCGI {
+		ogRenderer, err = og.New()
+		if err != nil {
+			log.Printf("app: OG renderer disabled: %v", err)
+		}
 	}
 
 	rebuilder := admin.NewRebuilderWithImages(cfg.RebuildOutDir, cfg.ImageDir, cfg.TemplateDir, cfg.BasePath)
