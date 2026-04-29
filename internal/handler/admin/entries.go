@@ -221,7 +221,7 @@ func (h *Handler) renderEntryForm(w http.ResponseWriter, r *http.Request, action
 			CSRFToken:  csrf.Token(r.Context()),
 			User:       session.UserFrom(r.Context()),
 		},
-		Action:        action,
+		Action:        root(r) + action,
 		Entry:         entry,
 		StatusInt:     int(entry.Status),
 		PostedAtLocal: entry.PostedAt.Format("2006-01-02T15:04"),

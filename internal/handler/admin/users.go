@@ -222,10 +222,10 @@ func (h *Handler) userEditForm(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) renderUserForm(w http.ResponseWriter, r *http.Request, u domain.User, errMsg, flash string) {
 	isNew := u.ID == 0
-	action := "/admin/users/new"
+	action := root(r) + "/admin/users/new"
 	title := tr(r, "users.form.titleNewPlain")
 	if !isNew {
-		action = "/admin/users/" + strconv.FormatInt(u.ID, 10) + "/edit"
+		action = root(r) + "/admin/users/" + strconv.FormatInt(u.ID, 10) + "/edit"
 		title = trf(r, "users.form.titleEditPlain", u.Name)
 	}
 	renderMain(w, r, pageUserForm, userFormPageData{

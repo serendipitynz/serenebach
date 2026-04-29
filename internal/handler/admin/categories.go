@@ -180,7 +180,7 @@ func (h *Handler) renderCategoryForm(
 			CSRFToken:  csrf.Token(r.Context()),
 			User:       session.UserFrom(r.Context()),
 		},
-		Action:     action,
+		Action:     root(r) + action,
 		Category:   cat,
 		Parents:    parents,
 		Templates:  templates,
