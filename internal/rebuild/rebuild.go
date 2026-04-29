@@ -691,13 +691,13 @@ func writeLLMsTxt(outDir string, weblog domain.Weblog, all []domain.Entry, rep *
 // The flow for each managed subtree (entry/, category/, tag/,
 // archive/):
 //
-//   1. If staging has it, rename the existing finalOut/<sub> aside
-//      to finalOut/<sub>.old (rename within the same dir is atomic
-//      and reversible), rename staging/<sub> into finalOut/<sub>,
-//      then remove .old.
-//   2. If staging does NOT have it (e.g. the DB has zero entries
-//      this run), remove finalOut/<sub> so deleted-everything is
-//      tracked.
+//  1. If staging has it, rename the existing finalOut/<sub> aside
+//     to finalOut/<sub>.old (rename within the same dir is atomic
+//     and reversible), rename staging/<sub> into finalOut/<sub>,
+//     then remove .old.
+//  2. If staging does NOT have it (e.g. the DB has zero entries
+//     this run), remove finalOut/<sub> so deleted-everything is
+//     tracked.
 //
 // On rename failure we restore the .old backup so the live snapshot
 // keeps the previous content. Once subtree promotion is done, the
