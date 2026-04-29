@@ -176,7 +176,7 @@ func (h *Handler) styleCSS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "site not configured", http.StatusInternalServerError)
 		return
 	}
-	writeCSS(w, content.RenderTemplateCSS(*weblog, tmpl))
+	writeCSS(w, content.RenderTemplateCSS(content.NewSite(*weblog).WithBasePath(root(r)), tmpl))
 }
 
 // templateStyleCSS serves the CSS column of a specific template row
@@ -207,7 +207,7 @@ func (h *Handler) templateStyleCSS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "site not configured", http.StatusInternalServerError)
 		return
 	}
-	writeCSS(w, content.RenderTemplateCSS(*weblog, tmpl))
+	writeCSS(w, content.RenderTemplateCSS(content.NewSite(*weblog).WithBasePath(root(r)), tmpl))
 }
 
 func writeCSS(w http.ResponseWriter, body string) {

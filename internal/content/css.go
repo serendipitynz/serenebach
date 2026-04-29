@@ -22,11 +22,11 @@ import (
 // `/template/<id>/` prefix; passing a tmpl with ID 0 falls through to
 // an empty PartsURL, which mirrors the behaviour of CSSURL when no
 // template is pinned.
-func RenderTemplateCSS(weblog domain.Weblog, tmpl *domain.Template) string {
+func RenderTemplateCSS(site Site, tmpl *domain.Template) string {
 	if tmpl == nil || tmpl.CSS == "" {
 		return ""
 	}
-	s := NewSite(weblog).WithTemplate(tmpl)
+	s := site.WithTemplate(tmpl)
 	out := strings.ReplaceAll(tmpl.CSS, "{site_parts}", s.PartsURL())
 	out = strings.ReplaceAll(out, "{site_encoding}", s.Encoding)
 	return out
