@@ -67,10 +67,21 @@ type Options struct {
 	TemplateDir string
 }
 
-// Build generates the full static snapshot. Existing files under OutDir are
-// overwritten in place; stale files (e.g. from a deleted entry) remain and
-// have to be cleaned by the caller — this keeps the builder safe even when
-// OutDir points at a shared directory.
+// Build generates the full static snapshot.
+//
+// The per-page subtrees the rebuilder fully owns
+// (entry/, category/, tag/, archive/) are wiped at the start so a
+// deleted entry, an unpublished post, a slug change, or a removed
+// category/tag does not leave a stale `*/index.html` file behind for
+// the static host to keep serving. Top-level files (index.html,
+// style.css, rss.xml, atom.xml, llms*.txt) are always rewritten so
+// they don't go stale either; llms.txt + llms-full.txt are removed
+// when the weblog has opted out so toggling the switch off cleans up.
+//
+// img/ and template/ are mirrors of external directories with their
+// own lifecycles and are NOT pruned here — copyImageTree only adds
+// files. Operators who manage those dirs separately are responsible
+// for cleaning them.
 func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error) {
 	if opts.OutDir == "" {
 		return nil, fmt.Errorf("rebuild: OutDir is required")
@@ -78,9 +89,21 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 	if opts.WID == 0 {
 		opts.WID = 1
 	}
+	if err := cleanManagedSubtrees(opts.OutDir); err != nil {
+		return nil, err
+	}
 	weblog, err := store.WeblogByID(ctx, opts.WID)
 	if err != nil {
 		return nil, fmt.Errorf("rebuild: load weblog: %w", err)
+	}
+	if !weblog.LLMSEnabled {
+		// Toggle was just flipped off — drop the previously-published
+		// agent-discovery files so the static host stops serving them.
+		for _, name := range []string{"llms.txt", "llms-full.txt"} {
+			if err := os.Remove(filepath.Join(opts.OutDir, name)); err != nil && !os.IsNotExist(err) {
+				return nil, fmt.Errorf("rebuild: remove %s: %w", name, err)
+			}
+		}
 	}
 	// Page size: explicit opts.EntryListLimit wins (tests / callers
 	// that want a deterministic value); otherwise honour the author's
@@ -636,6 +659,25 @@ func writeLLMsTxt(outDir string, weblog domain.Weblog, all []domain.Entry, rep *
 		return err
 	}
 	rep.LLMSWritten = true
+	return nil
+}
+
+// cleanManagedSubtrees wipes the per-page output directories that
+// Build fully owns. Run at the top of Build so deleted, unpublished,
+// or slug-changed entries (and removed categories / tags) don't leave
+// stale `*/index.html` files for the static host to serve.
+//
+// img/ and template/ are mirrors of external dirs and are NOT cleaned
+// here — they have separate lifecycles. Top-level files (index.html,
+// style.css, rss.xml, atom.xml) are always rewritten so they don't
+// need pre-cleaning either; llms*.txt are handled inline by Build
+// when the LLMS toggle is off.
+func cleanManagedSubtrees(outDir string) error {
+	for _, sub := range []string{"entry", "category", "tag", "archive"} {
+		if err := os.RemoveAll(filepath.Join(outDir, sub)); err != nil {
+			return fmt.Errorf("rebuild: clean %s: %w", sub, err)
+		}
+	}
 	return nil
 }
 

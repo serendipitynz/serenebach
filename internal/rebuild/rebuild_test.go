@@ -230,5 +230,84 @@ func TestBuildSurfacesMissingTemplate(t *testing.T) {
 	}
 }
 
+// TestBuildPrunesStaleManagedSubtrees verifies the cleanup contract:
+// when an entry/category/tag/archive page from a previous run no
+// longer matches the current DB state, Build must remove the stale
+// `*/index.html` so a static host stops serving deleted, unpublished,
+// or slug-changed content.
+func TestBuildPrunesStaleManagedSubtrees(t *testing.T) {
+	a := newSeededApp(t)
+	out := filepath.Join(t.TempDir(), "public")
+
+	// Plant stale fixtures that resemble output from a previous run
+	// where extra entries / categories / tags / archive months
+	// existed. None of these IDs / slugs / years exist in the seeded
+	// DB so they must all be pruned.
+	stale := []string{
+		"entry/9999/index.html",
+		"entry/old-slug/index.html",
+		"category/9999/index.html",
+		"tag/dead-tag/index.html",
+		"archive/2010/index.html",
+		"archive/2010/01/index.html",
+	}
+	for _, p := range stale {
+		full := filepath.Join(out, p)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte("stale"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	for _, p := range stale {
+		if _, err := os.Stat(filepath.Join(out, p)); !os.IsNotExist(err) {
+			t.Errorf("stale file %s should have been pruned (err = %v)", p, err)
+		}
+	}
+
+	// Sanity: live entry pages must still exist after the cleanup.
+	for _, p := range []string{"entry/1/index.html", "entry/2/index.html"} {
+		if _, err := os.Stat(filepath.Join(out, p)); err != nil {
+			t.Errorf("live page %s missing after rebuild: %v", p, err)
+		}
+	}
+}
+
+// TestBuildRemovesStaleLLMSFilesWhenDisabled covers the toggle-off
+// path: a previous rebuild emitted llms*.txt while the weblog had
+// LLMS publishing on. Once the operator switches the toggle off, the
+// next rebuild must remove those files so the static host stops
+// advertising the agent-discovery feed.
+func TestBuildRemovesStaleLLMSFilesWhenDisabled(t *testing.T) {
+	a := newSeededApp(t)
+	out := filepath.Join(t.TempDir(), "public")
+
+	// Plant the stale llms files (LLMSEnabled is 0 in the seeded weblog).
+	if err := os.MkdirAll(out, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"llms.txt", "llms-full.txt"} {
+		if err := os.WriteFile(filepath.Join(out, name), []byte("stale"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	for _, name := range []string{"llms.txt", "llms-full.txt"} {
+		if _, err := os.Stat(filepath.Join(out, name)); !os.IsNotExist(err) {
+			t.Errorf("stale %s should have been removed when LLMS is off (err = %v)", name, err)
+		}
+	}
+}
+
 // silence unused import lint when test-only helpers drift
 var _ = sql.Open
