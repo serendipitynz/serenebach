@@ -94,7 +94,7 @@ func New(cfg *config.Config) (*App, error) {
 		ogRenderer = nil
 	}
 
-	rebuilder := admin.NewRebuilderWithImages(cfg.RebuildOutDir, cfg.ImageDir, cfg.TemplateDir)
+	rebuilder := admin.NewRebuilderWithImages(cfg.RebuildOutDir, cfg.ImageDir, cfg.TemplateDir, cfg.BasePath)
 	adminH := &admin.Handler{
 		Store:               store,
 		Sessions:            sessions,

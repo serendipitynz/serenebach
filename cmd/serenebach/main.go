@@ -162,6 +162,7 @@ func runBuild(a *app.App, subArgs []string) {
 		OutDir:         *out,
 		WID:            app.DefaultWID,
 		EntryListLimit: *limit,
+		BasePath:       a.Config.BasePath,
 		ImageDir:       a.Config.ImageDir,
 		TemplateDir:    a.Config.TemplateDir,
 	})

@@ -176,6 +176,11 @@ func renderTagsFragment(s Site, tags []domain.Tag) string {
 type Site struct {
 	Weblog   domain.Weblog
 	Encoding string // always "utf-8" for now; SB v3 let this be user-configurable.
+	// BasePath is the deployment sub-path (e.g. "/sb4"). Used as the URL
+	// prefix for all site links when Weblog.BaseURL is not configured.
+	// When BaseURL is set it takes precedence, so the two can be set
+	// independently for split static/dynamic deployments.
+	BasePath string
 	// TemplateID lets `{site_parts}` resolve to the current template's
 	// asset folder. 0 means "not known yet" and the tag collapses to "".
 	TemplateID int64
@@ -195,6 +200,14 @@ type Site struct {
 
 func NewSite(w domain.Weblog) Site {
 	return Site{Weblog: w, Encoding: "utf-8"}
+}
+
+// WithBasePath returns a copy of the site bound to a deployment sub-path.
+// Use this on every dynamic render so {site_*} URLs stay correct under
+// sub-path deployments even when Weblog.BaseURL hasn't been configured.
+func (s Site) WithBasePath(p string) Site {
+	s.BasePath = p
+	return s
 }
 
 // WithTemplate returns a copy of the site bound to the active template id
@@ -225,10 +238,13 @@ func (s Site) WithPageSuffix(suffix string) Site {
 }
 
 func (s Site) baseURL() string {
-	if s.Weblog.BaseURL == "" {
-		return "/"
+	if s.Weblog.BaseURL != "" {
+		return strings.TrimRight(s.Weblog.BaseURL, "/") + "/"
 	}
-	return strings.TrimRight(s.Weblog.BaseURL, "/") + "/"
+	if s.BasePath != "" {
+		return s.BasePath + "/"
+	}
+	return "/"
 }
 
 func (s Site) TopURL() string  { return s.baseURL() }
@@ -256,19 +272,14 @@ func (s Site) PartsURL() string {
 	if s.TemplateID == 0 {
 		return ""
 	}
-	return "/template/" + strconv.FormatInt(s.TemplateID, 10) + "/"
+	return s.baseURL() + "template/" + strconv.FormatInt(s.TemplateID, 10) + "/"
 }
 
 // OGImageURL returns the absolute URL of the Open Graph card image
-// for an entry, falling back to a site-relative path when BaseURL is
-// empty. Matches the file layout the admin OG renderer writes to
+// for an entry. Matches the file layout the admin OG renderer writes to
 // <SB_IMAGE_DIR>/og/<entry_id>.png.
 func (s Site) OGImageURL(entryID int64) string {
-	path := "img/og/" + strconv.FormatInt(entryID, 10) + ".png"
-	if s.Weblog.BaseURL == "" {
-		return "/" + path
-	}
-	return s.baseURL() + path
+	return s.baseURL() + "img/og/" + strconv.FormatInt(entryID, 10) + ".png"
 }
 
 // formatWith expands an SB3 format string against t using the weblog's

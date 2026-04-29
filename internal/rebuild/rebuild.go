@@ -53,6 +53,10 @@ type Options struct {
 	OutDir         string
 	WID            int64
 	EntryListLimit int
+	// BasePath is the URL prefix under which the static site will be served
+	// (e.g. "/sb4"). Used as a fallback prefix in content.Site when the
+	// weblog's BaseURL is not configured. Leave empty for root deployments.
+	BasePath string
 	// ImageDir, when set, is copied into OutDir/img so the static snapshot
 	// carries its media alongside the HTML. Empty means "skip image copy"
 	// (deployments that serve images dynamically pass "").
@@ -126,7 +130,7 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 		return nil, fmt.Errorf("rebuild: load sidebar: %w", err)
 	}
 
-	site := content.NewSite(*weblog)
+	site := content.NewSite(*weblog).WithBasePath(opts.BasePath)
 	rep := &Report{OutDir: opts.OutDir}
 
 	if err := writeHome(ctx, store, opts.OutDir, site, tmpl, all, cats, users, profileUsers, sidebar, opts.EntryListLimit); err != nil {

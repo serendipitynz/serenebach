@@ -142,6 +142,7 @@ func Load(args []string) (*Config, string, []string, error) {
 			}
 		}
 	}
+	cfg.BasePath = normalizeBasePath(cfg.BasePath)
 
 	subcmd := ""
 	var subArgs []string
@@ -193,6 +194,19 @@ func parseAnalyticsRetention(raw string) int {
 
 // parseCSV splits a comma-separated list, trimming whitespace and
 // dropping empty entries. Returns nil for empty input.
+// normalizeBasePath strips trailing slashes and collapses "/" to "".
+// A leading slash is kept so the result is always either "" or "/sub/path".
+func normalizeBasePath(p string) string {
+	p = strings.TrimRight(p, "/")
+	if p == "" {
+		return ""
+	}
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	return p
+}
+
 func parseCSV(raw string) []string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {

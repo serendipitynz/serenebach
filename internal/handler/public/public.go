@@ -311,7 +311,7 @@ func (h *Handler) rsdFeed(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "site not configured", http.StatusInternalServerError)
 		return
 	}
-	site := content.NewSite(*weblog)
+	site := content.NewSite(*weblog).WithBasePath(root(r))
 	body := `<?xml version="1.0"?>
 <rsd version="1.0" xmlns="http://archipelago.phrasewise.com/rsd">
  <service>
@@ -348,7 +348,7 @@ func (h *Handler) serveFeed(w http.ResponseWriter, r *http.Request, build func(f
 	}
 	cats, users := h.lookupRefs(ctx, entries, logTag)
 	body, err := build(feed.Options{
-		Site:       content.NewSite(*weblog),
+		Site:       content.NewSite(*weblog).WithBasePath(root(r)),
 		Entries:    entries,
 		Users:      users,
 		Categories: cats,
@@ -430,7 +430,7 @@ func (h *Handler) renderList(w http.ResponseWriter, r *http.Request, entries []d
 	sidebar := h.loadSidebarData(ctx, logTag)
 
 	view := content.ListView{
-		Site:         content.NewSite(*weblog),
+		Site:         content.NewSite(*weblog).WithBasePath(root(r)),
 		Template:     tmpl,
 		Entries:      entries,
 		Categories:   cats,
@@ -924,7 +924,7 @@ func (h *Handler) entry(w http.ResponseWriter, r *http.Request) {
 	sidebar := h.loadSidebarData(ctx, "public.entry")
 
 	view := content.EntryView{
-		Site:          content.NewSite(*weblog),
+		Site:          content.NewSite(*weblog).WithBasePath(root(r)),
 		Template:      tmpl,
 		Entry:         *entry,
 		Category:      catPtr,

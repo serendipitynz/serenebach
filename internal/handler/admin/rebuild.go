@@ -24,6 +24,10 @@ import (
 // guard that stops two admins clicking "Rebuild" at the same time.
 type Rebuilder struct {
 	OutDir string
+	// BasePath is the URL prefix under which the static site will be served
+	// (e.g. "/sb4"). Forwarded to rebuild.Options so content.Site generates
+	// correct links when weblog.BaseURL is not configured.
+	BasePath string
 	// ImageDir is the source directory whose contents are mirrored into
 	// OutDir/img during rebuild. Empty means "skip image copy".
 	ImageDir string
@@ -43,8 +47,8 @@ func NewRebuilder(outDir string) *Rebuilder {
 // NewRebuilderWithImages is the variant app.New uses so the rebuilder knows
 // where to find uploaded media. Kept separate so test callers can still use
 // the positional constructor.
-func NewRebuilderWithImages(outDir, imageDir, templateDir string) *Rebuilder {
-	return &Rebuilder{OutDir: outDir, ImageDir: imageDir, TemplateDir: templateDir}
+func NewRebuilderWithImages(outDir, imageDir, templateDir, basePath string) *Rebuilder {
+	return &Rebuilder{OutDir: outDir, ImageDir: imageDir, TemplateDir: templateDir, BasePath: basePath}
 }
 
 var ErrRebuildBusy = errors.New("rebuild: another run in progress")
@@ -68,6 +72,7 @@ func (rb *Rebuilder) Run(ctx context.Context, store *repo.Store, wid int64) (*re
 		OutDir:         rb.OutDir,
 		WID:            wid,
 		EntryListLimit: rebuild.DefaultEntryListSize,
+		BasePath:       rb.BasePath,
 		ImageDir:       rb.ImageDir,
 		TemplateDir:    rb.TemplateDir,
 	})
