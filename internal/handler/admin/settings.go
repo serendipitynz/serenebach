@@ -243,6 +243,7 @@ func parseSettingsForm(r *http.Request, base domain.Weblog) (domain.Weblog, stri
 	base.BaseURL = baseURL
 
 	base.LLMSEnabled = strings.TrimSpace(r.PostFormValue("llms_enabled")) == "1"
+	base.AutoRebuildOnPublish = strings.TrimSpace(r.PostFormValue("auto_rebuild_on_publish")) == "1"
 	// OG background / text-colour are edited on /admin/templates/og.
 	// Those fields are not posted to this handler and the corresponding
 	// base.OGBGImagePath / base.OGTextColor values flow through

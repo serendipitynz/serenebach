@@ -49,6 +49,17 @@
         <div class="label"></div>
         <p class="hint">{{THTML "settings.blog.llmsHint"}}</p>
       </div>
+      <div class="form-row">
+        <div class="label">{{T "settings.blog.autoRebuild"}}</div>
+        <div class="radio-row">
+          <label class="inline-field"><input type="radio" name="auto_rebuild_on_publish" value="1"{{if .Weblog.AutoRebuildOnPublish}} checked{{end}}> {{T "settings.blog.autoRebuildOn"}}</label>
+          <label class="inline-field"><input type="radio" name="auto_rebuild_on_publish" value="0"{{if not .Weblog.AutoRebuildOnPublish}} checked{{end}}> {{T "settings.blog.autoRebuildOff"}}</label>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="label"></div>
+        <p class="hint">{{THTML "settings.blog.autoRebuildHint"}}</p>
+      </div>
     </div>
   </div>
 
