@@ -81,6 +81,12 @@ type Weblog struct {
 	// of the loop, while authors who want agent discoverability get a
 	// core-level feature no mainstream blog engine ships today.
 	LLMSEnabled bool
+	// AutoRebuildOnPublish triggers `rebuild.Build` automatically after
+	// the admin saves an entry (create/update/delete) or a category
+	// mutation. Off by default — enabling it requires SB_REBUILD_OUT to
+	// be writable. Errors are logged and surfaced as a flash; the save
+	// itself never rolls back on a failed rebuild.
+	AutoRebuildOnPublish bool
 	// ArchiveTemplateID pins a specific template for archive (year/month/
 	// category) pages. 0 means "use the active template". ProfileTemplateID
 	// plays the same role for the profile view.

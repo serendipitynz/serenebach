@@ -48,6 +48,7 @@ func defaultDescFormat(s string) string {
 func (s *Store) WeblogByID(ctx context.Context, id int64) (*domain.Weblog, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, title, description, base_url, lang, comment_mode, spam_words, ip_blacklist, llms_enabled,
+		       auto_rebuild_on_publish,
 		       og_bg_image_path, og_text_color,
 		       archive_template_id, profile_template_id,
 		       date_format_entry, time_format_entry, date_format_comment,
@@ -56,8 +57,9 @@ func (s *Store) WeblogByID(ctx context.Context, id int64) (*domain.Weblog, error
 		FROM weblogs WHERE id = ?`, id)
 	w := &domain.Weblog{}
 	var mode string
-	var llmsEnabled int
+	var llmsEnabled, autoRebuild int
 	if err := row.Scan(&w.ID, &w.Title, &w.Description, &w.BaseURL, &w.Lang, &mode, &w.SpamWords, &w.IPBlacklist, &llmsEnabled,
+		&autoRebuild,
 		&w.OGBGImagePath, &w.OGTextColor,
 		&w.ArchiveTemplateID, &w.ProfileTemplateID,
 		&w.DateFormatEntry, &w.TimeFormatEntry, &w.DateFormatComment,
@@ -73,6 +75,7 @@ func (s *Store) WeblogByID(ctx context.Context, id int64) (*domain.Weblog, error
 		w.CommentMode = domain.CommentModerated
 	}
 	w.LLMSEnabled = llmsEnabled != 0
+	w.AutoRebuildOnPublish = autoRebuild != 0
 	return w, nil
 }
 
@@ -143,14 +146,20 @@ func (s *Store) UpdateWeblog(ctx context.Context, w domain.Weblog) error {
 	if w.LLMSEnabled {
 		llms = 1
 	}
+	autoRebuild := 0
+	if w.AutoRebuildOnPublish {
+		autoRebuild = 1
+	}
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE weblogs SET
 			title = ?, description = ?, base_url = ?, lang = ?,
 			comment_mode = ?, spam_words = ?, ip_blacklist = ?, llms_enabled = ?,
+			auto_rebuild_on_publish = ?,
 			og_bg_image_path = ?, og_text_color = ?
 		WHERE id = ?`,
 		w.Title, w.Description, w.BaseURL, w.Lang,
 		string(w.CommentMode), w.SpamWords, w.IPBlacklist, llms,
+		autoRebuild,
 		w.OGBGImagePath, w.OGTextColor,
 		w.ID)
 	if err != nil {
