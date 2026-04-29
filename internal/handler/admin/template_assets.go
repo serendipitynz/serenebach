@@ -162,7 +162,7 @@ func (h *Handler) templateAssetUpload(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/admin/templates/%d/edit?ok=asset-uploaded", tplID), http.StatusFound)
+	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/templates/%d/edit?ok=asset-uploaded", tplID), http.StatusFound)
 }
 
 func (h *Handler) templateAssetDelete(w http.ResponseWriter, r *http.Request) {
@@ -198,5 +198,5 @@ func (h *Handler) templateAssetDelete(w http.ResponseWriter, r *http.Request) {
 	// Best-effort unlink. DB is the source of truth; we don't care if the
 	// file was already gone.
 	_ = os.Remove(filepath.Join(h.TemplateDir, strconv.FormatInt(tplID, 10), asset.Filename))
-	http.Redirect(w, r, fmt.Sprintf("/admin/templates/%d/edit?ok=asset-deleted", tplID), http.StatusFound)
+	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/templates/%d/edit?ok=asset-deleted", tplID), http.StatusFound)
 }

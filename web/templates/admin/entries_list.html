@@ -6,7 +6,7 @@
 <div class="panel">
   <div class="panel-head">
     <h2>{{Tf "entries.heading" (len .Entries)}}</h2>
-    <a href="/admin/entries/new" class="more">{{T "nav.entries.new"}} →</a>
+    <a href="{{Root}}/admin/entries/new" class="more">{{T "nav.entries.new"}} →</a>
   </div>
   <div class="panel-body">
     {{if .Entries}}
@@ -23,14 +23,14 @@
       {{range .Entries}}
         <tr>
           <td class="num col-id col-hide-mobile">{{.ID}}</td>
-          <td class="col-flex-wide col-primary"><a href="/admin/entries/{{.ID}}/edit">{{if .Title}}{{.Title}}{{else}}{{T "common.noTitle"}}{{end}}</a></td>
+          <td class="col-flex-wide col-primary"><a href="{{Root}}/admin/entries/{{.ID}}/edit">{{if .Title}}{{.Title}}{{else}}{{T "common.noTitle"}}{{end}}</a></td>
           <td class="col-status" data-label="{{T `common.col.status`}}"><span class="badge {{statusClass .Status}}">{{statusLabel .Status}}</span></td>
           <td class="col-datetime" data-label="{{T `common.col.posted`}}">{{fmtDate .PostedAt}}</td>
           <td class="col-flex" data-label="{{T `common.col.category`}}">{{if .CategoryName}}{{.CategoryName}}{{else}}<span class="hint">{{T "common.dash"}}</span>{{end}}</td>
           <td class="col-actions">
-            <a href="/entry/{{.ID}}/" target="_blank" rel="noopener" aria-label="{{T `common.viewPublic`}}" class="btn-icon" title="{{T `common.viewPublic`}}">↗</a>
+            <a href="{{Root}}/entry/{{.ID}}/" target="_blank" rel="noopener" aria-label="{{T `common.viewPublic`}}" class="btn-icon" title="{{T `common.viewPublic`}}">↗</a>
             {{- $canDeleteEntry := $.User.CanDeleteEntry .AuthorID -}}
-            <form method="post" action="/admin/entries/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `common.confirmDelete`}}')">
+            <form method="post" action="{{Root}}/admin/entries/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `common.confirmDelete`}}')">
               <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
               <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{if $canDeleteEntry}}{{T `action.delete`}}{{else}}{{T `action.delete.forbiddenOwner`}}{{end}}"{{if not $canDeleteEntry}} disabled{{end}}>{{iconTrash}}</button>
             </form>

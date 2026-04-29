@@ -183,7 +183,7 @@ func (h *Handler) userCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to create user", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/users?ok=created", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/users?ok=created", http.StatusFound)
 }
 
 // ---- edit ---------------------------------------------------------------
@@ -222,10 +222,10 @@ func (h *Handler) userEditForm(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) renderUserForm(w http.ResponseWriter, r *http.Request, u domain.User, errMsg, flash string) {
 	isNew := u.ID == 0
-	action := "/admin/users/new"
+	action := root(r) + "/admin/users/new"
 	title := tr(r, "users.form.titleNewPlain")
 	if !isNew {
-		action = "/admin/users/" + strconv.FormatInt(u.ID, 10) + "/edit"
+		action = root(r) + "/admin/users/" + strconv.FormatInt(u.ID, 10) + "/edit"
 		title = trf(r, "users.form.titleEditPlain", u.Name)
 	}
 	renderMain(w, r, pageUserForm, userFormPageData{
@@ -342,7 +342,7 @@ func (h *Handler) userUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	http.Redirect(w, r, "/admin/users/"+strconv.FormatInt(id, 10)+"/edit?ok=saved", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/users/"+strconv.FormatInt(id, 10)+"/edit?ok=saved", http.StatusFound)
 }
 
 // ---- delete -------------------------------------------------------------
@@ -355,7 +355,7 @@ func (h *Handler) userDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	actor := session.UserFrom(r.Context())
 	if actor != nil && actor.ID == id {
-		http.Redirect(w, r, "/admin/users?ok=cannot-delete-self", http.StatusFound)
+		http.Redirect(w, r, root(r)+"/admin/users?ok=cannot-delete-self", http.StatusFound)
 		return
 	}
 	// Never delete the last admin — even if the target is some other
@@ -364,7 +364,7 @@ func (h *Handler) userDelete(w http.ResponseWriter, r *http.Request) {
 	if err == nil && target.Role == domain.RoleAdmin {
 		count, _ := h.Store.CountAdmins(r.Context(), h.wid())
 		if count <= 1 {
-			http.Redirect(w, r, "/admin/users?ok=cannot-delete-last-admin", http.StatusFound)
+			http.Redirect(w, r, root(r)+"/admin/users?ok=cannot-delete-last-admin", http.StatusFound)
 			return
 		}
 	}
@@ -377,7 +377,7 @@ func (h *Handler) userDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to delete user", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/users?ok=deleted", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/users?ok=deleted", http.StatusFound)
 }
 
 // ---- reorder ------------------------------------------------------------

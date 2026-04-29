@@ -9,7 +9,7 @@
 {{if eq .Flash "rechecked"}}<p class="alert success">{{T "templates.form.flash.rechecked"}}</p>{{end}}
 {{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
 
-<form method="post" action="/admin/templates/{{.Template.ID}}/edit" class="form-stack" id="template-edit-form" data-unsaved-warn>
+<form method="post" action="{{Root}}/admin/templates/{{.Template.ID}}/edit" class="form-stack" id="template-edit-form" data-unsaved-warn>
   <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
   {{/* Name + info are not edited from this page. They are preserved
        server-side on save, and the save-as modal provides the only
@@ -43,9 +43,9 @@
   </details>
 
   <div class="form-actions">
-    <a href="/admin/templates">{{T "action.back"}}</a>
+    <a href="{{Root}}/admin/templates">{{T "action.back"}}</a>
     {{if .Template.ID}}
-    <a href="/?__sb_template={{.Template.ID}}" target="_blank" rel="noopener" class="button">{{T "action.preview"}}</a>
+    <a href="{{Root}}/?__sb_template={{.Template.ID}}" target="_blank" rel="noopener" class="button">{{T "action.preview"}}</a>
     {{end}}
     <button type="button" data-template-export
             data-export-id="{{.Template.ID}}"
@@ -63,7 +63,7 @@
     <span class="hint">{{THTML "templates.form.assetsHint"}}</span>
   </div>
   <div class="panel-body">
-    <form method="post" action="/admin/templates/{{.Template.ID}}/assets" enctype="multipart/form-data"
+    <form method="post" action="{{Root}}/admin/templates/{{.Template.ID}}/assets" enctype="multipart/form-data"
           class="upload-form" data-upload data-csrf="{{.CSRFToken}}">
       <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
       <label class="drop-zone" data-drop-zone>
@@ -97,7 +97,7 @@
           <td>{{fmtDate .CreatedAt}}</td>
           <td><button type="button" class="link copy-tag" data-copy-text="{site_parts}{{.Filename}}" title="{{T `common.copyTitle`}}"><code>{site_parts}{{.Filename}}</code></button></td>
           <td class="col-action">
-            <form method="post" action="/admin/templates/{{$.Template.ID}}/assets/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `templates.form.assets.deleteConfirm`}}')">
+            <form method="post" action="{{Root}}/admin/templates/{{$.Template.ID}}/assets/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `templates.form.assets.deleteConfirm`}}')">
               <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
               <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{T `action.delete`}}">{{iconTrash}}</button>
             </form>
@@ -120,7 +120,7 @@
 <div class="panel" id="template-status">
   <div class="panel-head">
     <h2>{{T "templates.form.lint.heading"}}</h2>
-    <button type="submit" form="template-edit-form" formaction="/admin/templates/{{.Template.ID}}/recheck" formnovalidate>{{T "templates.form.lint.recheck"}}</button>
+    <button type="submit" form="template-edit-form" formaction="{{Root}}/admin/templates/{{.Template.ID}}/recheck" formnovalidate>{{T "templates.form.lint.recheck"}}</button>
   </div>
   <div class="panel-body">
     {{template "lintBlock" (lintCtx "main" .MainLint .LintRan .LintFromRecheck)}}

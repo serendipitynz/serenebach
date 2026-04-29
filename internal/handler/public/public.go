@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/serendipitynz/serenebach/internal/basepath"
 	"github.com/serendipitynz/serenebach/internal/clientip"
 	"github.com/serendipitynz/serenebach/internal/content"
 	"github.com/serendipitynz/serenebach/internal/csrf"
@@ -98,6 +99,11 @@ func (h *Handler) MountLegacy(r chi.Router) {
 	r.Post("/sb.cgi", h.legacyCGI)
 }
 
+// root returns the deployment base path for the current request (e.g. "/sb4").
+func root(r *http.Request) string {
+	return basepath.FromContext(r.Context())
+}
+
 // The URL patterns here must track whatever Site.EntryPermalink /
 // Site.CategoryPermalink / Site.ArchivePermalink produce. When one of those
 // changes, change the matching route together.
@@ -170,7 +176,7 @@ func (h *Handler) styleCSS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "site not configured", http.StatusInternalServerError)
 		return
 	}
-	writeCSS(w, content.RenderTemplateCSS(*weblog, tmpl))
+	writeCSS(w, content.RenderTemplateCSS(content.NewSite(*weblog).WithBasePath(root(r)), tmpl))
 }
 
 // templateStyleCSS serves the CSS column of a specific template row
@@ -201,7 +207,7 @@ func (h *Handler) templateStyleCSS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "site not configured", http.StatusInternalServerError)
 		return
 	}
-	writeCSS(w, content.RenderTemplateCSS(*weblog, tmpl))
+	writeCSS(w, content.RenderTemplateCSS(content.NewSite(*weblog).WithBasePath(root(r)), tmpl))
 }
 
 func writeCSS(w http.ResponseWriter, body string) {
@@ -305,7 +311,7 @@ func (h *Handler) rsdFeed(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "site not configured", http.StatusInternalServerError)
 		return
 	}
-	site := content.NewSite(*weblog)
+	site := content.NewSite(*weblog).WithBasePath(root(r))
 	body := `<?xml version="1.0"?>
 <rsd version="1.0" xmlns="http://archipelago.phrasewise.com/rsd">
  <service>
@@ -342,7 +348,7 @@ func (h *Handler) serveFeed(w http.ResponseWriter, r *http.Request, build func(f
 	}
 	cats, users := h.lookupRefs(ctx, entries, logTag)
 	body, err := build(feed.Options{
-		Site:       content.NewSite(*weblog),
+		Site:       content.NewSite(*weblog).WithBasePath(root(r)),
 		Entries:    entries,
 		Users:      users,
 		Categories: cats,
@@ -424,7 +430,7 @@ func (h *Handler) renderList(w http.ResponseWriter, r *http.Request, entries []d
 	sidebar := h.loadSidebarData(ctx, logTag)
 
 	view := content.ListView{
-		Site:         content.NewSite(*weblog),
+		Site:         content.NewSite(*weblog).WithBasePath(root(r)),
 		Template:     tmpl,
 		Entries:      entries,
 		Categories:   cats,
@@ -543,7 +549,7 @@ func (h *Handler) home(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to count entries", http.StatusInternalServerError)
 		return
 	}
-	pg, offset, ok := paginationFor(page, size, total, "/")
+	pg, offset, ok := paginationFor(page, size, total, root(r)+"/")
 	if !ok {
 		http.NotFound(w, r)
 		return
@@ -647,7 +653,7 @@ func (h *Handler) category(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to count entries", http.StatusInternalServerError)
 		return
 	}
-	basePath := "/category/" + strconv.FormatInt(cat.ID, 10) + "/"
+	basePath := root(r) + "/category/" + strconv.FormatInt(cat.ID, 10) + "/"
 	pg, offset, ok := paginationFor(page, size, total, basePath)
 	if !ok {
 		http.NotFound(w, r)
@@ -691,7 +697,7 @@ func (h *Handler) tag(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to count entries", http.StatusInternalServerError)
 		return
 	}
-	basePath := "/tag/" + t.Slug + "/"
+	basePath := root(r) + "/tag/" + t.Slug + "/"
 	pg, offset, ok := paginationFor(page, size, total, basePath)
 	if !ok {
 		http.NotFound(w, r)
@@ -733,7 +739,7 @@ func (h *Handler) archiveYear(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to count entries", http.StatusInternalServerError)
 		return
 	}
-	basePath := "/archive/" + strconv.Itoa(year) + "/"
+	basePath := root(r) + "/archive/" + strconv.Itoa(year) + "/"
 	pg, offset, ok := paginationFor(page, size, total, basePath)
 	if !ok {
 		http.NotFound(w, r)
@@ -774,7 +780,7 @@ func (h *Handler) archiveMonth(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to count entries", http.StatusInternalServerError)
 		return
 	}
-	basePath := "/archive/" + strconv.Itoa(year) + "/" + padMonth(month) + "/"
+	basePath := root(r) + "/archive/" + strconv.Itoa(year) + "/" + padMonth(month) + "/"
 	pg, offset, ok := paginationFor(page, size, total, basePath)
 	if !ok {
 		http.NotFound(w, r)
@@ -817,7 +823,7 @@ func (h *Handler) entry(w http.ResponseWriter, r *http.Request) {
 	// converge on one spelling. Propagate the raw query string so a
 	// preview param survives the hop.
 	if viaID && entry.Slug != "" {
-		canonical := "/entry/" + entry.Slug + "/"
+		canonical := root(r) + "/entry/" + entry.Slug + "/"
 		if raw := r.URL.RawQuery; raw != "" {
 			canonical += "?" + raw
 		}
@@ -918,7 +924,7 @@ func (h *Handler) entry(w http.ResponseWriter, r *http.Request) {
 	sidebar := h.loadSidebarData(ctx, "public.entry")
 
 	view := content.EntryView{
-		Site:          content.NewSite(*weblog),
+		Site:          content.NewSite(*weblog).WithBasePath(root(r)),
 		Template:      tmpl,
 		Entry:         *entry,
 		Category:      catPtr,
@@ -993,7 +999,7 @@ func (h *Handler) commentSubmit(w http.ResponseWriter, r *http.Request) {
 
 	// Preserve the URL key the user submitted from so the redirect lands
 	// on the same canonical surface (slug when present, id otherwise).
-	siteBack := "/entry/" + entryKeyFor(entry) + "/"
+	siteBack := root(r) + "/entry/" + entryKeyFor(entry) + "/"
 	redirectBack := func(reason string) {
 		target := siteBack
 		if reason != "" {
@@ -1120,7 +1126,7 @@ func (h *Handler) commentSubmit(w http.ResponseWriter, r *http.Request) {
 
 	// Successful submit: drop back to the entry page. Using SeeOther (303)
 	// converts the POST into a GET so refreshes don't resend.
-	http.Redirect(w, r, fmt.Sprintf("/entry/%d/#comments", entryID), http.StatusSeeOther)
+	http.Redirect(w, r, root(r)+fmt.Sprintf("/entry/%d/#comments", entryID), http.StatusSeeOther)
 }
 
 // resolveMessageStatus turns the weblog's CommentMode + the submitter's
@@ -1173,7 +1179,7 @@ func (h *Handler) entryLike(w http.ResponseWriter, r *http.Request) {
 	}
 	entryID := entry.ID
 
-	back := "/entry/" + entryKeyFor(entry) + "/"
+	back := root(r) + "/entry/" + entryKeyFor(entry) + "/"
 
 	// Cookie short-circuit — avoids a needless DB round-trip when a browser
 	// has already liked this entry.
@@ -1230,7 +1236,7 @@ func (h *Handler) entryStamp(w http.ResponseWriter, r *http.Request) {
 	}
 	entryID := entry.ID
 
-	back := "/entry/" + entryKeyFor(entry) + "/"
+	back := root(r) + "/entry/" + entryKeyFor(entry) + "/"
 
 	// Cookie short-circuit per (entry, kind) so re-clicking the same
 	// reaction button doesn't need a DB round-trip.

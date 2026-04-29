@@ -5,7 +5,7 @@
     <ul>
       {{range .Nav}}
       <li>
-        <a href="/admin/help/{{.Slug}}"{{if .Active}} class="active" aria-current="page"{{end}}>{{.Title}}</a>
+        <a href="{{Root}}/admin/help/{{.Slug}}"{{if .Active}} class="active" aria-current="page"{{end}}>{{.Title}}</a>
         {{if .Fallback}}<span class="help-nav-fallback" title="{{T `help.fallback.tooltip`}}">·</span>{{end}}
       </li>
       {{end}}

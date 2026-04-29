@@ -2,16 +2,16 @@
 <h1>{{T "templates.title"}}</h1>
 
 <nav class="tabbar">
-  <a href="/admin/templates">{{T "templates.tab.list"}}</a>
-  <a href="/admin/templates/settings">{{T "templates.tab.settings"}}</a>
-  <a href="/admin/templates/import">{{T "templates.tab.import"}}</a>
-  <a href="/admin/templates/og" class="active">{{T "templates.tab.og"}}</a>
+  <a href="{{Root}}/admin/templates">{{T "templates.tab.list"}}</a>
+  <a href="{{Root}}/admin/templates/settings">{{T "templates.tab.settings"}}</a>
+  <a href="{{Root}}/admin/templates/import">{{T "templates.tab.import"}}</a>
+  <a href="{{Root}}/admin/templates/og" class="active">{{T "templates.tab.og"}}</a>
 </nav>
 
 {{if eq .Flash "saved"}}<p class="alert success">{{T "flash.saved"}}</p>{{end}}
 {{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
 
-<form method="post" action="/admin/templates/og" class="form-stack" data-unsaved-warn>
+<form method="post" action="{{Root}}/admin/templates/og" class="form-stack" data-unsaved-warn>
   <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 
   <div class="panel">
@@ -25,7 +25,7 @@
           <input type="hidden" name="og_bg_image_path" value="{{.Weblog.OGBGImagePath}}" data-og-bg-input>
           <div class="og-bg-row">
             <img class="og-bg-preview" data-og-bg-preview
-                 {{if .Weblog.OGBGImagePath}}src="/img/{{.Weblog.OGBGImagePath}}"{{else}}hidden{{end}}
+                 {{if .Weblog.OGBGImagePath}}src="{{Root}}/img/{{.Weblog.OGBGImagePath}}"{{else}}hidden{{end}}
                  alt="">
             <button type="button" class="link" data-og-bg-picker>{{T "settings.blog.ogBg.pick"}}</button>
             <button type="button" class="link" data-og-bg-clear>{{T "settings.blog.ogBg.clear"}}</button>
@@ -64,7 +64,7 @@
   </div>
 
   <div class="form-actions">
-    <a href="/admin/templates">{{T "action.back"}}</a>
+    <a href="{{Root}}/admin/templates">{{T "action.back"}}</a>
     <button type="submit" class="primary">{{T "action.save"}}</button>
   </div>
 </form>

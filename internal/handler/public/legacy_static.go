@@ -74,7 +74,7 @@ func (h *Handler) tryLegacyEntryHTML(w http.ResponseWriter, r *http.Request) boo
 		if n, err := strconv.ParseInt(key[len(cfg.IDPrefix):], 10, 64); err == nil {
 			ref, err := h.Store.EntryByLegacyID(r.Context(), h.WID, n)
 			if err == nil {
-				http.Redirect(w, r, "/entry/"+entryKeyForRef(ref)+"/", http.StatusMovedPermanently)
+				http.Redirect(w, r, root(r)+"/entry/"+entryKeyForRef(ref)+"/", http.StatusMovedPermanently)
 				return true
 			}
 			if !errors.Is(err, repo.ErrNotFound) {
@@ -94,7 +94,7 @@ func (h *Handler) tryLegacyEntryHTML(w http.ResponseWriter, r *http.Request) boo
 		http.Error(w, "lookup failed", http.StatusInternalServerError)
 		return true
 	}
-	http.Redirect(w, r, "/entry/"+entryKeyForRef(ref)+"/", http.StatusMovedPermanently)
+	http.Redirect(w, r, root(r)+"/entry/"+entryKeyForRef(ref)+"/", http.StatusMovedPermanently)
 	return true
 }
 
@@ -126,7 +126,7 @@ func (h *Handler) tryLegacyCategoryDir(w http.ResponseWriter, r *http.Request) b
 		http.Error(w, "lookup failed", http.StatusInternalServerError)
 		return true
 	}
-	http.Redirect(w, r, "/category/"+strconv.FormatInt(id, 10)+"/", http.StatusMovedPermanently)
+	http.Redirect(w, r, root(r)+"/category/"+strconv.FormatInt(id, 10)+"/", http.StatusMovedPermanently)
 	return true
 }
 

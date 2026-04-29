@@ -202,10 +202,10 @@ func (h *Handler) renderLinkForm(
 	// group's edit page — both for new-under-group and edit-child
 	// flows, so the admin can open a child, tweak, save, then return
 	// to the group's member list with one click.
-	backURL := "/admin/links"
+	backURL := root(r) + "/admin/links"
 	backLabel := tr(r, "action.back")
 	if !link.IsGroup() && link.ParentID > 0 {
-		backURL = fmt.Sprintf("/admin/links/%d/edit", link.ParentID)
+		backURL = root(r) + fmt.Sprintf("/admin/links/%d/edit", link.ParentID)
 		backLabel = tr(r, "links.form.backToGroup")
 	}
 	renderMain(w, r, pageLinkForm, linkFormPageData{
@@ -215,7 +215,7 @@ func (h *Handler) renderLinkForm(
 			CSRFToken:  csrf.Token(r.Context()),
 			User:       session.UserFrom(r.Context()),
 		},
-		Action:    action,
+		Action:    root(r) + action,
 		Link:      link,
 		Groups:    groups,
 		Members:   members,
@@ -313,7 +313,7 @@ func (h *Handler) linkCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to create link", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/links?ok=saved", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/links?ok=saved", http.StatusFound)
 }
 
 func (h *Handler) linkUpdate(w http.ResponseWriter, r *http.Request) {
@@ -352,7 +352,7 @@ func (h *Handler) linkUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to save link", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/links?ok=saved", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/links?ok=saved", http.StatusFound)
 }
 
 func (h *Handler) linkDelete(w http.ResponseWriter, r *http.Request) {
@@ -370,5 +370,5 @@ func (h *Handler) linkDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to delete link", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/links?ok=deleted", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/links?ok=deleted", http.StatusFound)
 }

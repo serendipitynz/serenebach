@@ -68,7 +68,7 @@ func (h *Handler) settingsAIForm(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) renderSettingsAI(w http.ResponseWriter, r *http.Request, newRaw string, newID int64, errMsg string) {
 	actor := session.UserFrom(r.Context())
 	if actor == nil {
-		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		http.Redirect(w, r, root(r)+"/admin/login", http.StatusFound)
 		return
 	}
 	// Reload the logged-in user so the AI panel reflects the latest
@@ -193,7 +193,7 @@ func (h *Handler) renderSettingsAI(w http.ResponseWriter, r *http.Request, newRa
 func (h *Handler) settingsAISave(w http.ResponseWriter, r *http.Request) {
 	actor := session.UserFrom(r.Context())
 	if actor == nil {
-		http.Redirect(w, r, "/admin/login", http.StatusFound)
+		http.Redirect(w, r, root(r)+"/admin/login", http.StatusFound)
 		return
 	}
 	if !ai.SecretConfigured() {
@@ -357,7 +357,7 @@ func providerForUser(u domain.User) (ai.Provider, error) {
 func aiFlashRedirect(w http.ResponseWriter, r *http.Request, key, val string) {
 	q := url.Values{}
 	q.Set(key, val)
-	http.Redirect(w, r, "/admin/settings/ai?"+q.Encode(), http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/settings/ai?"+q.Encode(), http.StatusFound)
 }
 
 // splitAIFlag strips the "ai_" prefix from query flags that belong to

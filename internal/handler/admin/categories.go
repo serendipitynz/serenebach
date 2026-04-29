@@ -180,7 +180,7 @@ func (h *Handler) renderCategoryForm(
 			CSRFToken:  csrf.Token(r.Context()),
 			User:       session.UserFrom(r.Context()),
 		},
-		Action:     action,
+		Action:     root(r) + action,
 		Category:   cat,
 		Parents:    parents,
 		Templates:  templates,
@@ -282,7 +282,7 @@ func (h *Handler) categoryCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to create category", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/categories?ok=saved", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/categories?ok=saved", http.StatusFound)
 }
 
 func (h *Handler) categoryUpdate(w http.ResponseWriter, r *http.Request) {
@@ -312,7 +312,7 @@ func (h *Handler) categoryUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to save category", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/categories?ok=saved", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/categories?ok=saved", http.StatusFound)
 }
 
 func (h *Handler) categoryDelete(w http.ResponseWriter, r *http.Request) {
@@ -330,5 +330,5 @@ func (h *Handler) categoryDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to delete category", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/categories?ok=deleted", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/categories?ok=deleted", http.StatusFound)
 }

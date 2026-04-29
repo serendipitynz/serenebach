@@ -7,7 +7,7 @@
 <div class="panel">
   <div class="panel-head">
     <h2>{{Tf "categories.heading" (len .Categories)}}</h2>
-    <a href="/admin/categories/new" class="more">{{T "categories.form.titleNew"}} →</a>
+    <a href="{{Root}}/admin/categories/new" class="more">{{T "categories.form.titleNew"}} →</a>
   </div>
   <div class="panel-body">
     {{if .Categories}}
@@ -26,13 +26,13 @@
         <tr data-category-id="{{.ID}}" draggable="true">
           <td class="drag-handle col-drag col-hide-mobile" title="{{T `common.dragToReorder`}}" aria-label="{{T `common.dragToReorder`}}">≡</td>
           <td class="num col-id col-hide-mobile">{{.ID}}</td>
-          <td class="col-flex-wide"><a href="/admin/categories/{{.ID}}/edit">{{.Name}}</a></td>
+          <td class="col-flex-wide"><a href="{{Root}}/admin/categories/{{.ID}}/edit">{{.Name}}</a></td>
           <td class="col-flex col-hide-mobile">{{if .Slug}}{{.Slug}}{{else}}<span class="hint">{{T "common.dash"}}</span>{{end}}</td>
           <td class="col-flex col-hide-mobile">{{if .ParentName}}{{.ParentName}}{{else}}<span class="hint">{{T "categories.parent.root"}}</span>{{end}}</td>
           <td class="num col-count">{{.EntryCount}}</td>
           <td class="col-actions">
-            <a href="/category/{{.ID}}/" target="_blank" rel="noopener" class="btn-icon" aria-label="{{T `common.viewPublic`}}" title="{{T `common.viewPublic`}}">↗</a>
-            <form method="post" action="/admin/categories/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `categories.delete.confirm`}}')">
+            <a href="{{Root}}/category/{{.ID}}/" target="_blank" rel="noopener" class="btn-icon" aria-label="{{T `common.viewPublic`}}" title="{{T `common.viewPublic`}}">↗</a>
+            <form method="post" action="{{Root}}/admin/categories/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `categories.delete.confirm`}}')">
               <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
               <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{T `action.delete`}}">{{iconTrash}}</button>
             </form>

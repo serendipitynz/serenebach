@@ -221,7 +221,7 @@ func (h *Handler) renderEntryForm(w http.ResponseWriter, r *http.Request, action
 			CSRFToken:  csrf.Token(r.Context()),
 			User:       session.UserFrom(r.Context()),
 		},
-		Action:        action,
+		Action:        root(r) + action,
 		Entry:         entry,
 		StatusInt:     int(entry.Status),
 		PostedAtLocal: entry.PostedAt.Format("2006-01-02T15:04"),
@@ -345,7 +345,7 @@ func (h *Handler) entryCreate(w http.ResponseWriter, r *http.Request) {
 		log.Printf("admin.entryCreate: tags: %v", err)
 	}
 	h.regenerateOGCard(r.Context(), entry)
-	http.Redirect(w, r, fmt.Sprintf("/admin/entries/%d/edit?ok=saved", id), http.StatusFound)
+	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/entries/%d/edit?ok=saved", id), http.StatusFound)
 }
 
 // syncEntryTags resolves a list of tag names (creating missing tags)
@@ -407,7 +407,7 @@ func (h *Handler) entryUpdate(w http.ResponseWriter, r *http.Request) {
 		log.Printf("admin.entryUpdate: tags: %v", err)
 	}
 	h.regenerateOGCard(r.Context(), entry)
-	http.Redirect(w, r, fmt.Sprintf("/admin/entries/%d/edit?ok=saved", id), http.StatusFound)
+	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/entries/%d/edit?ok=saved", id), http.StatusFound)
 }
 
 func (h *Handler) entryDelete(w http.ResponseWriter, r *http.Request) {
@@ -448,7 +448,7 @@ func (h *Handler) entryDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.removeOGCard(id)
-	http.Redirect(w, r, "/admin/entries?ok=deleted", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/entries?ok=deleted", http.StatusFound)
 }
 
 // ---- OG card generation ------------------------------------------------

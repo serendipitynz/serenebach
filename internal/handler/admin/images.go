@@ -83,21 +83,22 @@ func (h *Handler) imagesList(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "failed to list images", http.StatusInternalServerError)
 			return
 		}
+		imgPrefix := root(r) + imagesPathPrefix
 		payload := make([]map[string]any, 0, len(items))
 		for _, img := range items {
 			entry := map[string]any{
 				"id":          img.ID,
 				"filename":    img.Filename,
 				"stored_path": img.StoredPath,
-				"url":         imagesPathPrefix + img.StoredPath,
+				"url":         imgPrefix + img.StoredPath,
 				"width":       img.Width,
 				"height":      img.Height,
 				"alt":         img.AltText,
 			}
 			if img.ThumbPath != "" {
-				entry["thumb_url"] = imagesPathPrefix + img.ThumbPath
+				entry["thumb_url"] = imgPrefix + img.ThumbPath
 			} else {
-				entry["thumb_url"] = imagesPathPrefix + img.StoredPath
+				entry["thumb_url"] = imgPrefix + img.StoredPath
 			}
 			payload = append(payload, entry)
 		}
@@ -158,7 +159,7 @@ func (h *Handler) imagesList(w http.ResponseWriter, r *http.Request) {
 		},
 		Images:       items,
 		UploadMaxMB:  h.uploadMaxBytes() >> 20,
-		ImagesPrefix: imagesPathPrefix,
+		ImagesPrefix: root(r) + imagesPathPrefix,
 		FlashSuccess: q.Get("ok"),
 		FlashError:   q.Get("err"),
 		Page:         page,
@@ -181,7 +182,7 @@ func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 
 	if r.ContentLength > 0 && r.ContentLength > h.uploadMaxBytes() {
 		respondUpload(w, wantsJSON, http.StatusRequestEntityTooLarge,
-			trf(r, "common.error.fileTooLargeWithLimit", h.uploadMaxBytes()>>20), "")
+			trf(r, "common.error.fileTooLargeWithLimit", h.uploadMaxBytes()>>20), root(r))
 		return
 	}
 	// Hard cap on the body — MaxBytesReader will return an error from
@@ -193,14 +194,14 @@ func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 	// hasn't been parsed yet — do it now.
 	if r.MultipartForm == nil {
 		if err := r.ParseMultipartForm(h.uploadMaxBytes()); err != nil {
-			respondUpload(w, wantsJSON, http.StatusBadRequest, tr(r, "common.error.uploadParse"), "")
+			respondUpload(w, wantsJSON, http.StatusBadRequest, tr(r, "common.error.uploadParse"), root(r))
 			return
 		}
 	}
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		respondUpload(w, wantsJSON, http.StatusBadRequest, tr(r, "common.error.fileMissing"), "")
+		respondUpload(w, wantsJSON, http.StatusBadRequest, tr(r, "common.error.fileMissing"), root(r))
 		return
 	}
 	defer file.Close()
@@ -208,7 +209,7 @@ func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 	mime, err := detectImageMIME(file, header)
 	if err != nil {
 		respondUpload(w, wantsJSON, http.StatusUnsupportedMediaType,
-			tr(r, "common.error.unsupportedImage"), "")
+			tr(r, "common.error.unsupportedImage"), root(r))
 		return
 	}
 
@@ -216,7 +217,7 @@ func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 	stored, err := store.SaveUpload(file, header.Filename, mime, time.Now())
 	if err != nil {
 		log.Printf("admin.imagesUpload: save: %v", err)
-		respondUpload(w, wantsJSON, http.StatusInternalServerError, tr(r, "common.error.fileSaveFailed"), "")
+		respondUpload(w, wantsJSON, http.StatusInternalServerError, tr(r, "common.error.fileSaveFailed"), root(r))
 		return
 	}
 
@@ -237,7 +238,7 @@ func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 		// Orphan file — best effort clean up so the disk doesn't grow on a
 		// transient DB hiccup.
 		store.DeleteFiles(stored.StoredPath, stored.ThumbPath)
-		respondUpload(w, wantsJSON, http.StatusInternalServerError, tr(r, "common.error.imageDBSaveFailed"), "")
+		respondUpload(w, wantsJSON, http.StatusInternalServerError, tr(r, "common.error.imageDBSaveFailed"), root(r))
 		return
 	}
 
@@ -254,8 +255,8 @@ func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"id":                 id,
 			"filename":           stored.Filename,
-			"url":                imagesPathPrefix + stored.StoredPath,
-			"thumb_url":          thumbURL(stored),
+			"url":                root(r) + imagesPathPrefix + stored.StoredPath,
+			"thumb_url":          thumbURL(stored, root(r)),
 			"width":              stored.Width,
 			"height":             stored.Height,
 			"size":               stored.SizeBytes,
@@ -263,7 +264,7 @@ func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	http.Redirect(w, r, "/admin/images?ok=1", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/images?ok=1", http.StatusFound)
 }
 
 // mimeSupportsVision whitelists the MIME types every provider we
@@ -308,7 +309,7 @@ func (h *Handler) imagesDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.imageStore().DeleteFiles(img.StoredPath, img.ThumbPath)
-	http.Redirect(w, r, "/admin/images?ok=deleted", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/images?ok=deleted", http.StatusFound)
 }
 
 // ---- helpers -----------------------------------------------------------
@@ -366,20 +367,20 @@ func urlEscape(s string) string { return url.QueryEscape(s) }
 // respondUpload writes either a JSON error or a redirect with ?err=...
 // depending on what the client asked for, so drop-zone and plain-form
 // clients both get a sensible response shape.
-func respondUpload(w http.ResponseWriter, asJSON bool, status int, msg string, _ string) {
+func respondUpload(w http.ResponseWriter, asJSON bool, status int, msg, basePath string) {
 	if asJSON {
 		writeJSON(w, status, map[string]string{"error": msg})
 		return
 	}
-	w.Header().Set("Location", "/admin/images?err="+urlEscape(msg))
+	w.Header().Set("Location", basePath+"/admin/images?err="+urlEscape(msg))
 	w.WriteHeader(http.StatusFound)
 }
 
 // thumbURL returns the URL for the thumbnail, or the full image when no
 // thumbnail was generated.
-func thumbURL(s *images.Stored) string {
+func thumbURL(s *images.Stored, basePath string) string {
 	if s.ThumbPath != "" {
-		return imagesPathPrefix + s.ThumbPath
+		return basePath + imagesPathPrefix + s.ThumbPath
 	}
-	return imagesPathPrefix + s.StoredPath
+	return basePath + imagesPathPrefix + s.StoredPath
 }

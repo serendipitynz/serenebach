@@ -53,6 +53,10 @@ type Options struct {
 	OutDir         string
 	WID            int64
 	EntryListLimit int
+	// BasePath is the URL prefix under which the static site will be served
+	// (e.g. "/sb4"). Used as a fallback prefix in content.Site when the
+	// weblog's BaseURL is not configured. Leave empty for root deployments.
+	BasePath string
 	// ImageDir, when set, is copied into OutDir/img so the static snapshot
 	// carries its media alongside the HTML. Empty means "skip image copy"
 	// (deployments that serve images dynamically pass "").
@@ -126,7 +130,7 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 		return nil, fmt.Errorf("rebuild: load sidebar: %w", err)
 	}
 
-	site := content.NewSite(*weblog)
+	site := content.NewSite(*weblog).WithBasePath(opts.BasePath)
 	rep := &Report{OutDir: opts.OutDir}
 
 	if err := writeHome(ctx, store, opts.OutDir, site, tmpl, all, cats, users, profileUsers, sidebar, opts.EntryListLimit); err != nil {
@@ -154,7 +158,7 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 		// Render so {site_parts} / {site_encoding} land as actual
 		// values instead of dead literals — mirrors the dynamic
 		// /style.css handler.
-		body := content.RenderTemplateCSS(*weblog, tmpl)
+		body := content.RenderTemplateCSS(site, tmpl)
 		if err := writeFile(filepath.Join(opts.OutDir, "style.css"), []byte(body)); err != nil {
 			return nil, fmt.Errorf("rebuild: write css: %w", err)
 		}
@@ -165,7 +169,7 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 	// style.css"> so the reader loads the right CSS — mirror every
 	// weblog template to disk so the static snapshot supports the
 	// same behaviour as the dev server.
-	if err := writeTemplateCSS(ctx, store, *weblog, opts.WID, opts.OutDir); err != nil {
+	if err := writeTemplateCSS(ctx, store, site, opts.WID, opts.OutDir); err != nil {
 		return nil, err
 	}
 
@@ -575,7 +579,7 @@ func writeArchives(ctx context.Context, store *repo.Store, opts Options, site co
 // <out>/template/<id>/style.css so static deployments can serve the
 // per-template stylesheet URLs emitted by {site_css}. Templates with
 // an empty CSS column are skipped to avoid writing empty files.
-func writeTemplateCSS(ctx context.Context, store *repo.Store, weblog domain.Weblog, wid int64, outDir string) error {
+func writeTemplateCSS(ctx context.Context, store *repo.Store, site content.Site, wid int64, outDir string) error {
 	templates, err := store.ListTemplatesForAdmin(ctx, wid)
 	if err != nil {
 		return fmt.Errorf("rebuild: list templates for css: %w", err)
@@ -585,7 +589,7 @@ func writeTemplateCSS(ctx context.Context, store *repo.Store, weblog domain.Webl
 			continue
 		}
 		path := filepath.Join(outDir, "template", strconv.FormatInt(t.ID, 10), "style.css")
-		body := content.RenderTemplateCSS(weblog, &t)
+		body := content.RenderTemplateCSS(site, &t)
 		if err := writeFile(path, []byte(body)); err != nil {
 			return fmt.Errorf("rebuild: write template %d css: %w", t.ID, err)
 		}

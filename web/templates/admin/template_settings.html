@@ -2,16 +2,16 @@
 <h1>{{T "templates.title"}}</h1>
 
 <nav class="tabbar">
-  <a href="/admin/templates">{{T "templates.tab.list"}}</a>
-  <a href="/admin/templates/settings" class="active">{{T "templates.tab.settings"}}</a>
-  <a href="/admin/templates/import">{{T "templates.tab.import"}}</a>
-  <a href="/admin/templates/og">{{T "templates.tab.og"}}</a>
+  <a href="{{Root}}/admin/templates">{{T "templates.tab.list"}}</a>
+  <a href="{{Root}}/admin/templates/settings" class="active">{{T "templates.tab.settings"}}</a>
+  <a href="{{Root}}/admin/templates/import">{{T "templates.tab.import"}}</a>
+  <a href="{{Root}}/admin/templates/og">{{T "templates.tab.og"}}</a>
 </nav>
 
 {{if eq .Flash "saved"}}<p class="alert success">{{T "flash.saved"}}</p>{{end}}
 {{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
 
-<form method="post" action="/admin/templates/settings" class="form-stack" data-unsaved-warn>
+<form method="post" action="{{Root}}/admin/templates/settings" class="form-stack" data-unsaved-warn>
   <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 
   <div class="panel">
@@ -116,7 +116,7 @@
   </div>
 
   <div class="form-actions">
-    <a href="/admin/templates">{{T "action.back"}}</a>
+    <a href="{{Root}}/admin/templates">{{T "action.back"}}</a>
     <button type="submit" class="primary">{{T "action.save"}}</button>
   </div>
 </form>

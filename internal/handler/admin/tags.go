@@ -103,7 +103,7 @@ func (h *Handler) tagUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to update tag", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/tags?ok=saved", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/tags?ok=saved", http.StatusFound)
 }
 
 func (h *Handler) tagDelete(w http.ResponseWriter, r *http.Request) {
@@ -121,5 +121,5 @@ func (h *Handler) tagDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to delete tag", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/tags?ok=deleted", http.StatusFound)
+	http.Redirect(w, r, root(r)+"/admin/tags?ok=deleted", http.StatusFound)
 }

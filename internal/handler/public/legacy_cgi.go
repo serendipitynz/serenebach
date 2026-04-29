@@ -64,7 +64,7 @@ func (h *Handler) legacyCGI(w http.ResponseWriter, r *http.Request) {
 			redirectLegacyMonth(w, r, m)
 			return
 		}
-		http.Redirect(w, r, "/", http.StatusMovedPermanently)
+		http.Redirect(w, r, root(r)+"/", http.StatusMovedPermanently)
 		return
 	}
 
@@ -74,7 +74,7 @@ func (h *Handler) legacyCGI(w http.ResponseWriter, r *http.Request) {
 			h.redirectLegacyEntryID(w, r, eid)
 			return
 		}
-		http.Redirect(w, r, "/", http.StatusMovedPermanently)
+		http.Redirect(w, r, root(r)+"/", http.StatusMovedPermanently)
 	case "category":
 		if cid := q.Get("cid"); cid != "" {
 			h.redirectLegacyCategoryID(w, r, cid)
@@ -84,11 +84,11 @@ func (h *Handler) legacyCGI(w http.ResponseWriter, r *http.Request) {
 	case "archive":
 		cond := q.Get("cond")
 		if len(cond) == 4 {
-			http.Redirect(w, r, "/archive/"+cond+"/", http.StatusMovedPermanently)
+			http.Redirect(w, r, root(r)+"/archive/"+cond+"/", http.StatusMovedPermanently)
 			return
 		}
 		if len(cond) == 6 {
-			http.Redirect(w, r, "/archive/"+cond[:4]+"/"+cond[4:]+"/", http.StatusMovedPermanently)
+			http.Redirect(w, r, root(r)+"/archive/"+cond[:4]+"/"+cond[4:]+"/", http.StatusMovedPermanently)
 			return
 		}
 		http.NotFound(w, r)
@@ -99,7 +99,7 @@ func (h *Handler) legacyCGI(w http.ResponseWriter, r *http.Request) {
 		// rather than 404 to keep imported templates that emit
 		// {site_cgi}?mode=user&pid=N pointing somewhere useful.
 		if pid := q.Get("pid"); pid != "" {
-			http.Redirect(w, r, "/profile/"+pid+"/", http.StatusMovedPermanently)
+			http.Redirect(w, r, root(r)+"/profile/"+pid+"/", http.StatusMovedPermanently)
 			return
 		}
 		http.NotFound(w, r)
@@ -115,23 +115,23 @@ func (h *Handler) legacyCGI(w http.ResponseWriter, r *http.Request) {
 		// goes away once that template is replaced; the rare
 		// post-import comment hit is acceptable collateral.
 		if r.Method == http.MethodPost {
-			http.Redirect(w, r, "/entry/"+eid+"/comment", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, root(r)+"/entry/"+eid+"/comment", http.StatusTemporaryRedirect)
 			return
 		}
-		http.Redirect(w, r, "/entry/"+eid+"/#comment-form", http.StatusMovedPermanently)
+		http.Redirect(w, r, root(r)+"/entry/"+eid+"/#comment-form", http.StatusMovedPermanently)
 	case "search":
 		// Search isn't implemented yet. 404 surfaces the gap rather
 		// than silently redirecting to an empty home — once a /search
 		// route lands this branch becomes a 301 forwarder.
 		http.NotFound(w, r)
 	case "page":
-		http.Redirect(w, r, "/", http.StatusMovedPermanently)
+		http.Redirect(w, r, root(r)+"/", http.StatusMovedPermanently)
 	default:
 		// Unknown mode values (mobile, rsd, trackback…) land on the
 		// home page rather than 404 so a misconfigured imported
 		// template doesn't drop the reader off a cliff.
 		_ = strings.TrimSpace(mode)
-		http.Redirect(w, r, "/", http.StatusMovedPermanently)
+		http.Redirect(w, r, root(r)+"/", http.StatusMovedPermanently)
 	}
 }
 
@@ -150,7 +150,7 @@ func (h *Handler) redirectLegacyEntryID(w http.ResponseWriter, r *http.Request, 
 		http.Error(w, "lookup failed", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/entry/"+entryKeyForRef(ref)+"/", http.StatusMovedPermanently)
+	http.Redirect(w, r, root(r)+"/entry/"+entryKeyForRef(ref)+"/", http.StatusMovedPermanently)
 }
 
 func (h *Handler) redirectLegacyCategoryID(w http.ResponseWriter, r *http.Request, cid string) {
@@ -168,7 +168,7 @@ func (h *Handler) redirectLegacyCategoryID(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "lookup failed", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/category/"+strconv.FormatInt(id, 10)+"/", http.StatusMovedPermanently)
+	http.Redirect(w, r, root(r)+"/category/"+strconv.FormatInt(id, 10)+"/", http.StatusMovedPermanently)
 }
 
 // redirectLegacyMonth handles ?month=YYYYMM. The Go archive route is
@@ -183,7 +183,7 @@ func redirectLegacyMonth(w http.ResponseWriter, r *http.Request, m string) {
 		http.NotFound(w, r)
 		return
 	}
-	http.Redirect(w, r, "/archive/"+m[:4]+"/"+m[4:]+"/", http.StatusMovedPermanently)
+	http.Redirect(w, r, root(r)+"/archive/"+m[:4]+"/"+m[4:]+"/", http.StatusMovedPermanently)
 }
 
 // entryKeyForRef mirrors entryKeyFor() but takes the redirect-only

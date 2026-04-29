@@ -21,9 +21,9 @@
       {{end}}
       {{if .Entry.ID}}
       <span class="entry-form-sep" aria-hidden="true">|</span>
-      <a href="/entry/{{if .Entry.Slug}}{{.Entry.Slug}}{{else}}{{.Entry.ID}}{{end}}/?__sb_preview=1" target="_blank" rel="noopener">{{T "entries.form.preview"}}</a>
+      <a href="{{Root}}/entry/{{if .Entry.Slug}}{{.Entry.Slug}}{{else}}{{.Entry.ID}}{{end}}/?__sb_preview=1" target="_blank" rel="noopener">{{T "entries.form.preview"}}</a>
       <span class="entry-form-sep" aria-hidden="true">|</span>
-      <a href="/entry/{{if .Entry.Slug}}{{.Entry.Slug}}{{else}}{{.Entry.ID}}{{end}}/" target="_blank" rel="noopener">{{T "entries.form.viewPublic"}}</a>
+      <a href="{{Root}}/entry/{{if .Entry.Slug}}{{.Entry.Slug}}{{else}}{{.Entry.ID}}{{end}}/" target="_blank" rel="noopener">{{T "entries.form.viewPublic"}}</a>
       {{end}}
     </div>
   </div>
@@ -105,7 +105,7 @@
       <input type="hidden" name="og_bg_image_path" value="{{.Entry.OGBGImagePath}}" data-og-bg-input>
       <div class="og-bg-row">
         <img class="og-bg-preview" data-og-bg-preview
-             {{if .Entry.OGBGImagePath}}src="/img/{{.Entry.OGBGImagePath}}"{{else}}hidden{{end}}
+             {{if .Entry.OGBGImagePath}}src="{{Root}}/img/{{.Entry.OGBGImagePath}}"{{else}}hidden{{end}}
              alt="">
         <button type="button" class="link" data-og-bg-picker>{{T "entries.form.ogBg.pick"}}</button>
         <button type="button" class="link" data-og-bg-clear>{{T "entries.form.ogBg.clear"}}</button>
@@ -115,7 +115,7 @@
   </div>
 
   <div class="form-actions">
-    <a href="/admin/entries">{{T "action.back"}}</a>
+    <a href="{{Root}}/admin/entries">{{T "action.back"}}</a>
     <button type="submit" data-save-mode="draft">{{T "entries.form.saveDraft"}}</button>
     <button type="submit" class="primary" data-save-mode="dynamic">{{T "entries.form.savePublish"}}</button>
   </div>

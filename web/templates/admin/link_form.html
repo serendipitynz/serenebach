@@ -71,7 +71,7 @@
 <div class="panel link-members">
   <div class="panel-head">
     <h2>{{Tf "links.form.members" (len .Members)}}</h2>
-    <a href="/admin/links/new?parent={{.Link.ID}}" class="more">{{T "action.newLink"}}</a>
+    <a href="{{Root}}/admin/links/new?parent={{.Link.ID}}" class="more">{{T "action.newLink"}}</a>
   </div>
   <div class="panel-body">
     {{if .Members}}
@@ -87,11 +87,11 @@
       {{range .Members}}
         <tr>
           <td class="num col-id">{{.ID}}</td>
-          <td class="col-flex-wide"><a href="/admin/links/{{.ID}}/edit">{{.Name}}</a></td>
+          <td class="col-flex-wide"><a href="{{Root}}/admin/links/{{.ID}}/edit">{{.Name}}</a></td>
           <td class="col-flex-wide">{{if .URL}}<a href="{{.URL}}" target="_blank" rel="noopener">{{.URL}}</a>{{else}}<span class="hint">{{T "common.dash"}}</span>{{end}}</td>
           <td class="col-status">{{if eq .Disp 0}}{{T "status.visible"}}{{else}}<span class="hint">{{T "status.hidden"}}</span>{{end}}</td>
           <td class="col-action">
-            <form method="post" action="/admin/links/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `links.delete.confirmLink`}}')">
+            <form method="post" action="{{Root}}/admin/links/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `links.delete.confirmLink`}}')">
               <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
               <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{T `action.delete`}}">{{iconTrash}}</button>
             </form>

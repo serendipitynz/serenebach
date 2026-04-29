@@ -10,7 +10,7 @@
     <span class="hint">{{Tf "images.limit" .UploadMaxMB}}</span>
   </div>
   <div class="panel-body">
-    <form method="post" action="/admin/images" enctype="multipart/form-data" class="upload-form"
+    <form method="post" action="{{Root}}/admin/images" enctype="multipart/form-data" class="upload-form"
           data-upload data-csrf="{{.CSRFToken}}">
       <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
       <label class="drop-zone" data-drop-zone>
@@ -64,7 +64,7 @@
           <td class="col-actions">
             <button type="button" class="btn-icon" data-copy-url="{{$.ImagesPrefix}}{{.StoredPath}}" aria-label="{{T `images.copyUrl`}}" title="{{T `images.copyUrl`}}">{{iconCopy}}</button>
             {{- $canDeleteImg := $.User.CanDeleteImage .UploadedBy -}}
-            <form method="post" action="/admin/images/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `images.delete.confirm`}}')">
+            <form method="post" action="{{Root}}/admin/images/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `images.delete.confirm`}}')">
               <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
               <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{if $canDeleteImg}}{{T `action.delete`}}{{else}}{{T `action.delete.forbiddenOwner`}}{{end}}"{{if not $canDeleteImg}} disabled{{end}}>{{iconTrash}}</button>
             </form>
@@ -88,7 +88,7 @@
         <div class="image-actions">
           <button type="button" class="link" data-copy-url="{{$.ImagesPrefix}}{{.StoredPath}}">{{T "images.copyUrl"}}</button>
           {{- $canDeleteImg := $.User.CanDeleteImage .UploadedBy -}}
-          <form method="post" action="/admin/images/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `images.delete.confirm`}}')">
+          <form method="post" action="{{Root}}/admin/images/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `images.delete.confirm`}}')">
             <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
             <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{if $canDeleteImg}}{{T `action.delete`}}{{else}}{{T `action.delete.forbiddenOwner`}}{{end}}"{{if not $canDeleteImg}} disabled{{end}}>{{iconTrash}}</button>
           </form>

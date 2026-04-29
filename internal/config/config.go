@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -71,6 +72,11 @@ type Config struct {
 	// SB_PUBLIC_ALLOWED_ORIGINS, comma-separated, e.g.
 	// "https://static.example.net".
 	PublicAllowedOrigins []string
+	// BasePath is the URL prefix under which the app is mounted (e.g.
+	// "/sb4"). Empty means the app is at the root. Configured via
+	// SB_BASE_PATH; in CGI mode it is auto-detected from SCRIPT_NAME
+	// when SB_BASE_PATH is not set.
+	BasePath string
 }
 
 // Load parses top-level flags and returns the resulting Config, the name of
@@ -125,6 +131,19 @@ func Load(args []string) (*Config, string, []string, error) {
 		cfg.Mode = ModeServer
 	}
 
+	// BasePath: explicit env var wins; in CGI mode fall back to the
+	// directory component of SCRIPT_NAME (/sb4/serenebach.cgi → /sb4).
+	cfg.BasePath = os.Getenv("SB_BASE_PATH")
+	if cfg.BasePath == "" && cfg.Mode == ModeCGI {
+		if sn := os.Getenv("SCRIPT_NAME"); sn != "" {
+			dir := path.Dir(sn)
+			if dir != "/" && dir != "." {
+				cfg.BasePath = dir
+			}
+		}
+	}
+	cfg.BasePath = normalizeBasePath(cfg.BasePath)
+
 	subcmd := ""
 	var subArgs []string
 	if fs.NArg() > 0 {
@@ -175,6 +194,19 @@ func parseAnalyticsRetention(raw string) int {
 
 // parseCSV splits a comma-separated list, trimming whitespace and
 // dropping empty entries. Returns nil for empty input.
+// normalizeBasePath strips trailing slashes and collapses "/" to "".
+// A leading slash is kept so the result is always either "" or "/sub/path".
+func normalizeBasePath(p string) string {
+	p = strings.TrimRight(p, "/")
+	if p == "" {
+		return ""
+	}
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	return p
+}
+
 func parseCSV(raw string) []string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {

@@ -2,9 +2,9 @@
 <h1>{{T "settings.title"}}</h1>
 
 <nav class="tabbar">
-  {{if .CanManageDesign}}<a href="/admin/settings/basic"{{if eq .ActiveTab "basic"}} class="active"{{end}}>{{T "settings.tab.basic"}}</a>{{end}}
-  <a href="/admin/settings/ai"{{if eq .ActiveTab "ai"}} class="active"{{end}}>{{T "settings.tab.ai"}}</a>
-  <a href="/admin/settings/screen"{{if eq .ActiveTab "screen"}} class="active"{{end}}>{{T "settings.tab.screen"}}</a>
+  {{if .CanManageDesign}}<a href="{{Root}}/admin/settings/basic"{{if eq .ActiveTab "basic"}} class="active"{{end}}>{{T "settings.tab.basic"}}</a>{{end}}
+  <a href="{{Root}}/admin/settings/ai"{{if eq .ActiveTab "ai"}} class="active"{{end}}>{{T "settings.tab.ai"}}</a>
+  <a href="{{Root}}/admin/settings/screen"{{if eq .ActiveTab "screen"}} class="active"{{end}}>{{T "settings.tab.screen"}}</a>
 </nav>
 
 {{if .AIFlash}}<p class="alert success">{{T (printf "profile.ai.flash.%s" .AIFlash)}}</p>{{end}}
@@ -37,7 +37,7 @@
 
       <p class="hint">{{T "profile.ai.hint"}}</p>
 
-      <form method="post" action="/admin/settings/ai" class="form-stack" data-ai-config-form>
+      <form method="post" action="{{Root}}/admin/settings/ai" class="form-stack" data-ai-config-form>
         <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 
         <div class="form-row">
@@ -127,7 +127,7 @@
   <div class="panel-body">
     <p class="hint">{{THTML "settings.ops.mcp.hint"}}</p>
 
-    <form method="post" action="/admin/settings/mcp/new" class="form-stack mcp-new-token-form" data-unsaved-warn>
+    <form method="post" action="{{Root}}/admin/settings/mcp/new" class="form-stack mcp-new-token-form" data-unsaved-warn>
       <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
       <div class="form-row">
         <div class="label">{{T "settings.ops.mcp.name"}}</div>
@@ -188,7 +188,7 @@
           <td class="col-status" data-label="{{T `settings.ops.mcp.col.status`}}">{{if .Active}}<span class="badge approved">{{T "status.active"}}</span>{{else}}<span class="badge hidden">{{T "status.revoked"}}</span>{{end}}</td>
           <td class="col-actions">
             {{if .Active}}
-            <form method="post" action="/admin/settings/mcp/{{.ID}}/revoke" class="inline" onsubmit="return confirm('{{T `settings.ops.mcp.revokeConfirm`}}')">
+            <form method="post" action="{{Root}}/admin/settings/mcp/{{.ID}}/revoke" class="inline" onsubmit="return confirm('{{T `settings.ops.mcp.revokeConfirm`}}')">
               <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
               <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{T `action.delete`}}">{{iconTrash}}</button>
             </form>
@@ -225,7 +225,7 @@
         <tr>
           <td class="col-datetime">{{.CreatedAtFmt}}</td>
           <td data-label="{{T `settings.ops.audit.col.tool`}}"><code>{{.Tool}}</code></td>
-          <td class="num col-id" data-label="{{T `settings.ops.audit.col.target`}}">{{if gt .TargetID 0}}{{if or (eq .Tool "create_entry") (eq .Tool "update_entry") (eq .Tool "publish_entry")}}<a href="/admin/entries/{{.TargetID}}/edit">#{{.TargetID}}</a>{{else}}#{{.TargetID}}{{end}}{{else}}—{{end}}</td>
+          <td class="num col-id" data-label="{{T `settings.ops.audit.col.target`}}">{{if gt .TargetID 0}}{{if or (eq .Tool "create_entry") (eq .Tool "update_entry") (eq .Tool "publish_entry")}}<a href="{{Root}}/admin/entries/{{.TargetID}}/edit">#{{.TargetID}}</a>{{else}}#{{.TargetID}}{{end}}{{else}}—{{end}}</td>
           <td data-label="{{T `settings.ops.audit.col.token`}}">{{.TokenLabel}}</td>
           <td data-label="{{T `settings.ops.audit.col.author`}}">{{.AuthorLabel}}</td>
           <td class="col-detail" data-label="{{T `settings.ops.audit.col.detail`}}">{{if .Extra}}<code class="audit-extra">{{.Extra}}</code>{{else}}—{{end}}</td>
