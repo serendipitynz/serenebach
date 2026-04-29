@@ -230,5 +230,155 @@ func TestBuildSurfacesMissingTemplate(t *testing.T) {
 	}
 }
 
+// TestBuildPrunesStaleManagedSubtrees verifies the cleanup contract:
+// when an entry/category/tag/archive page from a previous run no
+// longer matches the current DB state, Build must remove the stale
+// `*/index.html` so a static host stops serving deleted, unpublished,
+// or slug-changed content.
+func TestBuildPrunesStaleManagedSubtrees(t *testing.T) {
+	a := newSeededApp(t)
+	out := filepath.Join(t.TempDir(), "public")
+
+	// Plant stale fixtures that resemble output from a previous run
+	// where extra entries / categories / tags / archive months
+	// existed. None of these IDs / slugs / years exist in the seeded
+	// DB so they must all be pruned.
+	stale := []string{
+		"entry/9999/index.html",
+		"entry/old-slug/index.html",
+		"category/9999/index.html",
+		"tag/dead-tag/index.html",
+		"archive/2010/index.html",
+		"archive/2010/01/index.html",
+	}
+	for _, p := range stale {
+		full := filepath.Join(out, p)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte("stale"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	for _, p := range stale {
+		if _, err := os.Stat(filepath.Join(out, p)); !os.IsNotExist(err) {
+			t.Errorf("stale file %s should have been pruned (err = %v)", p, err)
+		}
+	}
+
+	// Sanity: live entry pages must still exist after the cleanup.
+	for _, p := range []string{"entry/1/index.html", "entry/2/index.html"} {
+		if _, err := os.Stat(filepath.Join(out, p)); err != nil {
+			t.Errorf("live page %s missing after rebuild: %v", p, err)
+		}
+	}
+}
+
+// TestBuildRemovesStaleLLMSFilesWhenDisabled covers the toggle-off
+// path: a previous rebuild emitted llms*.txt while the weblog had
+// LLMS publishing on. Once the operator switches the toggle off, the
+// next rebuild must remove those files so the static host stops
+// advertising the agent-discovery feed.
+func TestBuildRemovesStaleLLMSFilesWhenDisabled(t *testing.T) {
+	a := newSeededApp(t)
+	out := filepath.Join(t.TempDir(), "public")
+
+	// Plant the stale llms files (LLMSEnabled is 0 in the seeded weblog).
+	if err := os.MkdirAll(out, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"llms.txt", "llms-full.txt"} {
+		if err := os.WriteFile(filepath.Join(out, name), []byte("stale"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	for _, name := range []string{"llms.txt", "llms-full.txt"} {
+		if _, err := os.Stat(filepath.Join(out, name)); !os.IsNotExist(err) {
+			t.Errorf("stale %s should have been removed when LLMS is off (err = %v)", name, err)
+		}
+	}
+}
+
+// TestBuildPreservesExistingOutputOnFailure verifies the staging
+// contract: a build that fails after a previous successful run must
+// leave the live snapshot intact. Auto-rebuild swallows errors and
+// lets the underlying save still succeed, so a transient failure
+// must not tear the public site down.
+func TestBuildPreservesExistingOutputOnFailure(t *testing.T) {
+	a := newSeededApp(t)
+	out := filepath.Join(t.TempDir(), "public")
+
+	// First build succeeds and populates the live snapshot.
+	if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("initial Build: %v", err)
+	}
+	for _, p := range []string{"index.html", "entry/1/index.html", "entry/2/index.html", "category/1/index.html"} {
+		if _, err := os.Stat(filepath.Join(out, p)); err != nil {
+			t.Fatalf("first build: missing %s: %v", p, err)
+		}
+	}
+	// Snapshot the bytes so we can prove the live files are untouched
+	// after the failed second build.
+	wantHome, err := os.ReadFile(filepath.Join(out, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantEntry, err := os.ReadFile(filepath.Join(out, "entry/1/index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Force the next Build to fail by removing the active template
+	// — same trick TestBuildSurfacesMissingTemplate uses. This breaks
+	// rendering after the staging dir is created, exercising the
+	// "fail mid-flight" path the staging swap is designed to survive.
+	if _, err := a.DB.ExecContext(context.Background(),
+		`DELETE FROM templates WHERE is_active = 1`); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{OutDir: out, WID: 1}); err == nil {
+		t.Fatal("expected Build to fail without an active template")
+	}
+
+	// Live snapshot must still match the first build byte-for-byte.
+	if got, err := os.ReadFile(filepath.Join(out, "index.html")); err != nil {
+		t.Errorf("home page disappeared after failed rebuild: %v", err)
+	} else if string(got) != string(wantHome) {
+		t.Errorf("home page mutated by failed rebuild")
+	}
+	if got, err := os.ReadFile(filepath.Join(out, "entry/1/index.html")); err != nil {
+		t.Errorf("entry/1 disappeared after failed rebuild: %v", err)
+	} else if string(got) != string(wantEntry) {
+		t.Errorf("entry/1 mutated by failed rebuild")
+	}
+	for _, p := range []string{"entry/2/index.html", "category/1/index.html"} {
+		if _, err := os.Stat(filepath.Join(out, p)); err != nil {
+			t.Errorf("%s disappeared after failed rebuild: %v", p, err)
+		}
+	}
+
+	// Staging dir must not leak into the output tree.
+	dirEntries, err := os.ReadDir(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, de := range dirEntries {
+		if strings.HasPrefix(de.Name(), ".sb-rebuild-") {
+			t.Errorf("staging dir leaked: %s", de.Name())
+		}
+	}
+}
+
 // silence unused import lint when test-only helpers drift
 var _ = sql.Open

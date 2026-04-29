@@ -56,6 +56,7 @@ func (h *Handler) categoryReorder(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to reorder", http.StatusInternalServerError)
 		return
 	}
+	h.maybeAutoRebuild(r.Context())
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_, _ = w.Write([]byte(`{"ok":true}`))
 }
@@ -282,6 +283,7 @@ func (h *Handler) categoryCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to create category", http.StatusInternalServerError)
 		return
 	}
+	h.maybeAutoRebuild(r.Context())
 	http.Redirect(w, r, root(r)+"/admin/categories?ok=saved", http.StatusFound)
 }
 
@@ -312,6 +314,7 @@ func (h *Handler) categoryUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to save category", http.StatusInternalServerError)
 		return
 	}
+	h.maybeAutoRebuild(r.Context())
 	http.Redirect(w, r, root(r)+"/admin/categories?ok=saved", http.StatusFound)
 }
 
@@ -330,5 +333,6 @@ func (h *Handler) categoryDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to delete category", http.StatusInternalServerError)
 		return
 	}
+	h.maybeAutoRebuild(r.Context())
 	http.Redirect(w, r, root(r)+"/admin/categories?ok=deleted", http.StatusFound)
 }

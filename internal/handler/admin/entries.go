@@ -345,6 +345,7 @@ func (h *Handler) entryCreate(w http.ResponseWriter, r *http.Request) {
 		log.Printf("admin.entryCreate: tags: %v", err)
 	}
 	h.regenerateOGCard(r.Context(), entry)
+	h.maybeAutoRebuild(r.Context())
 	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/entries/%d/edit?ok=saved", id), http.StatusFound)
 }
 
@@ -407,6 +408,7 @@ func (h *Handler) entryUpdate(w http.ResponseWriter, r *http.Request) {
 		log.Printf("admin.entryUpdate: tags: %v", err)
 	}
 	h.regenerateOGCard(r.Context(), entry)
+	h.maybeAutoRebuild(r.Context())
 	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/entries/%d/edit?ok=saved", id), http.StatusFound)
 }
 
@@ -448,6 +450,7 @@ func (h *Handler) entryDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.removeOGCard(id)
+	h.maybeAutoRebuild(r.Context())
 	http.Redirect(w, r, root(r)+"/admin/entries?ok=deleted", http.StatusFound)
 }
 
