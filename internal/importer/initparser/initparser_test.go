@@ -1,6 +1,7 @@
 package initparser
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -144,7 +145,9 @@ func TestParseFileSB2Sandbox(t *testing.T) {
 
 // sandboxPath resolves a repo-relative path from the test file location.
 // The importer/initparser tests live two levels deep, so we walk up to
-// the repo root.
+// the repo root. Skips the test if the fixture is missing — _sandbox/
+// is gitignored and only present in local checkouts that include the
+// real SB2/SB3 sample data.
 func sandboxPath(t *testing.T, rel string) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -153,5 +156,9 @@ func sandboxPath(t *testing.T, rel string) string {
 	}
 	// thisFile = .../internal/importer/initparser/initparser_test.go
 	root := filepath.Join(filepath.Dir(thisFile), "..", "..", "..")
-	return filepath.Join(root, rel)
+	path := filepath.Join(root, rel)
+	if _, err := os.Stat(path); err != nil {
+		t.Skipf("sandbox fixture not present (%s): %v", rel, err)
+	}
+	return path
 }
