@@ -104,10 +104,7 @@ func main() {
 		// app.New already ran migrations — nothing else to do.
 		fmt.Fprintln(os.Stderr, "migrate: ok")
 	case "import":
-		if len(subArgs) < 1 {
-			log.Fatalf("import: usage: serenebach import <sb3-sqlite-path>")
-		}
-		runImport(a, subArgs[0])
+		runImport(a, subArgs)
 	case "build":
 		runBuild(a, subArgs)
 	case "mcp":
@@ -197,11 +194,28 @@ func runMCPServe(a *app.App) {
 	}
 }
 
-func runImport(a *app.App, sourcePath string) {
-	report, err := importer.Import(context.Background(), a.DB, sourcePath, importer.Options{
+func runImport(a *app.App, args []string) {
+	fs := flag.NewFlagSet("import", flag.ExitOnError)
+	sbVersion := fs.Int("sb-version", 3, "source format: 2 (SB2 flat-file dir) or 3 (SB3 SQLite database)")
+	fs.Usage = func() {
+		fmt.Fprintln(os.Stderr, "usage: serenebach import [--sb-version 2|3] <path>")
+		fmt.Fprintln(os.Stderr, "  SB3 (default): <path> is the data.db SQLite file")
+		fmt.Fprintln(os.Stderr, "  SB2:           <path> is the data directory holding configure.cgi etc.")
+		fs.PrintDefaults()
+	}
+	if err := fs.Parse(args); err != nil {
+		log.Fatalf("import: %v", err)
+	}
+	rest := fs.Args()
+	if len(rest) < 1 {
+		fs.Usage()
+		log.Fatalf("import: missing source path")
+	}
+	report, err := importer.Import(context.Background(), a.DB, rest[0], importer.Options{
 		TargetWID:     app.DefaultWID,
 		AuthorID:      1,
 		OnlyPublished: true,
+		SBVersion:     *sbVersion,
 	})
 	if err != nil {
 		log.Fatalf("import: %v", err)
