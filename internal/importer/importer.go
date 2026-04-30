@@ -37,24 +37,24 @@ type Report struct {
 // Options controls import behaviour. Defaults are fine for the common
 // "import my own blog" case.
 type Options struct {
-	// TargetWID is the weblog id the imported rows are bound to. Default 1.
+	// TargetWID is the weblog id the imported rows are bound to. Zero
+	// resolves to 1 — every test and CLI path has historically used the
+	// seeded default weblog.
 	TargetWID int64
 	// AuthorID is the user id every imported entry is attributed to. It
-	// MUST exist in the destination database. Default 1 (the seeded admin).
+	// MUST exist in the destination database. Zero resolves to 1 (the
+	// seeded admin).
 	AuthorID int64
 	// OnlyPublished, when true, skips entries whose status is not
-	// EntryPublished (== 1). Default true — imports drafts/closed rows as-is
-	// when set to false.
+	// EntryPublished (== 1). Defaults to false (= include drafts and
+	// closed rows). Every existing caller passes this explicitly, so the
+	// zero-value semantic is here only as a guardrail.
 	OnlyPublished bool
 	// DataDir is the SB3 data directory holding configure.cgi / init.cgi.
 	// Empty means auto-detect from the parent (or grandparent) of
 	// sourcePath; the importer is happy to run without a flat-file dir
 	// at all and fall back to sb_config alone.
 	DataDir string
-}
-
-func defaultOptions() Options {
-	return Options{TargetWID: 1, AuthorID: 1, OnlyPublished: true}
 }
 
 // SB3 config.pl defaults used when sb_config has no override row. Real
@@ -98,7 +98,10 @@ func defaultLegacyURLConfig() legacyURLConfig {
 // any error rolls back everything.
 func Import(ctx context.Context, dest *sql.DB, sourcePath string, opts Options) (*Report, error) {
 	if opts.TargetWID == 0 {
-		opts = defaultOptions()
+		opts.TargetWID = 1
+	}
+	if opts.AuthorID == 0 {
+		opts.AuthorID = 1
 	}
 
 	absPath, err := filepath.Abs(sourcePath)

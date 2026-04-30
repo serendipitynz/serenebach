@@ -547,6 +547,39 @@ func TestImportConfigureCgiOverridesInitCgi(t *testing.T) {
 	}
 }
 
+func TestImportDataDirHonouredWithZeroValueOptions(t *testing.T) {
+	// Regression: when the caller passes Options{DataDir: dir} alone (no
+	// explicit TargetWID / AuthorID), the importer used to wholesale-
+	// replace the struct with defaults and lose the explicit DataDir.
+	// Now field-level zero-value resolution preserves it.
+	src := buildSB3Fixture(t)
+
+	// Put configure.cgi in a *different* directory than the one
+	// auto-detect would pick (the SQLite parent), so the only way these
+	// values reach legacy_* is through the explicit DataDir option.
+	explicit := t.TempDir()
+	writeFile(t, filepath.Join(explicit, "configure.cgi"),
+		"conf_srv_base\thttp://explicit.example/path/\n",
+	)
+
+	a := destApp(t)
+	if _, err := importer.Import(context.Background(), a.DB, src, importer.Options{
+		DataDir: explicit,
+	}); err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+
+	var basePath string
+	if err := a.DB.QueryRow(
+		`SELECT legacy_base_path FROM weblogs WHERE id = 1`,
+	).Scan(&basePath); err != nil {
+		t.Fatal(err)
+	}
+	if basePath != "/path/" {
+		t.Errorf("base_path = %q, want /path/ (explicit DataDir must reach loadLegacyConfig)", basePath)
+	}
+}
+
 func TestImportConfigureCgiSrvCgiFallback(t *testing.T) {
 	// SB2-style configs only set conf_srv_cgi (cgi script URL), not
 	// conf_srv_base. sb::Config::verify_values copies the former into
