@@ -416,3 +416,219 @@ func TestImportAgainstRealSB3IfAvailable(t *testing.T) {
 		t.Errorf("category legacy_id missing: %d of %d", catsWithLegacyID, report.Categories)
 	}
 }
+
+// writeFile writes content to t.TempDir-relative path. Used by the
+// configure.cgi / init.cgi flat-file tests.
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("writeFile %s: %v", path, err)
+	}
+}
+
+func TestImportReadsConfigureCgi(t *testing.T) {
+	// Most live SB3 instances keep all URL-shaping config in
+	// data/configure.cgi, not in the sb_config table. The importer must
+	// pick those values up automatically when configure.cgi sits next to
+	// the SQLite source.
+	src := buildSB3Fixture(t)
+	dir := filepath.Dir(src)
+	writeFile(t, filepath.Join(dir, "configure.cgi"),
+		"conf_srv_base\thttp://example.com/sb/\n"+
+			"conf_dir_log\tarticles/\n"+
+			"conf_entry_archive\tIndividual\n"+
+			"basic_preid\tarticle\n"+
+			"basic_suffix\thtm\n",
+	)
+
+	a := destApp(t)
+	if _, err := importer.Import(context.Background(), a.DB, src, importer.Options{
+		TargetWID: 1, AuthorID: 1, OnlyPublished: true,
+	}); err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+
+	var arch, logPath, basePath, prefix, suffix string
+	if err := a.DB.QueryRow(
+		`SELECT legacy_archive_type, legacy_log_path, legacy_base_path,
+		        legacy_id_prefix, legacy_suffix
+		 FROM weblogs WHERE id = 1`,
+	).Scan(&arch, &logPath, &basePath, &prefix, &suffix); err != nil {
+		t.Fatal(err)
+	}
+	if arch != "Individual" {
+		t.Errorf("archive_type = %q, want Individual", arch)
+	}
+	if basePath != "/sb/" {
+		t.Errorf("base_path = %q, want /sb/ (host stripped)", basePath)
+	}
+	if logPath != "articles/" {
+		t.Errorf("log_path = %q, want articles/", logPath)
+	}
+	if prefix != "article" {
+		t.Errorf("id_prefix = %q, want article", prefix)
+	}
+	if suffix != "htm" {
+		t.Errorf("suffix = %q, want htm", suffix)
+	}
+}
+
+func TestImportConfigureCgiOverridesSBConfig(t *testing.T) {
+	// Layer priority: configure.cgi (highest) > init.cgi > sb_config >
+	// config.pl defaults. Seed both an sb_config row and a configure.cgi
+	// entry for the same key — configure.cgi must win.
+	src := buildSB3Fixture(t)
+	db, err := sql.Open("sqlite", "file:"+src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`CREATE TABLE sb_config (config_id INTEGER PRIMARY KEY, config_wid INTEGER, config_name TEXT, config_type TEXT, config_data TEXT, config_text TEXT)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO sb_config VALUES (1, 0, 'conf_srv_base', 'str', 'http://from-table.example/', '')`); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := filepath.Dir(src)
+	writeFile(t, filepath.Join(dir, "configure.cgi"),
+		"conf_srv_base\thttp://from-configure.example/blog/\n",
+	)
+
+	a := destApp(t)
+	if _, err := importer.Import(context.Background(), a.DB, src, importer.Options{
+		TargetWID: 1, AuthorID: 1, OnlyPublished: true,
+	}); err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+
+	var basePath string
+	if err := a.DB.QueryRow(
+		`SELECT legacy_base_path FROM weblogs WHERE id = 1`,
+	).Scan(&basePath); err != nil {
+		t.Fatal(err)
+	}
+	if basePath != "/blog/" {
+		t.Errorf("base_path = %q, want /blog/ (configure.cgi must override sb_config)", basePath)
+	}
+}
+
+func TestImportConfigureCgiOverridesInitCgi(t *testing.T) {
+	// configure.cgi wins over init.cgi within the flat-file pair.
+	src := buildSB3Fixture(t)
+	dir := filepath.Dir(src)
+	writeFile(t, filepath.Join(dir, "init.cgi"),
+		"conf_srv_base\thttp://from-init.example/init/\n"+
+			"basic_preid\tinit-prefix\n",
+	)
+	writeFile(t, filepath.Join(dir, "configure.cgi"),
+		"conf_srv_base\thttp://from-configure.example/conf/\n",
+	)
+
+	a := destApp(t)
+	if _, err := importer.Import(context.Background(), a.DB, src, importer.Options{
+		TargetWID: 1, AuthorID: 1, OnlyPublished: true,
+	}); err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+
+	var basePath, prefix string
+	if err := a.DB.QueryRow(
+		`SELECT legacy_base_path, legacy_id_prefix FROM weblogs WHERE id = 1`,
+	).Scan(&basePath, &prefix); err != nil {
+		t.Fatal(err)
+	}
+	if basePath != "/conf/" {
+		t.Errorf("base_path = %q, want /conf/ (configure.cgi wins)", basePath)
+	}
+	// init.cgi-only key still applies — only conflicts get overwritten.
+	if prefix != "init-prefix" {
+		t.Errorf("id_prefix = %q, want init-prefix (init.cgi-only key preserved)", prefix)
+	}
+}
+
+func TestImportConfigureCgiSrvCgiFallback(t *testing.T) {
+	// SB2-style configs only set conf_srv_cgi (cgi script URL), not
+	// conf_srv_base. sb::Config::verify_values copies the former into
+	// the latter when conf_srv_base is empty; the importer mirrors that.
+	src := buildSB3Fixture(t)
+	dir := filepath.Dir(src)
+	writeFile(t, filepath.Join(dir, "configure.cgi"),
+		"conf_srv_cgi\thttp://example.com/cgi-blog/\n",
+	)
+
+	a := destApp(t)
+	if _, err := importer.Import(context.Background(), a.DB, src, importer.Options{
+		TargetWID: 1, AuthorID: 1, OnlyPublished: true,
+	}); err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+
+	var basePath string
+	if err := a.DB.QueryRow(
+		`SELECT legacy_base_path FROM weblogs WHERE id = 1`,
+	).Scan(&basePath); err != nil {
+		t.Fatal(err)
+	}
+	if basePath != "/cgi-blog/" {
+		t.Errorf("base_path = %q, want /cgi-blog/ (conf_srv_cgi fallback)", basePath)
+	}
+}
+
+func TestImportSandboxSB3RoundTrip(t *testing.T) {
+	// End-to-end against the real SB3 sandbox: data.db carries the
+	// content rows, configure.cgi (a sibling file) carries the URL
+	// settings. Asserts BasePath comes out as /sb/ — the bug that
+	// motivated this layer of the importer.
+	sandbox := sandboxSB3DataDB(t)
+	a := destApp(t)
+	if _, err := importer.Import(context.Background(), a.DB, sandbox, importer.Options{
+		TargetWID: 1, AuthorID: 1, OnlyPublished: true,
+	}); err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+
+	var arch, logPath, basePath, prefix, suffix string
+	if err := a.DB.QueryRow(
+		`SELECT legacy_archive_type, legacy_log_path, legacy_base_path,
+		        legacy_id_prefix, legacy_suffix
+		 FROM weblogs WHERE id = 1`,
+	).Scan(&arch, &logPath, &basePath, &prefix, &suffix); err != nil {
+		t.Fatal(err)
+	}
+	if basePath != "/sb/" {
+		t.Errorf("base_path = %q, want /sb/", basePath)
+	}
+	if logPath != "log/" {
+		t.Errorf("log_path = %q, want log/", logPath)
+	}
+	if arch != "Individual" {
+		t.Errorf("archive_type = %q, want Individual", arch)
+	}
+	// configure.cgi for this sandbox doesn't set basic_preid/basic_suffix,
+	// so we should be on config.pl defaults.
+	if prefix != "eid" {
+		t.Errorf("id_prefix = %q, want eid (default)", prefix)
+	}
+	if suffix != ".html" {
+		t.Errorf("suffix = %q, want .html (default)", suffix)
+	}
+}
+
+// sandboxSB3DataDB locates _sandbox/data-sb3/data.db relative to the
+// repo. Skips the test if the sandbox isn't present (e.g. lean clones
+// that don't ship the fixture).
+func sandboxSB3DataDB(t *testing.T) string {
+	t.Helper()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// importer_test runs from internal/importer; walk up to repo root.
+	root := filepath.Join(wd, "..", "..")
+	path := filepath.Join(root, "_sandbox", "data-sb3", "data.db")
+	if _, err := os.Stat(path); err != nil {
+		t.Skipf("sandbox not present: %v", err)
+	}
+	return path
+}
