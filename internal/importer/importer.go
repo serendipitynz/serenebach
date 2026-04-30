@@ -55,6 +55,11 @@ type Options struct {
 	// sourcePath; the importer is happy to run without a flat-file dir
 	// at all and fall back to sb_config alone.
 	DataDir string
+	// SBVersion selects the source format. 0 / 3 read from a SB3 SQLite
+	// database (sourcePath = data.db). 2 reads from a SB2 flat-file
+	// data directory (sourcePath = the data dir itself; DataDir is
+	// ignored in that mode). Other values return an error.
+	SBVersion int
 }
 
 // SB3 config.pl defaults used when sb_config has no override row. Real
@@ -93,9 +98,12 @@ func defaultLegacyURLConfig() legacyURLConfig {
 	}
 }
 
-// Import opens the SB3 database at sourcePath (read-only) and copies data
-// into dest. The entire operation runs in a single destination transaction:
-// any error rolls back everything.
+// Import opens the source described by opts.SBVersion at sourcePath
+// (read-only) and copies data into dest. The entire operation runs in
+// a single destination transaction: any error rolls back everything.
+//
+// SBVersion 0 / 3: sourcePath is a SB3 data.db (SQLite).
+// SBVersion 2:     sourcePath is the SB2 data directory (flat files).
 func Import(ctx context.Context, dest *sql.DB, sourcePath string, opts Options) (*Report, error) {
 	if opts.TargetWID == 0 {
 		opts.TargetWID = 1
@@ -104,6 +112,19 @@ func Import(ctx context.Context, dest *sql.DB, sourcePath string, opts Options) 
 		opts.AuthorID = 1
 	}
 
+	switch opts.SBVersion {
+	case 0, 3:
+		return importSB3(ctx, dest, sourcePath, opts)
+	case 2:
+		return importSB2(ctx, dest, sourcePath, opts)
+	default:
+		return nil, fmt.Errorf("importer: unsupported SB version %d (expected 2 or 3)", opts.SBVersion)
+	}
+}
+
+// importSB3 is the original Import body — SB3 SQLite source. Kept as
+// its own function so the dispatcher in Import stays readable.
+func importSB3(ctx context.Context, dest *sql.DB, sourcePath string, opts Options) (*Report, error) {
 	absPath, err := filepath.Abs(sourcePath)
 	if err != nil {
 		return nil, fmt.Errorf("importer: abs path: %w", err)
@@ -260,8 +281,12 @@ func loadLegacyConfig(ctx context.Context, src *sql.DB, sb3WID int64, dataDir st
 // global wid=0 fallback) and writes their non-empty values into dst.
 // A missing table or query error is silently treated as "no overrides"
 // — this matches the prior behaviour and keeps the importer running on
-// unusual source DB shapes.
+// unusual source DB shapes. A nil src is treated as "no DB to read"
+// so the SB2 importer can call this helper without an SQLite source.
 func overlaySBConfig(ctx context.Context, dst map[string]string, src *sql.DB, sb3WID int64) error {
+	if src == nil {
+		return nil
+	}
 	rows, err := src.QueryContext(ctx, `
 		SELECT config_name, COALESCE(config_data,''), COALESCE(config_wid,0)
 		FROM sb_config
