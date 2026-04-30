@@ -96,9 +96,9 @@ Export uses the same `template.txt` format — useful for backups or moving a te
 
 The Go port does not support trackbacks, Amazon affiliate tags, or mobile-only views. Imports succeed, but you'll need to remove or rewrite those bits in the template editor.
 
-See [Migrating from SB3 and feature differences](sb3-migration) for the full list.
+See [Migrating from SB2 / SB3 and feature differences](sb3-migration) for the full list.
 
 ## Related pages
 
 - [Preview mode](preview)
-- [Migrating from SB3 and feature differences](sb3-migration)
+- [Migrating from SB2 / SB3 and feature differences](sb3-migration)

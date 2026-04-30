@@ -17,7 +17,7 @@ This help focuses on the day-to-day admin operations — writing entries, dialli
 - [Categories and tags](categories-tags)
 - [Template editing](templates)
 - [AI integration and MCP](mcp)
-- [Migrating from SB3 and feature differences](sb3-migration)
+- [Migrating from SB2 / SB3 and feature differences](sb3-migration)
 - [Preview mode](preview)
 - [Publishing settings and OG cards](settings-publishing)
 - [Comments and spam controls](comments-spam)
@@ -30,7 +30,7 @@ This help focuses on the day-to-day admin operations — writing entries, dialli
 
 Switch pages from the "Help" menu in the admin sidebar. The help is bundled into the Serene Bach binary, so it works offline.
 
-The admin UI and templates broadly resemble SB3, but comments, trackbacks, image handling, and AI integrations differ in places. Before migrating, please review [Migrating from SB3 and feature differences](sb3-migration).
+The admin UI and templates broadly resemble SB3, but comments, trackbacks, image handling, and AI integrations differ in places. Before migrating, please review [Migrating from SB2 / SB3 and feature differences](sb3-migration).
 
 ## Feedback
 

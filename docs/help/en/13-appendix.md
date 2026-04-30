@@ -90,5 +90,5 @@ The Go port of Serene Bach is published under the MIT licence. See `LICENSE` in 
 ## Related pages
 
 - [Getting started](getting-started)
-- [Migrating from SB3 and feature differences](sb3-migration)
+- [Migrating from SB2 / SB3 and feature differences](sb3-migration)
 - [Static rebuild and publishing](rebuild-publishing)
