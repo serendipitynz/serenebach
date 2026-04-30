@@ -11,6 +11,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -18,6 +19,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"github.com/serendipitynz/serenebach/internal/importer/initparser"
 	"github.com/serendipitynz/serenebach/internal/template/lint"
 	"github.com/serendipitynz/serenebach/internal/template/sbtemplate"
 )
@@ -35,19 +37,24 @@ type Report struct {
 // Options controls import behaviour. Defaults are fine for the common
 // "import my own blog" case.
 type Options struct {
-	// TargetWID is the weblog id the imported rows are bound to. Default 1.
+	// TargetWID is the weblog id the imported rows are bound to. Zero
+	// resolves to 1 — every test and CLI path has historically used the
+	// seeded default weblog.
 	TargetWID int64
 	// AuthorID is the user id every imported entry is attributed to. It
-	// MUST exist in the destination database. Default 1 (the seeded admin).
+	// MUST exist in the destination database. Zero resolves to 1 (the
+	// seeded admin).
 	AuthorID int64
 	// OnlyPublished, when true, skips entries whose status is not
-	// EntryPublished (== 1). Default true — imports drafts/closed rows as-is
-	// when set to false.
+	// EntryPublished (== 1). Defaults to false (= include drafts and
+	// closed rows). Every existing caller passes this explicitly, so the
+	// zero-value semantic is here only as a guardrail.
 	OnlyPublished bool
-}
-
-func defaultOptions() Options {
-	return Options{TargetWID: 1, AuthorID: 1, OnlyPublished: true}
+	// DataDir is the SB3 data directory holding configure.cgi / init.cgi.
+	// Empty means auto-detect from the parent (or grandparent) of
+	// sourcePath; the importer is happy to run without a flat-file dir
+	// at all and fall back to sb_config alone.
+	DataDir string
 }
 
 // SB3 config.pl defaults used when sb_config has no override row. Real
@@ -91,7 +98,10 @@ func defaultLegacyURLConfig() legacyURLConfig {
 // any error rolls back everything.
 func Import(ctx context.Context, dest *sql.DB, sourcePath string, opts Options) (*Report, error) {
 	if opts.TargetWID == 0 {
-		opts = defaultOptions()
+		opts.TargetWID = 1
+	}
+	if opts.AuthorID == 0 {
+		opts.AuthorID = 1
 	}
 
 	absPath, err := filepath.Abs(sourcePath)
@@ -132,7 +142,11 @@ func Import(ctx context.Context, dest *sql.DB, sourcePath string, opts Options) 
 	if err != nil {
 		return nil, err
 	}
-	cfg, err := readLegacyConfig(ctx, src, sb3WID)
+	dataDir := opts.DataDir
+	if dataDir == "" {
+		dataDir = detectDataDir(absPath)
+	}
+	cfg, err := loadLegacyConfig(ctx, src, sb3WID, dataDir)
 	if err != nil {
 		return nil, err
 	}
@@ -183,54 +197,124 @@ func importWeblog(ctx context.Context, src *sql.DB, tx *sql.Tx, opts Options, re
 	return sb3WID, nil
 }
 
-// readLegacyConfig pulls SB3 sb_config values relevant to URL
-// reconstruction. Missing rows fall back to config.pl defaults — many
-// SB3 instances ran without ever overriding these. A missing sb_config
-// table or query error also falls back to defaults; the importer should
-// not abort just because the source DB shape is unusual.
-func readLegacyConfig(ctx context.Context, src *sql.DB, sb3WID int64) (legacyURLConfig, error) {
+// loadLegacyConfig builds the legacy URL config by layering, in
+// increasing priority order:
+//
+//  1. config.pl defaults (defaultLegacyURLConfig)
+//  2. sb_config rows (rarely populated in real installs, but the schema
+//     has supported it since SB3.0)
+//  3. <data-dir>/init.cgi   — installation-time overrides
+//  4. <data-dir>/configure.cgi — admin-edited settings, the actual
+//     source of truth for most live blogs
+//
+// Each layer overlays only its non-empty values, mirroring sb::Config's
+// own load semantics. Missing files / missing sb_config table are fine
+// — both flat-file and DB sources are best-effort.
+func loadLegacyConfig(ctx context.Context, src *sql.DB, sb3WID int64, dataDir string) (legacyURLConfig, error) {
+	merged := map[string]string{}
+	if err := overlaySBConfig(ctx, merged, src, sb3WID); err != nil {
+		return legacyURLConfig{}, err
+	}
+	if dataDir != "" {
+		init, err := initparser.ParseFile(filepath.Join(dataDir, "init.cgi"))
+		if err != nil {
+			return legacyURLConfig{}, fmt.Errorf("importer: read init.cgi: %w", err)
+		}
+		overlay(merged, init)
+		conf, err := initparser.ParseFile(filepath.Join(dataDir, "configure.cgi"))
+		if err != nil {
+			return legacyURLConfig{}, fmt.Errorf("importer: read configure.cgi: %w", err)
+		}
+		overlay(merged, conf)
+	}
+
 	cfg := defaultLegacyURLConfig()
+	if v := merged["conf_entry_archive"]; v != "" {
+		cfg.ArchiveType = v
+	}
+	if v := merged["conf_dir_log"]; v != "" {
+		cfg.LogPath = v
+	}
+	// conf_srv_base is the canonical source. sb::Config::verify_values
+	// substitutes conf_srv_cgi when conf_srv_base is empty (SB2 deployments
+	// often only set the cgi URL), so the importer does the same.
+	if v := merged["conf_srv_base"]; v != "" {
+		cfg.BasePath = v
+	} else if v := merged["conf_srv_cgi"]; v != "" {
+		cfg.BasePath = v
+	}
+	if v := merged["basic_sb"]; v != "" {
+		cfg.CgiName = v
+	}
+	if v := merged["basic_preid"]; v != "" {
+		cfg.IDPrefix = v
+	}
+	if v := merged["basic_suffix"]; v != "" {
+		cfg.Suffix = v
+	}
+	cfg.normalise()
+	return cfg, nil
+}
+
+// overlaySBConfig reads the SB3 sb_config rows for sb3WID (and the
+// global wid=0 fallback) and writes their non-empty values into dst.
+// A missing table or query error is silently treated as "no overrides"
+// — this matches the prior behaviour and keeps the importer running on
+// unusual source DB shapes.
+func overlaySBConfig(ctx context.Context, dst map[string]string, src *sql.DB, sb3WID int64) error {
 	rows, err := src.QueryContext(ctx, `
 		SELECT config_name, COALESCE(config_data,''), COALESCE(config_wid,0)
 		FROM sb_config
 		WHERE config_wid = 0 OR config_wid = ?
 		ORDER BY config_wid ASC`, sb3WID)
 	if err != nil {
-		return cfg, nil
+		return nil
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var name, data string
 		var wid int64
 		if err := rows.Scan(&name, &data, &wid); err != nil {
-			return cfg, fmt.Errorf("importer: scan sb_config: %w", err)
+			return fmt.Errorf("importer: scan sb_config: %w", err)
 		}
-		// ORDER BY config_wid ASC means later iterations are
-		// weblog-scoped overrides; an empty value never replaces a
-		// previous non-empty one.
 		if data == "" {
 			continue
 		}
-		switch name {
-		case "conf_entry_archive":
-			cfg.ArchiveType = data
-		case "conf_dir_log":
-			cfg.LogPath = data
-		case "conf_srv_base":
-			cfg.BasePath = data
-		case "basic_sb":
-			cfg.CgiName = data
-		case "basic_preid":
-			cfg.IDPrefix = data
-		case "basic_suffix":
-			cfg.Suffix = data
-		}
+		dst[name] = data
 	}
 	if err := rows.Err(); err != nil {
-		return cfg, fmt.Errorf("importer: read sb_config: %w", err)
+		return fmt.Errorf("importer: read sb_config: %w", err)
 	}
-	cfg.normalise()
-	return cfg, nil
+	return nil
+}
+
+// overlay writes every non-empty entry of src into dst, replacing any
+// prior value. Empty values are dropped so a later layer can never
+// blank out an earlier non-empty setting.
+func overlay(dst, src map[string]string) {
+	for k, v := range src {
+		if v == "" {
+			continue
+		}
+		dst[k] = v
+	}
+}
+
+// detectDataDir locates the SB3 data dir from a SQLite file path. SB3's
+// default install puts data.db directly in `data/` next to configure.cgi
+// (the sandbox layout), but some operators move the SQLite under
+// `data/sqlite/data.db`; we try both. Empty return means no flat-file
+// config could be found — the caller proceeds with defaults + sb_config.
+func detectDataDir(sourcePath string) string {
+	candidates := []string{filepath.Dir(sourcePath), filepath.Dir(filepath.Dir(sourcePath))}
+	for _, dir := range candidates {
+		for _, name := range []string{"configure.cgi", "init.cgi"} {
+			if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
+				return dir
+			}
+		}
+	}
+	return ""
 }
 
 // normalise rewrites loosely-formatted SB3 inputs into the canonical

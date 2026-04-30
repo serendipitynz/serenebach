@@ -1,4 +1,10 @@
-package templatepack
+// Package jacharset normalises legacy Japanese-encoded byte streams to
+// UTF-8. It carries the detection logic SB3 templatepack imports relied
+// on (Content-Type charset hint → HTML <meta charset> / CSS @charset
+// probes → ISO-2022-JP escape sniff → UTF-8 validity → byte-distribution
+// score between Shift_JIS and EUC-JP) so the SB2/SB3 importers can reuse
+// it on flat-file content where the encoding is not declared.
+package jacharset
 
 import (
 	"bytes"
@@ -10,30 +16,25 @@ import (
 	"golang.org/x/text/transform"
 )
 
-// Legacy SB3 template bundles predate the UTF-8 era — info parts advertise
-// charset=ISO-2022-JP in the MIME header, while base.html / style.css have
-// no MIME-level charset and were authored in whatever encoding the user's
-// editor used (commonly Shift_JIS or EUC-JP on Japanese systems of the era).
-// The helpers below normalise everything to UTF-8 at import time so the
-// rest of the Go port can stay single-encoding.
-
-type contentKind int
+// Kind tells the detector which inline charset declaration to look for.
+// Plain content has none; HTML carries <meta charset>; CSS carries
+// @charset at the top.
+type Kind int
 
 const (
-	kindPlain contentKind = iota
-	kindHTML
-	kindCSS
+	KindPlain Kind = iota
+	KindHTML
+	KindCSS
 )
 
-// decodeToUTF8 converts body to UTF-8, using hint (the Content-Type
+// DecodeToUTF8 converts body to UTF-8, using hint (the Content-Type
 // charset parameter if any) as the first source of truth. When hint is
-// empty it falls back to content-based detection — HTML <meta charset>
-// and CSS @charset declarations, ISO-2022-JP escape sequences, then a
-// byte-distribution score between Shift_JIS and EUC-JP.
+// empty it falls back to content-based detection.
 //
 // The second return is the detected encoding name, useful for logs.
-// ASCII-only and already-UTF-8 inputs are returned unchanged.
-func decodeToUTF8(body []byte, hint string, kind contentKind) (string, string) {
+// ASCII-only and already-UTF-8 inputs are returned unchanged with name
+// "utf-8".
+func DecodeToUTF8(body []byte, hint string, kind Kind) (string, string) {
 	name := canonicalCharsetName(hint)
 	if name == "" {
 		name = detectCharset(body, kind)
@@ -98,13 +99,13 @@ var (
 	reCSSAtCharset = regexp.MustCompile(`(?i)^\s*@charset\s+"([^"]+)"`)
 )
 
-func detectCharset(body []byte, kind contentKind) string {
+func detectCharset(body []byte, kind Kind) string {
 	switch kind {
-	case kindHTML:
+	case KindHTML:
 		if n := extractDeclaredCharset(body, reHTMLMetaCharset); n != "" {
 			return n
 		}
-	case kindCSS:
+	case KindCSS:
 		if n := extractDeclaredCharset(body, reCSSAtCharset); n != "" {
 			return n
 		}

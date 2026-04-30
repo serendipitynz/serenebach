@@ -14,6 +14,13 @@ SB_SEED_NO_SAMPLES=1 task seed
 task import -- /path/to/your/sb3.db
 ```
 
+The importer also auto-detects your SB3 data directory by looking at
+the parent (and grandparent) of the SQLite path for `configure.cgi`
+and `init.cgi`. Those files carry the URL-shaping settings the legacy
+redirect layer needs — you'll get the best result if you copy the
+whole SB3 `data/` directory and point the importer at the `data.db`
+inside it.
+
 ## What gets imported
 
 - Weblog title + description, base URL, language
@@ -56,6 +63,12 @@ inbound links keep resolving:
   path
 - `/sb.cgi?mode=comment` → 307 forwards the POST body to
   `/entry/{id}/comment` so imported comment forms keep posting
+- Static archive URLs — `/<base>/<log>/<prefix><N><suffix>` (the
+  classic `/blog/log/eid42.html` shape) → 301 to the canonical entry
+  URL. Per-blog values (`<base>`, `<log>`, `<prefix>`, `<suffix>`)
+  come from `configure.cgi`, so blogs hosted under a sub-path (e.g.
+  `https://example.com/sb/`) keep their inbound links only when that
+  file is present alongside the imported `data.db`.
 - `/profile/{id}/` populates SB3's `profile_area` block
 - `{site_rsd}` / `/rsd.xml` is served (the discovery XML works,
   even though the underlying XML-RPC API is not implemented)

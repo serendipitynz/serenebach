@@ -30,6 +30,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/serendipitynz/serenebach/internal/jacharset"
 )
 
 // Pack is the decoded contents of a template.txt. Only Name and one of
@@ -135,7 +137,7 @@ func readPart(pack *Pack, part *multipart.Part) error {
 
 	// Info part: no filename attached; carries the Name/Author metadata.
 	if filename == "" {
-		text, _ := decodeToUTF8(body, charsetHint, kindPlain)
+		text, _ := jacharset.DecodeToUTF8(body, charsetHint, jacharset.KindPlain)
 		pack.Info = text
 		parseInfoFields(pack)
 		return nil
@@ -143,11 +145,11 @@ func readPart(pack *Pack, part *multipart.Part) error {
 
 	switch filename {
 	case FilenameMain:
-		pack.MainBody, _ = decodeToUTF8(body, charsetHint, kindHTML)
+		pack.MainBody, _ = jacharset.DecodeToUTF8(body, charsetHint, jacharset.KindHTML)
 	case FilenameCSS:
-		pack.CSS, _ = decodeToUTF8(body, charsetHint, kindCSS)
+		pack.CSS, _ = jacharset.DecodeToUTF8(body, charsetHint, jacharset.KindCSS)
 	case FilenameEntry, FilenameEntryBase:
-		pack.EntryBody, _ = decodeToUTF8(body, charsetHint, kindHTML)
+		pack.EntryBody, _ = jacharset.DecodeToUTF8(body, charsetHint, jacharset.KindHTML)
 	default:
 		// Anything else — treat as an asset. Trust the declared
 		// Content-Type over guessing from the extension; the admin UI
