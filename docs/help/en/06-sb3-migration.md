@@ -35,6 +35,12 @@ Then import from the SB3 database:
 
 When import completes, you'll see counts and warnings. Warnings flag template tags or other constructs that need attention.
 
+### About `configure.cgi`
+
+SB3's URL conventions (the `/blog/log/eid42.html`-style permalinks for instance) are not stored in `data.db`. They live in the flat-file `configure.cgi` (admin-edited settings) and `init.cgi` (install-time settings) inside the SB3 `data/` directory. The importer automatically checks the parent of the SQLite path for these files and reads them when present.
+
+So when you migrate from SB3, the safest approach is to **copy the entire `data/` directory and point the importer at the `data.db` inside it**. Without `configure.cgi` the import falls back to SB3's default values, which is fine for blogs hosted at the site root but breaks legacy redirects for blogs hosted under a sub-path (e.g. `https://example.com/sb/`).
+
 ## What gets imported
 
 | Data | Notes |
@@ -83,7 +89,15 @@ After import, the editor flags unsupported or behaviourally different tags so yo
 
 ## URL compatibility
 
-Some legacy SB3 URLs are redirected to their Go-port equivalents to keep old links working. Coverage isn't complete for every hand-written or external URL — open the important pages after migration to confirm.
+The Go port redirects these legacy SB3 URL shapes to their canonical counterparts:
+
+- Dynamic URLs like `sb.cgi?eid=N` → 301 to the entry page
+- Static archive URLs like `log/eid42.html` → 301 to the entry page
+- Category directory URLs → 301 to the category page
+
+Static-archive redirects only work when `configure.cgi` was readable at import time (see "About `configure.cgi`" above). If your blog ran under a sub-path and you want those legacy URLs to keep resolving, copy the entire `data/` directory before importing.
+
+Coverage isn't complete for every hand-written or external URL — open the important pages after migration to confirm.
 
 ## Migrating images
 
