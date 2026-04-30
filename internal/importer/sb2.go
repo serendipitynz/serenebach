@@ -155,7 +155,7 @@ type sb2Category struct {
 }
 
 type sb2Message struct {
-	ID, WID, EID, Stat, Date              int64
+	ID, WID, EID, Stat, Date               int64
 	Auth, Host, TZ, Mail, URL, Agent, Body string
 }
 
@@ -165,7 +165,7 @@ type sb2Template struct {
 }
 
 type sb2Weblog struct {
-	ID                int64
+	ID                 int64
 	Title, Description string
 }
 
