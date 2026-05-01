@@ -8,5 +8,6 @@
   "comment.error.turnstileFail": "Challenge was not passed. Please try again.",
   "comment.error.rateLimit": "Too many submissions. Please wait a moment before posting again.",
   "sidebar.recent.noName": "(no name)",
-  "comment.numLabel": "Comments"
+  "comment.numLabel": "Comments",
+  "entry.readMore": "read more ..."
 }
