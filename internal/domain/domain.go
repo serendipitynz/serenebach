@@ -386,6 +386,10 @@ type Entry struct {
 	// Kept in sync by StampEntry the same way LikesCount is. Per-kind
 	// breakdowns are queried on demand via StampCountsByEntry.
 	StampsCount int64
+	// CommentsCount is the denormalised count of approved comments on
+	// this entry. Kept in sync by comment CUD operations so template
+	// rendering never needs a COUNT(*) per entry on list pages.
+	CommentsCount int64
 }
 
 // StampKind is the short identifier for one reaction. Fixed set so URLs
