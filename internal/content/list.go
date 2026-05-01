@@ -121,7 +121,7 @@ func (v ListView) Render() (string, error) {
 		// link (comments are "accepted" on list regardless of mode).
 		// The count comes from the denormalised CommentsCount column.
 		label := commentNumLabel(v.Site, e.CommentsCount)
-		href := html.EscapeString(v.Site.EntryPermalink(e) + "comment")
+		href := html.EscapeString(v.Site.EntryPermalink(e) + "#comments")
 		c.Tag("comment_num", `<a href="`+href+`">`+label+`</a>`)
 		c.Tag("comment_count", strconv.FormatInt(e.CommentsCount, 10))
 		// SB3 emits a scroll anchor on list pages so permalinks can

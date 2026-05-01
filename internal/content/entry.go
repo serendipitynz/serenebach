@@ -146,13 +146,14 @@ func (v EntryView) Render() (string, error) {
 		c.Tag("user_login", html.EscapeString(v.Author.Name))
 		c.Tag("user_id", strconv.FormatInt(v.Author.ID, 10))
 	}
-	// SB3's {comment_num} emits a link like <a href="…#com">Comments(N)</a>
+	// SB3's {comment_num} emits a link like <a href="…#comments">Comments(N)</a>
 	// when comments are open and a plain "-" when closed. {comment_count}
-	// is the raw number (empty string when closed). Go reproduces the same
-	// semantics using the denormalised CommentsCount on the entry row.
+	// is the raw number (empty string when closed). The link targets the
+	// entry permalink with a #comments anchor so readers jump straight to
+	// the comment section — matching SB3's mode=>'com' behaviour.
 	if v.CommentMode != domain.CommentClosed {
 		label := commentNumLabel(v.Site, v.Entry.CommentsCount)
-		href := html.EscapeString(v.Site.EntryPermalink(v.Entry) + "comment")
+		href := html.EscapeString(v.Site.EntryPermalink(v.Entry) + "#comments")
 		c.Tag("comment_num", `<a href="`+href+`">`+label+`</a>`)
 		c.Tag("comment_count", strconv.FormatInt(v.Entry.CommentsCount, 10))
 	} else {
