@@ -88,6 +88,11 @@ func (v EntryView) Render() (string, error) {
 	c.Tag("entry_title", v.Entry.Title)
 	c.Tag("entry_date", v.Site.FormatEntryDate(v.Entry.PostedAt))
 	c.Tag("entry_time", v.Site.FormatEntryTime(v.Entry.PostedAt))
+	// SB3 emits {entry_time} as a permalink anchor and {entry_disp_time}
+	// as bare text. Go's {entry_time} is already bare text; the display
+	// alias resolves to the same value so imported templates don't leak
+	// the raw placeholder.
+	c.Tag("entry_disp_time", v.Site.FormatEntryTime(v.Entry.PostedAt))
 	c.Tag("entry_description", formatBody(v.Entry.Body, v.Entry.Format, "entry.body"))
 	c.Tag("entry_sequel", formatBody(v.Entry.More, v.Entry.Format, "entry.more"))
 	c.Tag("entry_mode", "entry")
@@ -141,7 +146,30 @@ func (v EntryView) Render() (string, error) {
 		c.Tag("user_login", html.EscapeString(v.Author.Name))
 		c.Tag("user_id", strconv.FormatInt(v.Author.ID, 10))
 	}
+	// SB3's {comment_num} emits a link like <a href="…#comments">Comments(N)</a>
+	// when comments are open and a plain "-" when closed. {comment_count}
+	// is the raw number (empty string when closed). The link targets the
+	// entry permalink with a #comments anchor so readers jump straight to
+	// the comment section — matching SB3's mode=>'com' behaviour.
+	if v.CommentMode != domain.CommentClosed {
+		label := commentNumLabel(v.Site.CommentNumLabel, v.Entry.CommentsCount)
+		href := html.EscapeString(v.Site.EntryPermalink(v.Entry) + "#comments")
+		c.Tag("comment_num", `<a href="`+href+`">`+label+`</a>`)
+		c.Tag("comment_count", strconv.FormatInt(v.Entry.CommentsCount, 10))
+	} else {
+		c.Tag("comment_num", "-")
+		c.Tag("comment_count", "")
+	}
 	c.Block("entry", 1)
+
+	// sb_entry_marking is a scroll anchor emitted by SB3 on list pages so
+	// permalinks can jump straight to the entry. On the permalink page the
+	// anchor is pointless so we emit a no-op anchor (the DefaultCallback
+	// already injected the {sb_entry_marking} placeholder). The list
+	// renderer (ListView) emits the real anchor for each loop iteration;
+	// here we leave it empty since mode=="ent" means we're on the
+	// permalink page.
+	c.Tag("sb_entry_marking", "")
 
 	// Permalink-only block: nav links between adjacent entries. SB v3's
 	// sample uses `sequel` to wrap this kind of content so it doesn't show
@@ -216,6 +244,11 @@ func (v EntryView) applyComments(c *sbtemplate.Context, tmpl *sbtemplate.Templat
 	c.Tag("cookie_email", html.EscapeString(v.CookieEmail))
 	c.Tag("cookie_url", html.EscapeString(v.CookieURL))
 	c.Tag("turnstile_widget", v.TurnstileHTML)
+	// SB3 injected a <script> tag for cook.js here. The Go port has no
+	// reader-facing comment JS, so {sb_comment_js} is always empty.
+	// Setting it explicitly keeps the lint honest and mirrors
+	// DefaultCallback's placeholder injection.
+	c.Tag("sb_comment_js", "")
 
 	for i, m := range v.Messages {
 		c.Num(i)
@@ -249,4 +282,15 @@ func (v EntryView) navLink(target *domain.Entry, affix string) string {
 		return `<a href="` + href + `">` + title + affix + `</a>`
 	}
 	return `<a href="` + href + `">` + affix + title + `</a>`
+}
+
+// commentNumLabel formats the reader-facing label inside the {comment_num}
+// anchor. numLabel is the localised word for "comments" (e.g. "Comments" or
+// "コメント"), already resolved by the caller from the public i18n bundle
+// keyed as "comment.numLabel". Empty numLabel falls back to "Comments".
+func commentNumLabel(numLabel string, count int64) string {
+	if numLabel == "" {
+		numLabel = "Comments"
+	}
+	return numLabel + "(" + strconv.FormatInt(count, 10) + ")"
 }

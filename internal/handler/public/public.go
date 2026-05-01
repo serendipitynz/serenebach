@@ -48,6 +48,21 @@ func loadPublicBundle() *i18n.Bundle {
 	return b
 }
 
+// commentNumLabel resolves the localised "comments" word for the
+// {comment_num} anchor from the public i18n bundle.
+func commentNumLabel(lang string) string {
+	return publicBundle.T(lang, "comment.numLabel")
+}
+
+// siteWithLabel builds a content.Site with the localised comment label
+// pre-resolved from the public i18n bundle. The handler layer owns
+// the i18n resolution; the content package stays bundle-free.
+func siteWithLabel(w domain.Weblog, lang string) content.Site {
+	s := content.NewSite(w)
+	s.CommentNumLabel = commentNumLabel(lang)
+	return s
+}
+
 // tr resolves a reader-facing key. Locale preference: the blog's
 // configured Lang (weblog.Lang) wins when supported, so visitors
 // consistently see errors in the blog's own language; otherwise the
@@ -430,7 +445,7 @@ func (h *Handler) renderList(w http.ResponseWriter, r *http.Request, entries []d
 	sidebar := h.loadSidebarData(ctx, logTag)
 
 	view := content.ListView{
-		Site:         content.NewSite(*weblog).WithBasePath(root(r)),
+		Site:         siteWithLabel(*weblog, weblog.Lang).WithBasePath(root(r)),
 		Template:     tmpl,
 		Entries:      entries,
 		Categories:   cats,
@@ -924,7 +939,7 @@ func (h *Handler) entry(w http.ResponseWriter, r *http.Request) {
 	sidebar := h.loadSidebarData(ctx, "public.entry")
 
 	view := content.EntryView{
-		Site:          content.NewSite(*weblog).WithBasePath(root(r)),
+		Site:          siteWithLabel(*weblog, weblog.Lang).WithBasePath(root(r)),
 		Template:      tmpl,
 		Entry:         *entry,
 		Category:      catPtr,

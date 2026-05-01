@@ -60,6 +60,13 @@ var unsupportedTags = map[string]string{
 	"trackback_count":       "trackback feature is out of scope",
 	"recent_trackback_list": "trackback feature is out of scope",
 	"comment_iconform":      "comment icons aren't supported in the Go port",
+	"related_category":      "secondary categories aren't modelled in the Go port",
+	"related_category_disp": "secondary categories aren't modelled in the Go port",
+	"entry_excerpt":         "entry summary/excerpt field isn't modelled yet",
+	"calendar":              "calendar sidebar widget isn't implemented yet",
+	"calendar2":             "calendar sidebar widget isn't implemented yet",
+	"calendar_horizontal":   "calendar sidebar widget isn't implemented yet",
+	"calendar_vertical":     "calendar sidebar widget isn't implemented yet",
 }
 
 var unsupportedTagPrefixes = []struct {
@@ -76,15 +83,25 @@ var differsTags = map[string]string{
 	"site_mobile":   "always empty — the Go port has no mobile-specific route",
 	"comment_icon":  "always empty — reader avatars aren't modelled yet",
 	"profile_email": "always empty — author email is an admin credential, not public",
+	"entry_time":    "plain formatted time — SB3 wraps this in a permalink anchor",
+	"category_name": "plain name text — SB3 emits an HTML link to the category page",
+	"sb_comment_js": "always empty — the Go port has no reader-facing comment script",
+	"entry_sequel":  "always renders body content — on list pages SB3 emits a 'read more' link instead",
 }
 
 var unsupportedBlocks = map[string]string{
-	"trackback_area":   "trackback feature is out of scope",
-	"recent_trackback": "trackback feature is out of scope",
-	"trackback":        "trackback feature is out of scope",
-	"amazon_area":      "Amazon affiliate integration is out of scope",
-	"amazon":           "Amazon affiliate integration is out of scope",
-	"comment_iconform": "comment icons aren't supported in the Go port",
+	"trackback_area":        "trackback feature is out of scope",
+	"recent_trackback":      "trackback feature is out of scope",
+	"trackback":             "trackback feature is out of scope",
+	"amazon_area":           "Amazon affiliate integration is out of scope",
+	"amazon":                "Amazon affiliate integration is out of scope",
+	"comment_iconform":      "comment icons aren't supported in the Go port",
+	"calendar":              "calendar sidebar widget isn't implemented yet",
+	"mobile_top":            "mobile mode was dropped in the Go port",
+	"mobile_entry":          "mobile mode was dropped in the Go port",
+	"mobile_comment_area":   "mobile mode was dropped in the Go port",
+	"mobile_comment_form":   "mobile mode was dropped in the Go port",
+	"mobile_trackback_area": "mobile mode was dropped in the Go port",
 }
 
 var differsBlocks = map[string]string{

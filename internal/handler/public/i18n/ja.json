@@ -7,5 +7,6 @@
   "comment.error.turnstileVerify": "チャレンジの検証に失敗しました。時間をおいて再送してください。",
   "comment.error.turnstileFail": "チャレンジに通過できませんでした。もう一度お試しください。",
   "comment.error.rateLimit": "投稿が多すぎます。しばらく待ってから再送してください。",
-  "sidebar.recent.noName": "(名前なし)"
+  "sidebar.recent.noName": "(名前なし)",
+  "comment.numLabel": "コメント"
 }
