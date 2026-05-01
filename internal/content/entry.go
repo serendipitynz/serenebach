@@ -152,7 +152,7 @@ func (v EntryView) Render() (string, error) {
 	// entry permalink with a #comments anchor so readers jump straight to
 	// the comment section — matching SB3's mode=>'com' behaviour.
 	if v.CommentMode != domain.CommentClosed {
-		label := commentNumLabel(v.Site, v.Entry.CommentsCount)
+		label := commentNumLabel(v.Site.CommentNumLabel, v.Entry.CommentsCount)
 		href := html.EscapeString(v.Site.EntryPermalink(v.Entry) + "#comments")
 		c.Tag("comment_num", `<a href="`+href+`">`+label+`</a>`)
 		c.Tag("comment_count", strconv.FormatInt(v.Entry.CommentsCount, 10))
@@ -284,14 +284,13 @@ func (v EntryView) navLink(target *domain.Entry, affix string) string {
 	return `<a href="` + href + `">` + affix + title + `</a>`
 }
 
-// commentNumLabel produces the reader-facing label inside the {comment_num}
-// anchor — "Comments(N)" in English, "コメント(N)" in Japanese, matching
-// SB3's $lang->string('comments'). The count is always shown so zero-comment
-// entries display "Comments(0)" rather than hiding the count.
-func commentNumLabel(s Site, count int64) string {
-	label := "Comments"
-	if s.Weblog.Lang == "ja" {
-		label = "コメント"
+// commentNumLabel formats the reader-facing label inside the {comment_num}
+// anchor. numLabel is the localised word for "comments" (e.g. "Comments" or
+// "コメント"), already resolved by the caller from the public i18n bundle
+// keyed as "comment.numLabel". Empty numLabel falls back to "Comments".
+func commentNumLabel(numLabel string, count int64) string {
+	if numLabel == "" {
+		numLabel = "Comments"
 	}
-	return label + "(" + strconv.FormatInt(count, 10) + ")"
+	return numLabel + "(" + strconv.FormatInt(count, 10) + ")"
 }

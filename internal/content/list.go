@@ -120,7 +120,7 @@ func (v ListView) Render() (string, error) {
 		// {comment_num} / {comment_count}: list pages always show the
 		// link (comments are "accepted" on list regardless of mode).
 		// The count comes from the denormalised CommentsCount column.
-		label := commentNumLabel(v.Site, e.CommentsCount)
+		label := commentNumLabel(v.Site.CommentNumLabel, e.CommentsCount)
 		href := html.EscapeString(v.Site.EntryPermalink(e) + "#comments")
 		c.Tag("comment_num", `<a href="`+href+`">`+label+`</a>`)
 		c.Tag("comment_count", strconv.FormatInt(e.CommentsCount, 10))

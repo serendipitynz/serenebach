@@ -196,10 +196,30 @@ type Site struct {
 	// concatenates the entry subject / archive label here so the
 	// <title> of a given page reads "Blog | Specific page".
 	PageSuffix string
+	// CommentNumLabel is the localised word for "comments" used in
+	// the {comment_num} anchor label (e.g. "Comments" or "コメント").
+	// Resolved from the public i18n bundle via the "comment.numLabel"
+	// key. Empty falls back to "Comments".
+	CommentNumLabel string
 }
 
 func NewSite(w domain.Weblog) Site {
-	return Site{Weblog: w, Encoding: "utf-8"}
+	s := Site{Weblog: w, Encoding: "utf-8"}
+	s.CommentNumLabel = commentLabelForLang(w.Lang)
+	return s
+}
+
+// commentLabelForLang returns the "comments" label for the {comment_num}
+// anchor. The handler layer can override Site.CommentNumLabel with a
+// value from the public i18n bundle for full catalogue coverage; this
+// fallback covers the static-rebuild path where the bundle isn't loaded.
+func commentLabelForLang(lang string) string {
+	switch lang {
+	case "en":
+		return "Comments"
+	default:
+		return "コメント"
+	}
 }
 
 // WithBasePath returns a copy of the site bound to a deployment sub-path.
