@@ -49,6 +49,7 @@
                     data-meta-address="{{.Meta.Address}}"
                     data-meta-version="{{.Meta.Version}}"
                     data-meta-memo="{{.Meta.Memo}}"
+                    data-meta-memo-html="{{.Meta.MemoHTML}}"
                     aria-label="{{T `templates.action.infoTitle`}}" title="{{T `templates.col.info`}}">{{iconInfo}}</button>
             {{if not .IsActive}}
             <form method="post" action="{{Root}}/admin/templates/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `templates.delete.confirm`}}')">

@@ -15,6 +15,7 @@ import (
 	"github.com/serendipitynz/serenebach/internal/csrf"
 	"github.com/serendipitynz/serenebach/internal/dateformat"
 	"github.com/serendipitynz/serenebach/internal/domain"
+	"github.com/serendipitynz/serenebach/internal/format"
 	"github.com/serendipitynz/serenebach/internal/session"
 	"github.com/serendipitynz/serenebach/internal/storage/repo"
 	"github.com/serendipitynz/serenebach/internal/template/lint"
@@ -581,11 +582,12 @@ type templateRow struct {
 }
 
 type templateMeta struct {
-	Name    string
-	Author  string
-	Address string
-	Version string
-	Memo    string
+	Name     string
+	Author   string
+	Address  string
+	Version  string
+	Memo     string
+	MemoHTML string
 }
 
 type templatesListPageData struct {
@@ -643,7 +645,14 @@ func (h *Handler) templatesList(w http.ResponseWriter, r *http.Request) {
 	}
 	rows := make([]templateRow, 0, len(items))
 	for _, t := range items {
-		rows = append(rows, templateRow{Template: t, Meta: parseTemplateInfo(t.Info)})
+		m := parseTemplateInfo(t.Info)
+		if m.Memo != "" {
+			memoHTML, err := format.Render(m.Memo, "markdown")
+			if err == nil {
+				m.MemoHTML = memoHTML
+			}
+		}
+		rows = append(rows, templateRow{Template: t, Meta: m})
 	}
 	q := r.URL.Query()
 	renderMain(w, r, pageTemplatesList, templatesListPageData{
