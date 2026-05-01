@@ -34,7 +34,7 @@ A `.env` template ships at `.env.example`. Copy it to `.env` and fill in `SB_AI_
 | Public + admin URL reference | [docs/url-map.md](docs/url-map.md) |
 | Environment variables, flags, `task` shortcuts | [docs/configuration.md](docs/configuration.md) |
 | Deployment modes (HTTP server / CGI / static rebuild) | [docs/deployment.md](docs/deployment.md) |
-| Migrating from Serene Bach v3 | [docs/importing-sb3.md](docs/importing-sb3.md) |
+| Migrating from Serene Bach v2 / v3 | [docs/importing-sb3.md](docs/importing-sb3.md) |
 | Stack overview + design notes (CSRF, anti-spam, OG cards, analytics, …) | [docs/architecture.md](docs/architecture.md) |
 | End-user help (also served at `/admin/help` from the running binary) | [docs/help/](docs/help/) |
 

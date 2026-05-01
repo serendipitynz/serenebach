@@ -1,9 +1,11 @@
-# Importing from legacy Serene Bach v3
+# Importing from legacy Serene Bach (SB2 / SB3)
 
-If you have a production Serene Bach 3 (Perl) SQLite database on
-hand, you can migrate the content directly.
+If you have a production Serene Bach 2 or 3 (Perl) installation on
+hand, you can migrate the content directly. The importer dispatches
+on `--sb-version`; SB3 (default) reads the SQLite database, SB2 reads
+the flat-file `data/` directory.
 
-## Procedure
+## Procedure — SB3 (SQLite)
 
 ```bash
 # prepare a destination that has an admin user but no demo entries
@@ -20,6 +22,24 @@ and `init.cgi`. Those files carry the URL-shaping settings the legacy
 redirect layer needs — you'll get the best result if you copy the
 whole SB3 `data/` directory and point the importer at the `data.db`
 inside it.
+
+## Procedure — SB2 (flat-file)
+
+```bash
+SB_SEED_NO_SAMPLES=1 task seed
+task import -- --sb-version 2 /path/to/your/sb2/data
+```
+
+The path argument is the SB2 `data/` directory itself — the one that
+contains `configure.cgi`, `entry.cgi`, `entry/`, `category.cgi`,
+`message.cgi`, `message/`, `template.cgi`, `template/`, and so on.
+The importer walks each per-id detail file (e.g. `entry/123.cgi`)
+rather than relying on the abbreviated index files, so every field
+the destination schema cares about is preserved.
+
+The SB2 path also imports comments (Message records) — the SB3 path
+currently does not. Drafts and future-scheduled entries are dropped
+unless you pass an explicit override.
 
 ## What gets imported
 
@@ -38,21 +58,27 @@ inside it.
   any other accounts you need.
 - **Drafts and closed entries** — the standard import covers
   published entries only.
-- **Comments** — not currently supported.
+- **Comments** — SB2 import: yes. SB3 import: not currently supported.
 - **Trackbacks** — not supported in the Go port at all.
 - **Images** — copy the files manually; re-register through the
   image library if you want them to appear in the admin picker.
 - **Plugins** — Perl plugins do not run in the Go port.
 - **Amazon-related features** — not supported in the Go port.
+- **Links / blogroll** — SB2's `link.cgi` is not imported; re-create
+  via the admin UI. (SB3's blogroll structure differs and isn't
+  imported either.)
 
 ## Character-encoding handling
 
-SB3 templates often live in Shift_JIS, EUC-JP, or ISO-2022-JP. The
-importer auto-detects these in three passes (Content-Type charset
-hint → HTML `<meta charset>` / CSS `@charset` probe → byte-
-distribution scoring) and re-encodes everything to UTF-8 before
-storing. Failures fall back to UTF-8 with a warning rather than
-panicking.
+SB2 typically stored content in EUC-JP. SB3 templates are sometimes
+Shift_JIS, EUC-JP, or ISO-2022-JP. The importer auto-detects in five
+passes (Content-Type charset hint → HTML `<meta charset>` / CSS
+`@charset` probe → ISO-2022-JP escape sniff → UTF-8 validity →
+Shift_JIS/EUC-JP byte-distribution score) and re-encodes everything
+to UTF-8 before storing. The same path is used for both SB2 record
+files and SB3 template bundles, so a SB2 deployment that ran in
+UTF-8 (or a SB3 deployment that ran in EUC-JP) is detected just as
+reliably as the version's "standard" encoding.
 
 ## URL-compatibility shims
 
