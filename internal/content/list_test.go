@@ -60,7 +60,8 @@ func TestListViewRendersEntriesAndSiteVars(t *testing.T) {
 		// Default list-date pattern is "%Mon%/%Day%" (SB3 convention)
 		// when no weblog-level override is configured.
 		// SB3 semantics: {user_disp_name} = display, {user_name} = login.
-		`by Admin (admin) in news on 04/19`,
+		// SB3 semantics: {category_name} is a link to the category page.
+		`by Admin (admin) in <a href="https://example.com/category/10/">news</a> on 04/19`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q\nfull output:\n%s", want, out)

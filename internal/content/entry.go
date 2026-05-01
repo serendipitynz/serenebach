@@ -87,12 +87,12 @@ func (v EntryView) Render() (string, error) {
 	c.Tag("entry_permalink", v.Site.EntryPermalink(v.Entry))
 	c.Tag("entry_title", v.Entry.Title)
 	c.Tag("entry_date", v.Site.FormatEntryDate(v.Entry.PostedAt))
-	c.Tag("entry_time", v.Site.FormatEntryTime(v.Entry.PostedAt))
-	// SB3 emits {entry_time} as a permalink anchor and {entry_disp_time}
-	// as bare text. Go's {entry_time} is already bare text; the display
-	// alias resolves to the same value so imported templates don't leak
-	// the raw placeholder.
-	c.Tag("entry_disp_time", v.Site.FormatEntryTime(v.Entry.PostedAt))
+	// SB3 wraps {entry_time} in a permalink anchor; {entry_disp_time}
+	// remains the bare formatted time.
+	permalink := html.EscapeString(v.Site.EntryPermalink(v.Entry))
+	timeStr := html.EscapeString(v.Site.FormatEntryTime(v.Entry.PostedAt))
+	c.Tag("entry_time", `<a href="`+permalink+`">`+timeStr+`</a>`)
+	c.Tag("entry_disp_time", timeStr)
 	c.Tag("entry_description", formatBody(v.Entry.Body, v.Entry.Format, "entry.body"))
 	c.Tag("entry_sequel", formatBody(v.Entry.More, v.Entry.Format, "entry.more"))
 	c.Tag("entry_mode", "entry")
@@ -128,7 +128,9 @@ func (v EntryView) Render() (string, error) {
 	c.Tag("csrf_token", v.CSRFToken)
 
 	if v.Category != nil {
-		c.Tag("category_name", v.Category.Name)
+		catLink := html.EscapeString(v.Site.CategoryPermalink(*v.Category))
+		catName := html.EscapeString(v.Category.Name)
+		c.Tag("category_name", `<a href="`+catLink+`">`+catName+`</a>`)
 		c.Tag("category_id", strconv.FormatInt(v.Category.ID, 10))
 		c.Tag("category_disp_name", v.Category.Name)
 	}
