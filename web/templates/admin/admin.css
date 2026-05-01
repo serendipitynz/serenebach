@@ -1540,6 +1540,12 @@ table.sortable tbody tr.drop-below td {
   justify-content: flex-end;
   border-top: 1px solid var(--border);
 }
+/* Markdown-rendered memo inside the template-info modal.
+   Override dl.kv dd { white-space: pre-wrap } so tag-newlines
+   inside the HTML don't create visible blank lines.
+   We set it on .md-content itself only — child elements inherit it
+   naturally, while <pre> keeps its UA default white-space: pre. */
+.md-content { white-space: normal; line-height: 1.5; }
 /* Image preview variant — fit the image within the viewport without
    letting it stretch beyond the modal's own size. */
 .modal.modal-image .modal-body {
@@ -1603,6 +1609,8 @@ dl.kv dd { margin: 0; word-break: break-word; white-space: pre-wrap; }
   }
   .form-row { grid-template-columns: 1fr; }
   .form-row > .label { padding-top: 0; }
+  dl.kv { grid-template-columns: 1fr; gap: 0.15rem 0; }
+  dl.kv dd { padding-left: 0.25rem; }
 }
 
 /* Phone-class viewports: mobile polish (touch targets, horizontal-

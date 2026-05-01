@@ -683,7 +683,7 @@
   "js.field.email": "メール",
   "js.field.commentAuthor": "投稿者",
   "js.field.commentBody": "本文",
-  "js.field.templateName": "テンプレート名",
+  "js.field.templateName": "名称",
   "js.field.author": "作者",
   "js.field.version": "バージョン",
   "js.field.memo": "メモ",

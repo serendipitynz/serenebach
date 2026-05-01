@@ -683,7 +683,7 @@
   "js.field.email": "Email",
   "js.field.commentAuthor": "Author",
   "js.field.commentBody": "Body",
-  "js.field.templateName": "Template name",
+  "js.field.templateName": "Name",
   "js.field.author": "Author",
   "js.field.version": "Version",
   "js.field.memo": "Memo",

@@ -580,6 +580,7 @@
   // row's data-meta-* attributes and render a read-only modal.
   document.querySelectorAll('[data-template-info]').forEach(function (btn) {
     btn.addEventListener('click', function () {
+      var container = document.createElement('div');
       var dl = document.createElement('dl');
       dl.className = 'kv';
       var DASH = sbT('js.field.dash');
@@ -588,8 +589,18 @@
       var addr = btn.getAttribute('data-meta-address');
       appendKV(dl, 'URL', addr ? linkifyNode(addr) : DASH);
       appendKV(dl, sbT('js.field.version'), btn.getAttribute('data-meta-version') || DASH);
-      appendKV(dl, sbT('js.field.memo'), btn.getAttribute('data-meta-memo') || DASH);
-      openModal({ title: sbT('js.modal.templateInfo'), bodyNode: dl });
+      container.appendChild(dl);
+
+      var memoHtml = btn.getAttribute('data-meta-memo-html');
+      if (memoHtml) {
+        var hr = document.createElement('hr');
+        container.appendChild(hr);
+        var memoDiv = document.createElement('div');
+        memoDiv.className = 'md-content';
+        memoDiv.innerHTML = memoHtml;
+        container.appendChild(memoDiv);
+      }
+      openModal({ title: sbT('js.modal.templateInfo'), bodyNode: container });
     });
   });
 
