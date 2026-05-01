@@ -105,6 +105,7 @@ func (v ListView) Render() (string, error) {
 		c.Tag("entry_title", e.Title)
 		c.Tag("entry_date", v.Site.FormatListDate(e.PostedAt))
 		c.Tag("entry_time", v.Site.FormatEntryTime(e.PostedAt))
+		c.Tag("entry_disp_time", v.Site.FormatEntryTime(e.PostedAt))
 		c.Tag("entry_description", formatBody(e.Body, e.Format, "list.body"))
 		c.Tag("entry_sequel", formatBody(e.More, e.Format, "list.more"))
 		c.Tag("entry_mode", "list")
@@ -116,6 +117,17 @@ func (v ListView) Render() (string, error) {
 		c.Tag("entry_keyword", e.Keywords)
 		c.Tag("permalink", v.Site.EntryPermalink(e))
 		c.Tag("entry_tags", renderTagsFragment(v.Site, v.Tags[e.ID]))
+		// {comment_num} / {comment_count}: list pages always show the
+		// link (comments are "accepted" on list regardless of mode).
+		// The count comes from the denormalised CommentsCount column.
+		label := commentNumLabel(v.Site, e.CommentsCount)
+		href := html.EscapeString(v.Site.EntryPermalink(e) + "comment")
+		c.Tag("comment_num", `<a href="`+href+`">`+label+`</a>`)
+		c.Tag("comment_count", strconv.FormatInt(e.CommentsCount, 10))
+		// SB3 emits a scroll anchor on list pages so permalinks can
+		// jump straight to the entry. The DefaultCallback already
+		// injected {sb_entry_marking} at the top of the entry block.
+		c.Tag("sb_entry_marking", `<a id="mark`+strconv.FormatInt(e.ID, 10)+`"></a>`)
 
 		if cat, ok := v.Categories[e.CategoryID]; ok {
 			c.Tag("category_name", cat.Name)
