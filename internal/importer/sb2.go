@@ -57,7 +57,7 @@ func importSB2(ctx context.Context, dest *sql.DB, dataDir string, opts Options) 
 	if err != nil {
 		return nil, err
 	}
-	entries, err := readSB2Entries(absDir, opts.OnlyPublished)
+	entries, err := readSB2Entries(absDir)
 	if err != nil {
 		return nil, err
 	}
@@ -214,9 +214,10 @@ func readSB2Categories(dir string) ([]sb2Category, error) {
 // The index file (data/entry.cgi) is intentionally skipped: it carries
 // only a subset of fields, and walking the directory is simpler.
 //
-// onlyPublished, when true, drops rows whose stat is not in {1,2} —
-// SB2's published-list condition (lib/sb/Build.pm uses cond stat=>[1,2]).
-func readSB2Entries(dir string, onlyPublished bool) ([]sb2Entry, error) {
+// The OnlyPublished filter is applied at write time (importSB2Entries)
+// so that skipped rows can be counted in Report.SkippedEntries —
+// matching the SB3 importer's reporting contract.
+func readSB2Entries(dir string) ([]sb2Entry, error) {
 	files, err := os.ReadDir(filepath.Join(dir, "entry"))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -240,10 +241,6 @@ func readSB2Entries(dir string, onlyPublished bool) ([]sb2Entry, error) {
 		// elements: id, wid, subj, cat, date, auth, stat, com, tb, file,
 		// tz, add, edit, acm, atb, form, ping, body, more, sum, key,
 		// ext, tmp
-		stat := atoi64(at(r, 6))
-		if onlyPublished && stat != 1 && stat != 2 {
-			continue
-		}
 		out = append(out, sb2Entry{
 			ID:   atoi64(at(r, 0)),
 			WID:  atoi64(at(r, 1)),
@@ -251,7 +248,7 @@ func readSB2Entries(dir string, onlyPublished bool) ([]sb2Entry, error) {
 			Cat:  atoi64(at(r, 3)),
 			Date: atoi64(at(r, 4)),
 			Auth: atoi64(at(r, 5)),
-			Stat: stat,
+			Stat: atoi64(at(r, 6)),
 			File: at(r, 9),
 			TZ:   at(r, 10),
 			Form: at(r, 15),
@@ -535,6 +532,8 @@ func importSB2Entries(ctx context.Context, tx *sql.Tx, entries []sb2Entry, catMa
 
 	for _, e := range entries {
 		// SB2 stat 1 / 2 → Published; 0 → Draft; anything else → Closed.
+		// SB2's published-list condition uses cond stat=>[1,2] (see
+		// _sandbox/sb2/lib/sb/Build.pm), so OnlyPublished mirrors that.
 		var status int64
 		switch e.Stat {
 		case 0:
@@ -544,12 +543,22 @@ func importSB2Entries(ctx context.Context, tx *sql.Tx, entries []sb2Entry, catMa
 		default:
 			status = -1 // EntryClosed
 		}
-		// Caller already filtered with OnlyPublished; the switch above
-		// is defensive only.
+		if opts.OnlyPublished && status != 1 {
+			report.SkippedEntries++
+			continue
+		}
 
-		var catID sql.NullInt64
-		if mapped, ok := catMap[e.Cat]; ok {
-			catID = sql.NullInt64{Int64: mapped, Valid: true}
+		// entries.category_id is NOT NULL in the destination schema, so
+		// missing or zero category ids must fall back to -1 (the
+		// "uncategorised" sentinel the SB3 importer also uses).
+		var catID int64 = -1
+		if e.Cat != 0 {
+			if mapped, ok := catMap[e.Cat]; ok {
+				catID = mapped
+			} else {
+				report.Warnings = append(report.Warnings,
+					fmt.Sprintf("entry %d references unknown SB2 category %d; imported as uncategorised", e.ID, e.Cat))
+			}
 		}
 
 		// SB3 importer normalises format to "" / "html" / "md" / "sbtext".

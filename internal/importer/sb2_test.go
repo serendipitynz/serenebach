@@ -7,31 +7,179 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/text/encoding/japanese"
+	"golang.org/x/text/transform"
+
 	"github.com/serendipitynz/serenebach/internal/importer"
 )
 
-// sandboxSB2DataDir locates _sandbox/sb2/data relative to the repo
-// root. The directory is gitignored — tests skip when it isn't checked
-// out (CI runners, lean clones).
-func sandboxSB2DataDir(t *testing.T) string {
+// buildSB2Fixture writes a synthetic SB2 data directory to t.TempDir
+// and returns the path. The fixture is intentionally small but
+// exercises every code path the importer has: published / draft /
+// uncategorised entries, a comment whose entry will be filtered when
+// OnlyPublished=true (so it must be silently dropped), a category
+// hierarchy, a template, weblog metadata, and a configure.cgi for the
+// legacy_* settings.
+//
+// The records use the SB2 driver's TAB-separated layout from
+// _sandbox/sb2/lib/sb/Driver/Text.pm — one row per file (or one row
+// per record for list-only tables), trailing tab before the newline,
+// `\t` / `\n` / `\\` per-field escapes.
+func buildSB2Fixture(t *testing.T) string {
 	t.Helper()
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	// importer_test runs from internal/importer; walk up to repo root.
-	root := filepath.Join(wd, "..", "..")
-	path := filepath.Join(root, "_sandbox", "sb2", "data")
-	if _, err := os.Stat(path); err != nil {
-		t.Skipf("SB2 sandbox not present: %v", err)
-	}
-	return path
+	dir := t.TempDir()
+
+	// configure.cgi — InitParser format. The SB2 sandbox demonstrates
+	// that conf_srv_cgi alone (no conf_srv_base) must fall through to
+	// legacy_base_path via the verify_values fallback.
+	mustWrite(t, filepath.Join(dir, "configure.cgi"),
+		"conf_dbtype\tText\n"+
+			"conf_srv_cgi\thttp://example.com/myblog/\n"+
+			"conf_dir_log\tlog/\n"+
+			"conf_entry_archive\tIndividual\n",
+	)
+
+	// weblog.cgi — Data/Weblog.pm elements: id, title, text, ...
+	// Only the first three matter for the import.
+	mustWrite(t, filepath.Join(dir, "weblog.cgi"),
+		sb2Row("0", "Synthetic Blog", "A synthetic SB2 fixture for tests"),
+	)
+
+	// category.cgi — Data/Category.pm elements: id, wid, name, text,
+	// url, main, order, temp, dir, disp, sub, num, idx
+	mustWrite(t, filepath.Join(dir, "category.cgi"),
+		sb2Row("1", "0", "Tech", "tech posts", "", "0", "0", "0", "tech/", "0", "", "0", ""),
+		sb2Row("2", "0", "Sub-tech", "child of tech", "", "1", "0", "0", "tech/sub/", "0", "", "0", ""),
+	)
+
+	// entry/100.cgi — published, in category 1
+	mustMkdir(t, filepath.Join(dir, "entry"))
+	mustWrite(t, filepath.Join(dir, "entry", "100.cgi"),
+		sb2Entry("100", "Published Post", "1", "1700000000", "1", "Hello world body.", "", ""),
+	)
+	// entry/101.cgi — draft (stat=0), should be skipped under
+	// OnlyPublished and counted in SkippedEntries.
+	mustWrite(t, filepath.Join(dir, "entry", "101.cgi"),
+		sb2Entry("101", "Draft Post", "1", "1700001000", "0", "Draft body.", "", ""),
+	)
+	// entry/102.cgi — published but cat=0 (uncategorised in SB2). Must
+	// land with category_id = -1, NOT a NULL constraint failure.
+	mustWrite(t, filepath.Join(dir, "entry", "102.cgi"),
+		sb2Entry("102", "Uncategorised Post", "0", "1700002000", "1", "No category here.", "", ""),
+	)
+	// entry/103.cgi — published but references a non-existent category.
+	mustWrite(t, filepath.Join(dir, "entry", "103.cgi"),
+		sb2Entry("103", "Bad Category Post", "999", "1700003000", "1", "Body.", "", ""),
+	)
+
+	// message/200.cgi — comment on entry 100 (published). Should land.
+	mustMkdir(t, filepath.Join(dir, "message"))
+	mustWrite(t, filepath.Join(dir, "message", "200.cgi"),
+		sb2Message("200", "100", "1", "1700000500", "Reader", "192.0.2.1", "comment on published"),
+	)
+	// message/201.cgi — comment on entry 101 (draft). When the entry
+	// is filtered out by OnlyPublished the comment must be dropped
+	// silently (no orphan inserts).
+	mustWrite(t, filepath.Join(dir, "message", "201.cgi"),
+		sb2Message("201", "101", "1", "1700001500", "Reader", "192.0.2.2", "comment on draft"),
+	)
+
+	// template/10.cgi — Data/Template.pm elements: id, wid, use, name,
+	// gen, mod, info, main, css, entry, files
+	mustMkdir(t, filepath.Join(dir, "template"))
+	mustWrite(t, filepath.Join(dir, "template", "10.cgi"),
+		sb2Row("10", "0", "0", "default", "0", "0", "info", "<html>{site_title}</html>", "body{}", "", ""),
+	)
+
+	return dir
 }
 
-func TestImportSB2SandboxRoundTrip(t *testing.T) {
-	dir := sandboxSB2DataDir(t)
-	a := destApp(t)
+// sb2Row encodes one SB2 record as TAB-separated values with the
+// per-field `\t` / `\n` / `\\` escapes plus a trailing tab + newline,
+// matching Driver::Text._encode.
+func sb2Row(fields ...string) string {
+	encoded := make([]string, len(fields))
+	for i, f := range fields {
+		s := strings.ReplaceAll(f, `\`, `\\`)
+		s = strings.ReplaceAll(s, "\t", `\t`)
+		s = strings.ReplaceAll(s, "\n", `\n`)
+		encoded[i] = s
+	}
+	return strings.Join(encoded, "\t") + "\t\n"
+}
 
+// sb2Entry produces a 23-column SB2 entry row in the order defined by
+// Data/Entry.pm. Fields the importer does not look at are zero-padded
+// so the row keeps the right shape.
+func sb2Entry(id, subj, cat, date, stat, body, more, file string) string {
+	return sb2Row(
+		id,      // 0  id
+		"0",     // 1  wid
+		subj,    // 2  subj
+		cat,     // 3  cat
+		date,    // 4  date
+		"1",     // 5  auth
+		stat,    // 6  stat
+		"0",     // 7  com
+		"0",     // 8  tb
+		file,    // 9  file
+		"+0900", // 10 tz
+		"",      // 11 add
+		"",      // 12 edit
+		"1",     // 13 acm
+		"1",     // 14 atb
+		"",      // 15 form
+		"",      // 16 ping
+		body,    // 17 body
+		more,    // 18 more
+		"",      // 19 sum
+		"",      // 20 key
+		"",      // 21 ext
+		"",      // 22 tmp
+	)
+}
+
+// sb2Message produces a 16-column SB2 message row matching
+// Data/Message.pm. Status is passed through directly (SB2 0/1/-1
+// already aligns with the destination schema).
+func sb2Message(id, eid, stat, date, auth, host, body string) string {
+	return sb2Row(
+		id,                         // 0  id
+		"0",                        // 1  wid
+		eid,                        // 2  eid
+		stat,                       // 3  stat
+		date,                       // 4  date
+		auth,                       // 5  auth
+		host,                       // 6  host
+		"+0900",                    // 7 tz
+		"",                         // 8  mail
+		"",                         // 9  url
+		"Mozilla/5.0 (test agent)", // 10 agnt
+		body,                       // 11 body
+		"",                         // 12 icon
+		"",                         // 13 ext
+		"",                         // 14 admn
+		"0",                        // 15 out
+	)
+}
+
+func mustWrite(t *testing.T, path string, parts ...string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(strings.Join(parts, "")), 0o644); err != nil {
+		t.Fatalf("WriteFile %s: %v", path, err)
+	}
+}
+
+func mustMkdir(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatalf("MkdirAll %s: %v", path, err)
+	}
+}
+
+func TestImportSB2BasicRoundTrip(t *testing.T) {
+	dir := buildSB2Fixture(t)
+	a := destApp(t)
 	report, err := importer.Import(context.Background(), a.DB, dir, importer.Options{
 		TargetWID:     1,
 		AuthorID:      1,
@@ -42,90 +190,192 @@ func TestImportSB2SandboxRoundTrip(t *testing.T) {
 		t.Fatalf("Import: %v", err)
 	}
 
-	t.Logf("SB2 import: weblog=%t templates=%d categories=%d entries=%d", report.WeblogUpdated, report.Templates, report.Categories, report.Entries)
-
-	// The sandbox is a real blog — assert non-trivial counts rather
-	// than exact numbers (which would couple this test to the fixture's
-	// exact contents and break on benign updates).
 	if !report.WeblogUpdated {
-		t.Errorf("weblog not updated; SB2 weblog.cgi likely missed")
+		t.Errorf("weblog not updated")
 	}
-	if report.Categories < 5 {
-		t.Errorf("categories = %d, want at least 5", report.Categories)
+	if report.Categories != 2 {
+		t.Errorf("categories = %d, want 2", report.Categories)
 	}
-	if report.Entries < 50 {
-		t.Errorf("entries = %d, want at least 50 (sandbox has ~400)", report.Entries)
+	if report.Entries != 3 {
+		t.Errorf("entries = %d, want 3 (1 draft skipped)", report.Entries)
 	}
-	if report.Templates < 1 {
-		t.Errorf("templates = %d, want at least 1", report.Templates)
+	if report.Templates != 1 {
+		t.Errorf("templates = %d, want 1", report.Templates)
 	}
 
-	// Comments table should have rows pointing at imported entries.
-	var msgCount int
-	if err := a.DB.QueryRow(`SELECT COUNT(*) FROM messages WHERE wid = 1`).Scan(&msgCount); err != nil {
+	var weblogTitle, weblogDesc string
+	if err := a.DB.QueryRow(`SELECT title, description FROM weblogs WHERE id = 1`).Scan(&weblogTitle, &weblogDesc); err != nil {
 		t.Fatal(err)
 	}
-	if msgCount < 50 {
-		t.Errorf("imported comments = %d, want at least 50", msgCount)
+	if weblogTitle != "Synthetic Blog" {
+		t.Errorf("weblog title = %q, want Synthetic Blog", weblogTitle)
+	}
+	if !strings.Contains(weblogDesc, "synthetic SB2 fixture") {
+		t.Errorf("weblog description = %q", weblogDesc)
 	}
 
-	// configure.cgi → legacy_*. The sandbox has conf_srv_cgi set to
-	// http://127.0.0.1/sblog/, no conf_srv_base, so the fallback
-	// must produce /sblog/.
+	// configure.cgi has only conf_srv_cgi (SB2 style); the importer
+	// must fall through to it for legacy_base_path.
 	var basePath string
 	if err := a.DB.QueryRow(`SELECT legacy_base_path FROM weblogs WHERE id = 1`).Scan(&basePath); err != nil {
 		t.Fatal(err)
 	}
-	if basePath != "/sblog/" {
-		t.Errorf("legacy_base_path = %q, want /sblog/", basePath)
+	if basePath != "/myblog/" {
+		t.Errorf("legacy_base_path = %q, want /myblog/ (conf_srv_cgi fallback)", basePath)
 	}
 
-	// Spot-check entry body decoding: pick one entry, look for any
-	// Japanese hiragana — confirms the EUC-JP → UTF-8 conversion fired.
-	var body string
-	if err := a.DB.QueryRow(
-		`SELECT body FROM entries WHERE legacy_id IS NOT NULL AND length(body) > 100 ORDER BY posted_at LIMIT 1`,
-	).Scan(&body); err != nil {
+	// Categories preserve parent/child.
+	var parentRemapped, childParent int64
+	if err := a.DB.QueryRow(`SELECT id FROM categories WHERE name = 'Tech'`).Scan(&parentRemapped); err != nil {
 		t.Fatal(err)
 	}
-	if !containsHiragana(body) {
-		t.Errorf("first entry body lacks hiragana — EUC-JP decode may have failed; body[:80]=%q", truncate(body, 80))
+	if err := a.DB.QueryRow(`SELECT parent_id FROM categories WHERE name = 'Sub-tech'`).Scan(&childParent); err != nil {
+		t.Fatal(err)
+	}
+	if childParent != parentRemapped {
+		t.Errorf("child parent_id = %d, want %d", childParent, parentRemapped)
 	}
 
-	// Comments should map to real imported entries (foreign-key style).
-	var orphan int
-	if err := a.DB.QueryRow(
-		`SELECT COUNT(*) FROM messages m WHERE NOT EXISTS (SELECT 1 FROM entries e WHERE e.id = m.entry_id)`,
-	).Scan(&orphan); err != nil {
+	// One comment was attached to a published entry; the other was on
+	// the draft and must have been silently dropped.
+	var msgCount int
+	if err := a.DB.QueryRow(`SELECT COUNT(*) FROM messages WHERE wid = 1`).Scan(&msgCount); err != nil {
 		t.Fatal(err)
 	}
-	if orphan != 0 {
-		t.Errorf("orphan comments after import = %d", orphan)
+	if msgCount != 1 {
+		t.Errorf("messages = %d, want 1", msgCount)
 	}
 }
 
-func TestImportSB2SandboxIncludesDrafts(t *testing.T) {
-	// OnlyPublished=false should pull a higher entry count than the
-	// published-only run (assuming the fixture has at least one draft;
-	// SB2's entry stat=0 marks drafts).
-	dir := sandboxSB2DataDir(t)
-
-	a1 := destApp(t)
-	r1, err := importer.Import(context.Background(), a1.DB, dir, importer.Options{
+func TestImportSB2UncategorisedFallback(t *testing.T) {
+	// Regression: entries.category_id is NOT NULL. SB2 entries with
+	// cat=0 (uncategorised) or cat referencing a missing row must
+	// land at -1 instead of triggering a NULL constraint rollback.
+	dir := buildSB2Fixture(t)
+	a := destApp(t)
+	report, err := importer.Import(context.Background(), a.DB, dir, importer.Options{
 		TargetWID: 1, AuthorID: 1, OnlyPublished: true, SBVersion: 2,
 	})
 	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+
+	rows, err := a.DB.Query(`SELECT title, category_id FROM entries WHERE wid = 1 ORDER BY title`)
+	if err != nil {
 		t.Fatal(err)
 	}
-	a2 := destApp(t)
-	r2, err := importer.Import(context.Background(), a2.DB, dir, importer.Options{
+	defer rows.Close()
+	got := map[string]int64{}
+	for rows.Next() {
+		var title string
+		var cat int64
+		if err := rows.Scan(&title, &cat); err != nil {
+			t.Fatal(err)
+		}
+		got[title] = cat
+	}
+	if got["Uncategorised Post"] != -1 {
+		t.Errorf("Uncategorised Post category_id = %d, want -1", got["Uncategorised Post"])
+	}
+	if got["Bad Category Post"] != -1 {
+		t.Errorf("Bad Category Post category_id = %d, want -1", got["Bad Category Post"])
+	}
+
+	// And the unknown-category warning must surface.
+	var saw bool
+	for _, w := range report.Warnings {
+		if strings.Contains(w, "unknown SB2 category 999") {
+			saw = true
+			break
+		}
+	}
+	if !saw {
+		t.Errorf("expected warning for unknown category 999; got %v", report.Warnings)
+	}
+}
+
+func TestImportSB2SkippedCountReported(t *testing.T) {
+	// Regression: OnlyPublished=true must populate Report.SkippedEntries
+	// so the CLI's "skipped=N" line matches the SB3 importer's contract.
+	dir := buildSB2Fixture(t)
+	a := destApp(t)
+	report, err := importer.Import(context.Background(), a.DB, dir, importer.Options{
+		TargetWID: 1, AuthorID: 1, OnlyPublished: true, SBVersion: 2,
+	})
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	if report.SkippedEntries != 1 {
+		t.Errorf("SkippedEntries = %d, want 1 (one draft in fixture)", report.SkippedEntries)
+	}
+	if report.Entries != 3 {
+		t.Errorf("Entries = %d, want 3", report.Entries)
+	}
+}
+
+func TestImportSB2IncludesDrafts(t *testing.T) {
+	dir := buildSB2Fixture(t)
+	a := destApp(t)
+	report, err := importer.Import(context.Background(), a.DB, dir, importer.Options{
 		TargetWID: 1, AuthorID: 1, OnlyPublished: false, SBVersion: 2,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r2.Entries < r1.Entries {
-		t.Errorf("OnlyPublished=false produced %d entries; expected >= published-only %d", r2.Entries, r1.Entries)
+	if report.Entries != 4 {
+		t.Errorf("Entries = %d, want 4 (incl. draft)", report.Entries)
+	}
+	if report.SkippedEntries != 0 {
+		t.Errorf("SkippedEntries = %d, want 0", report.SkippedEntries)
+	}
+	// The draft's comment now has a real entry to attach to.
+	var msgCount int
+	if err := a.DB.QueryRow(`SELECT COUNT(*) FROM messages WHERE wid = 1`).Scan(&msgCount); err != nil {
+		t.Fatal(err)
+	}
+	if msgCount != 2 {
+		t.Errorf("messages = %d, want 2", msgCount)
+	}
+}
+
+func TestImportSB2EUCJPDecode(t *testing.T) {
+	// Build a tiny EUC-JP fixture inline (one weblog row + one entry
+	// with hiragana in title and body). Confirms jacharset auto-detect
+	// fires inside readSB2Records — SB2's "standard" encoding.
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "configure.cgi"), "conf_dbtype\tText\n")
+	encEUC := func(s string) string {
+		out, _, err := transform.String(japanese.EUCJP.NewEncoder(), s)
+		if err != nil {
+			t.Fatalf("EUC-JP encode: %v", err)
+		}
+		return out
+	}
+	mustWrite(t, filepath.Join(dir, "weblog.cgi"), encEUC("0\tこんにちは\tテスト用\t\n"))
+	mustWrite(t, filepath.Join(dir, "category.cgi"), encEUC("1\t0\tカテゴリ\t\t\t0\t0\t0\t\t0\t\t0\t\t\n"))
+	mustMkdir(t, filepath.Join(dir, "entry"))
+	mustWrite(t, filepath.Join(dir, "entry", "1.cgi"),
+		encEUC("1\t0\t日本語タイトル\t1\t1700000000\t1\t1\t0\t0\t\t+0900\t\t\t1\t1\t\t\tこれは本文です。\t\t\t\t\t\n"),
+	)
+
+	a := destApp(t)
+	if _, err := importer.Import(context.Background(), a.DB, dir, importer.Options{
+		TargetWID: 1, AuthorID: 1, OnlyPublished: true, SBVersion: 2,
+	}); err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+
+	// Filter by legacy_id so the seeded sample entry doesn't shadow
+	// the imported row.
+	var title, body string
+	if err := a.DB.QueryRow(`SELECT title, body FROM entries WHERE wid = 1 AND legacy_id = 1`).Scan(&title, &body); err != nil {
+		t.Fatal(err)
+	}
+	if title != "日本語タイトル" {
+		t.Errorf("title = %q, want 日本語タイトル (EUC-JP decode failed)", title)
+	}
+	if body != "これは本文です。" {
+		t.Errorf("body = %q, want これは本文です。", body)
 	}
 }
 
@@ -137,20 +387,4 @@ func TestImportSB2RejectsBadVersion(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "unsupported SB version") {
 		t.Errorf("expected unsupported-version error, got %v", err)
 	}
-}
-
-func containsHiragana(s string) bool {
-	for _, r := range s {
-		if r >= 0x3040 && r <= 0x309F {
-			return true
-		}
-	}
-	return false
-}
-
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n]
 }
