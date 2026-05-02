@@ -49,7 +49,7 @@
       var v = languageSelect.value;
       if (v !== 'ja' && v !== 'en') return;
       var body = new URLSearchParams({ lang: v, csrf_token: readCSRFToken() });
-      fetch('/admin/settings/language', {
+      fetch('language', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: body,
