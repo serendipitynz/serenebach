@@ -12,6 +12,7 @@ import (
 // after a static rebuild and in `task dev`, so the dynamic handler
 // can't 404 out.
 func TestPublicStyleCSSServesActiveTemplateCSS(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// Plant a known marker in the active template's CSS so we can tell
@@ -39,6 +40,7 @@ func TestPublicStyleCSSServesActiveTemplateCSS(t *testing.T) {
 // Category / archive / profile pages point their <link> at this URL
 // when pinned to a non-active template.
 func TestPerTemplateCSSServesCorrectBody(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// Create an inactive template with a distinct CSS marker.
 	res, err := a.DB.Exec(`INSERT INTO templates (wid, name, is_active, main_body, entry_body, css, info, sort_order, created_at, updated_at)
@@ -83,6 +85,7 @@ func TestPerTemplateCSSServesCorrectBody(t *testing.T) {
 // matching the behaviour the SB3 sb2.css fixture depends on (every
 // background image URL uses {site_parts}).
 func TestPublicStyleCSSExpandsSiteParts(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	if _, err := a.DB.Exec(`UPDATE templates SET css = '@charset "{site_encoding}";' || X'0a' || 'body{background:url({site_parts}bg.gif)}' WHERE is_active = 1`); err != nil {
 		t.Fatal(err)
@@ -112,6 +115,7 @@ func TestPublicStyleCSSExpandsSiteParts(t *testing.T) {
 // case for `/template/{id}/style.css`. site_parts has to resolve to
 // THIS template's id, not the active one.
 func TestPerTemplateCSSExpandsSiteParts(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	res, err := a.DB.Exec(`INSERT INTO templates (wid, name, is_active, main_body, entry_body, css, info, sort_order, created_at, updated_at)
 		VALUES (1, 'pin', 0, '<!-- BEGIN entry --><!-- END entry -->', '', 'body{background:url({site_parts}pinbg.gif)}', '', 99, strftime('%s','now'), strftime('%s','now'))`)
@@ -137,6 +141,7 @@ func TestPerTemplateCSSExpandsSiteParts(t *testing.T) {
 // points at the pinned template's CSS URL — closing the loop on the
 // feature so readers actually load the right stylesheet.
 func TestCategoryPageEmitsPinnedCSSURL(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// Create a pinned template whose main_body echoes {site_css} so

@@ -80,6 +80,7 @@ func issueMCPTokenFull(t *testing.T, a *app.App, cookies []*http.Cookie, name, s
 }
 
 func TestMCPHTTPRequiresBearerToken(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// No Authorization header → 401.
@@ -100,6 +101,7 @@ func TestMCPHTTPRequiresBearerToken(t *testing.T) {
 }
 
 func TestMCPHTTPWithValidTokenHandshake(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	token, _ := issueMCPToken(t, a, cookies, "test-laptop")
@@ -136,6 +138,7 @@ func TestMCPHTTPWithValidTokenHandshake(t *testing.T) {
 }
 
 func TestMCPHTTPCallListEntries(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	token, _ := issueMCPToken(t, a, cookies, "list-probe")
@@ -164,6 +167,7 @@ func TestMCPHTTPCallListEntries(t *testing.T) {
 }
 
 func TestMCPHTTPRevokedTokenRejected(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	token, id := issueMCPToken(t, a, cookies, "revokable")
@@ -185,6 +189,7 @@ func TestMCPHTTPRevokedTokenRejected(t *testing.T) {
 }
 
 func TestMCPHTTPTouchesLastUsedAt(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	token, id := issueMCPToken(t, a, cookies, "last-used-probe")
@@ -209,6 +214,7 @@ func TestMCPHTTPTouchesLastUsedAt(t *testing.T) {
 }
 
 func TestAdminMCPTokensUIRequiresAuth(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// Unauthenticated GET is bounced to the login page by the
 	// RequireUser middleware — MCP token management is admin-only

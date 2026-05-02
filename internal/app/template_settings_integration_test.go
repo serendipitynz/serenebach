@@ -8,6 +8,7 @@ import (
 )
 
 func TestAdminTemplateSettingsFormRenders(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -38,6 +39,7 @@ func TestAdminTemplateSettingsFormRenders(t *testing.T) {
 }
 
 func TestAdminTemplateSettingsPersists(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -74,6 +76,7 @@ func TestAdminTemplateSettingsPersists(t *testing.T) {
 // pinning an archive template actually changes what gets rendered on
 // /category/{id}/ (one of the archive-family routes).
 func TestAdminTemplateSettingsArchivePinAffectsCategoryPage(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -122,6 +125,7 @@ func TestAdminTemplateSettingsArchivePinAffectsCategoryPage(t *testing.T) {
 }
 
 func TestAdminTemplateSettingsRejectsNegativeID(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 

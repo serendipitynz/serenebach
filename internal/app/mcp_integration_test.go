@@ -136,6 +136,7 @@ func (c *rpcClient) readLine() []byte {
 }
 
 func TestMCPInitializeAndToolsList(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	c := startMCPServer(t, a)
 
@@ -194,6 +195,7 @@ func parseToolText(t *testing.T, resp map[string]any) map[string]any {
 }
 
 func TestMCPListEntries(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	c := startMCPServer(t, a)
 	resp := c.call("tools/call", map[string]any{
@@ -217,6 +219,7 @@ func TestMCPListEntries(t *testing.T) {
 }
 
 func TestMCPGetEntryByIDAndSlug(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	c := startMCPServer(t, a)
 
@@ -253,6 +256,7 @@ func TestMCPGetEntryByIDAndSlug(t *testing.T) {
 }
 
 func TestMCPGetEntryMissingReturnsIsError(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	c := startMCPServer(t, a)
 	resp := c.call("tools/call", map[string]any{
@@ -266,6 +270,7 @@ func TestMCPGetEntryMissingReturnsIsError(t *testing.T) {
 }
 
 func TestMCPSearchEntries(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	c := startMCPServer(t, a)
 	// Pick a word from a seeded entry's title so we know the match exists.
@@ -291,6 +296,7 @@ func TestMCPSearchEntries(t *testing.T) {
 }
 
 func TestMCPListCategoriesAndTags(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	c := startMCPServer(t, a)
 
@@ -312,6 +318,7 @@ func TestMCPListCategoriesAndTags(t *testing.T) {
 }
 
 func TestMCPUnknownMethodReturnsError(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	c := startMCPServer(t, a)
 	resp := c.call("unknown/method", nil)

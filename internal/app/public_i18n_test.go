@@ -15,6 +15,7 @@ import (
 // flips between "ja" and "en", and checking the redirect's ?err=
 // carries the locale-appropriate copy.
 func TestCommentErrorHonoursBlogLanguage(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// Default seed = ja. Missing-body submission → JA copy.

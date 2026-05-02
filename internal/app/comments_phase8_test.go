@@ -48,6 +48,7 @@ func approveComment(t *testing.T, h http.Handler, cookies []*http.Cookie, id int
 }
 
 func TestTrustMemoryAutoApprovesReturningEmail(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// 1. first comment from trusted@example.com → waiting (default moderated)
@@ -80,6 +81,7 @@ func TestTrustMemoryAutoApprovesReturningEmail(t *testing.T) {
 }
 
 func TestTrustMemoryStillQueuesStrangers(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// only one email has been approved
@@ -106,6 +108,7 @@ func TestTrustMemoryStillQueuesStrangers(t *testing.T) {
 }
 
 func TestSpamWordsSilentReject(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	if _, err := a.DB.ExecContext(context.Background(),
@@ -131,6 +134,7 @@ func TestSpamWordsSilentReject(t *testing.T) {
 }
 
 func TestTurnstileEnabledRejectsMissingToken(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fake := &fakeVerifier{enabled: true, pass: false}
 	a.Public.Turnstile = fake
@@ -154,6 +158,7 @@ func TestTurnstileEnabledRejectsMissingToken(t *testing.T) {
 }
 
 func TestTurnstileEnabledAcceptsValidToken(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	fake := &fakeVerifier{enabled: true, pass: true}
 	a.Public.Turnstile = fake
@@ -178,6 +183,7 @@ func TestTurnstileEnabledAcceptsValidToken(t *testing.T) {
 }
 
 func TestTurnstileDisabledKeepsOldBehaviour(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// Default: newTestApp leaves Turnstile disabled. A submission should
 	// still succeed without a token.
@@ -196,6 +202,7 @@ func TestTurnstileDisabledKeepsOldBehaviour(t *testing.T) {
 }
 
 func TestCookiePrefillRoundtrip(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// submit with set_cookie=1 so the server persists our name/email/url

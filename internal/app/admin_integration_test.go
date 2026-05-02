@@ -12,6 +12,7 @@ import (
 )
 
 func TestAdminHomeRedirectsWhenUnauthenticated(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	req := httptest.NewRequest("GET", "/admin/", nil)
@@ -31,6 +32,7 @@ func TestAdminHomeRedirectsWhenUnauthenticated(t *testing.T) {
 }
 
 func TestLoginFormRendersForAnonymous(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	req := httptest.NewRequest("GET", "/admin/login", nil)
@@ -49,6 +51,7 @@ func TestLoginFormRendersForAnonymous(t *testing.T) {
 }
 
 func TestLoginSuccessIssuesSessionCookieAndRedirects(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	csrfCookie, token := fetchCSRF(t, a.Handler())
@@ -75,6 +78,7 @@ func TestLoginSuccessIssuesSessionCookieAndRedirects(t *testing.T) {
 }
 
 func TestLoginFailureKeepsUserOnForm(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	csrfCookie, token := fetchCSRF(t, a.Handler())
@@ -102,6 +106,7 @@ func TestLoginFailureKeepsUserOnForm(t *testing.T) {
 }
 
 func TestLoggedInRequestReachesAdminHome(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -115,6 +120,7 @@ func TestLoggedInRequestReachesAdminHome(t *testing.T) {
 }
 
 func TestLogoutClearsSession(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -132,6 +138,7 @@ func TestLogoutClearsSession(t *testing.T) {
 }
 
 func TestLoginRejectsOpenRedirectNext(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	csrfCookie, token := fetchCSRF(t, a.Handler())

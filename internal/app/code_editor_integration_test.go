@@ -7,6 +7,7 @@ import (
 )
 
 func TestTemplateFormMarksTextareasForCodeEditor(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	var activeID int64
@@ -32,6 +33,7 @@ func TestTemplateFormMarksTextareasForCodeEditor(t *testing.T) {
 }
 
 func TestEntryFormMarksBodyTextareasForCodeEditor(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	w := authedGET(t, a.Handler(), "/admin/entries/1/edit", cookies)
@@ -64,6 +66,7 @@ func TestEntryFormMarksBodyTextareasForCodeEditor(t *testing.T) {
 }
 
 func TestAceStaticAssetsServe(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	for _, path := range []string{
 		"/admin/static/ace/ace.js",

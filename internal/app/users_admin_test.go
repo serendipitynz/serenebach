@@ -12,6 +12,7 @@ import (
 // TestAdminUsersListRejectsNonAdmin confirms a power-tier session
 // cannot reach /admin/users even if it guesses the URL.
 func TestAdminUsersListRejectsNonAdmin(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// Create a power-tier user and log in as them.
 	hash, _ := auth.HashPassword("secret")
@@ -32,6 +33,7 @@ func TestAdminUsersListRejectsNonAdmin(t *testing.T) {
 // the separate /admin/users/new form (the inline create form was
 // moved out to match /admin/categories).
 func TestAdminUsersListShowsSeededAdmin(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	w := authedGET(t, a.Handler(), "/admin/users", cookies)
@@ -59,6 +61,7 @@ func TestAdminUsersListShowsSeededAdmin(t *testing.T) {
 // TestAdminUserNewFormRenders confirms the dedicated /admin/users/new
 // page carries the create fields the list page no longer hosts.
 func TestAdminUserNewFormRenders(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	w := authedGET(t, a.Handler(), "/admin/users/new", cookies)
@@ -81,6 +84,7 @@ func TestAdminUserNewFormRenders(t *testing.T) {
 // TestAdminUserCreateHappyPath creates a regular-tier user and confirms
 // it lands in the DB with the hashed password + role wired correctly.
 func TestAdminUserCreateHappyPath(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	csrfCookie, token := fetchCSRF(t, a.Handler())
@@ -123,6 +127,7 @@ func TestAdminUserCreateHappyPath(t *testing.T) {
 // TestAdminUserCreateMismatchedPasswords confirms the confirm-field
 // check catches typos before anything lands in the DB.
 func TestAdminUserCreateMismatchedPasswords(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	csrfCookie, token := fetchCSRF(t, a.Handler())
@@ -157,6 +162,7 @@ func TestAdminUserCreateMismatchedPasswords(t *testing.T) {
 // TestAdminUserDeleteRefusesLastAdmin confirms the last-admin guard —
 // deleting the only admin would lock the site out of user management.
 func TestAdminUserDeleteRefusesLastAdmin(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	csrfCookie, token := fetchCSRF(t, a.Handler())
@@ -196,6 +202,7 @@ func TestAdminUserDeleteRefusesLastAdmin(t *testing.T) {
 // row can't lower their role. Handler silently pins role to
 // RoleAdmin; form template also disables the select client-side.
 func TestAdminCannotDemoteSelf(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// Seed a second admin so the last-admin safeguard doesn't interfere.
 	hash, _ := auth.HashPassword("secret")
@@ -252,6 +259,7 @@ func TestAdminCannotDemoteSelf(t *testing.T) {
 // self-only — an admin can still change another admin's role (as long
 // as at least one admin remains).
 func TestAdminCanDemoteOtherAdmin(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	hash, _ := auth.HashPassword("secret")
 	if _, err := a.DB.Exec(`INSERT INTO users (wid, name, display_name, email, password_hash, role, created_at, updated_at, list_visible, description_format)
@@ -293,6 +301,7 @@ func TestAdminCanDemoteOtherAdmin(t *testing.T) {
 // TestRegularUserMenuHidesDesignAndUsersLinks verifies a regular-tier
 // session's admin home renders with the locked menu items removed.
 func TestRegularUserMenuHidesDesignAndUsersLinks(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	hash, _ := auth.HashPassword("secret")
 	if _, err := a.DB.Exec(`INSERT INTO users (wid, name, display_name, email, password_hash, role, created_at, updated_at, list_visible, description_format)

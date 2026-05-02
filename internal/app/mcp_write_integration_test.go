@@ -82,6 +82,7 @@ func toolCallErrorText(env map[string]any) string {
 }
 
 func TestMCPReadTokenCannotCallWriteTools(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	token, _ := issueMCPToken(t, a, cookies, "read-only-probe")
@@ -109,6 +110,7 @@ func TestMCPReadTokenCannotCallWriteTools(t *testing.T) {
 }
 
 func TestMCPWriteTokenRoundtripsCreateUpdatePublish(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	token, _ := issueMCPTokenWithScope(t, a, cookies, "write-probe", "write")
@@ -156,6 +158,7 @@ func TestMCPWriteTokenRoundtripsCreateUpdatePublish(t *testing.T) {
 }
 
 func TestMCPCreateEntrySlugConflict(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	token, _ := issueMCPTokenWithScope(t, a, cookies, "slug-probe", "write")
@@ -178,6 +181,7 @@ func TestMCPCreateEntrySlugConflict(t *testing.T) {
 }
 
 func TestMCPUpdateEntryNotFound(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	token, _ := issueMCPTokenWithScope(t, a, cookies, "nf-probe", "write")
@@ -192,6 +196,7 @@ func TestMCPUpdateEntryNotFound(t *testing.T) {
 }
 
 func TestMCPCreateEntryAttributesToBoundAuthor(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -226,6 +231,7 @@ func TestMCPCreateEntryAttributesToBoundAuthor(t *testing.T) {
 }
 
 func TestMCPUploadImageWriteScopedRoundtrip(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	token, _ := issueMCPTokenWithScope(t, a, cookies, "upload-probe", "write")
@@ -280,6 +286,7 @@ func TestMCPUploadImageWriteScopedRoundtrip(t *testing.T) {
 }
 
 func TestMCPUploadImageRejectsUnsupportedMIME(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	token, _ := issueMCPTokenWithScope(t, a, cookies, "bad-mime", "write")
@@ -296,6 +303,7 @@ func TestMCPUploadImageRejectsUnsupportedMIME(t *testing.T) {
 }
 
 func TestMCPUploadImageRequiresWriteScope(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	token, _ := issueMCPToken(t, a, cookies, "upload-read-probe")

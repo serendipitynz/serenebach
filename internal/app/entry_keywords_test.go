@@ -10,6 +10,7 @@ import (
 // TestAdminEntryKeywordsRoundtrip confirms the keywords field saves and
 // re-renders correctly, with whitespace normalised to ", " separators.
 func TestAdminEntryKeywordsRoundtrip(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	csrfCookie, token := fetchCSRF(t, a.Handler())

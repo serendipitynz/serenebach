@@ -12,6 +12,7 @@ import (
 // public permalink plus the home page show the rendered HTML (not the
 // source). Backstop against regressions in the content → format wiring.
 func TestMarkdownEntryRendersAsHTML(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -64,6 +65,7 @@ func TestMarkdownEntryRendersAsHTML(t *testing.T) {
 // "html" format) still works — no goldmark in the path, the stored bytes
 // land verbatim in the rendered page.
 func TestHTMLEntryStaysPassThrough(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 

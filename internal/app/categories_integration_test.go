@@ -11,6 +11,7 @@ import (
 )
 
 func TestAdminCategoriesListShowsSeeded(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -31,6 +32,7 @@ func TestAdminCategoriesListShowsSeeded(t *testing.T) {
 }
 
 func TestAdminCategoryCreateAndEdit(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -79,6 +81,7 @@ func TestAdminCategoryCreateAndEdit(t *testing.T) {
 }
 
 func TestAdminCategoryRejectsBlankName(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	form := url.Values{
@@ -98,6 +101,7 @@ func TestAdminCategoryRejectsBlankName(t *testing.T) {
 // entries to uncategorised" guarantee the repo makes. Without it the
 // admin listing would silently show entries pointing at a dead id.
 func TestAdminCategoryDeleteReassignsEntries(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -139,6 +143,7 @@ func TestAdminCategoryDeleteReassignsEntries(t *testing.T) {
 // drop UI would send and confirms sort_order gets rewritten so the
 // AllCategories listing reflects the new positions.
 func TestAdminCategoryReorderPersistsOrder(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -201,6 +206,7 @@ func TestAdminCategoryReorderPersistsOrder(t *testing.T) {
 // CSRF middleware actually refuses a JSON POST that doesn't echo the
 // token. Otherwise the whole reorder endpoint would be an open relay.
 func TestAdminCategoryReorderRequiresCSRF(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -219,6 +225,7 @@ func TestAdminCategoryReorderRequiresCSRF(t *testing.T) {
 }
 
 func TestAdminCategoryParentCycleRejected(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 

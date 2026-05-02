@@ -19,6 +19,7 @@ func countMessages(t *testing.T, a *app.App) int64 {
 }
 
 func TestCommentBlacklistExactIPSilentlyDropped(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// Block the submitComment helper's hard-coded RemoteAddr (127.0.0.1).
 	if _, err := a.DB.Exec(`UPDATE weblogs SET ip_blacklist = '127.0.0.1' WHERE id = 1`); err != nil {
@@ -41,6 +42,7 @@ func TestCommentBlacklistExactIPSilentlyDropped(t *testing.T) {
 }
 
 func TestCommentBlacklistCIDRSilentlyDropped(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// /24 covers 127.0.0.x.
 	if _, err := a.DB.Exec(`UPDATE weblogs SET ip_blacklist = '127.0.0.0/24' WHERE id = 1`); err != nil {
@@ -61,6 +63,7 @@ func TestCommentBlacklistCIDRSilentlyDropped(t *testing.T) {
 }
 
 func TestCommentBlacklistOutOfRangeAllowed(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// Block a different range so the test IP (127.0.0.1) slips through.
 	if _, err := a.DB.Exec(`UPDATE weblogs SET ip_blacklist = '198.51.100.0/24' WHERE id = 1`); err != nil {
@@ -81,6 +84,7 @@ func TestCommentBlacklistOutOfRangeAllowed(t *testing.T) {
 }
 
 func TestAdminCommentSettingsShowsAndSavesIPBlacklist(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 

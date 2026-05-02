@@ -13,6 +13,7 @@ import (
 // authenticated admin page should render the English sidebar copy;
 // `Accept-Language: ja` (or nothing) falls back to Japanese.
 func TestAdminSidebarHonoursAcceptLanguage(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -79,6 +80,7 @@ func sliceBetween(s, start, end string) string {
 }
 
 func TestAdminHTMLLangAttrReflectsLocale(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 

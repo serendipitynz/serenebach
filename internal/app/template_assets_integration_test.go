@@ -64,6 +64,7 @@ func tinyPNG(t *testing.T) []byte {
 }
 
 func TestTemplateAssetUploadPersistsFileAndRow(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	var activeID int64
@@ -97,6 +98,7 @@ func TestTemplateAssetUploadPersistsFileAndRow(t *testing.T) {
 }
 
 func TestTemplateAssetUploadRejectsBadMIME(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	var activeID int64
@@ -110,6 +112,7 @@ func TestTemplateAssetUploadRejectsBadMIME(t *testing.T) {
 }
 
 func TestTemplateAssetReuploadReplaces(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	var activeID int64
@@ -132,6 +135,7 @@ func TestTemplateAssetReuploadReplaces(t *testing.T) {
 }
 
 func TestTemplateAssetDeleteRemovesRowAndFile(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	var activeID int64
@@ -163,6 +167,7 @@ func TestTemplateAssetDeleteRemovesRowAndFile(t *testing.T) {
 }
 
 func TestSiteParsesSitePartsTag(t *testing.T) {
+	t.Parallel()
 	// Updates the active template so {site_parts} appears in the rendered
 	// home page. The tag should resolve to "/template/<active_id>/".
 	a := newTestApp(t)

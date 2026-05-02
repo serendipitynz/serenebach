@@ -12,6 +12,7 @@ import (
 // regression net — if someone renames a tag, the SB3 spelling has to
 // keep working.
 func TestSB3CompatEntryAliasTags(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// Swap the active template to exercise every alias the fix touches.
 	main := "<!doctype html><html><body>\n" +
@@ -73,6 +74,7 @@ func TestSB3CompatEntryAliasTags(t *testing.T) {
 // assertions focus on what's specific to the route so a later
 // refactor that accidentally drops a tag surfaces here.
 func TestSB3CompatSiteLevelTags(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	main := "<!doctype html><html><body>\n" +
 		`<div data-mode-name="{mode_name}" data-mode-id="{mode_id}"` + "\n" +
@@ -126,6 +128,7 @@ func TestSB3CompatSiteLevelTags(t *testing.T) {
 // these bits only on entry pages" gate — fires 1 on /entry/<id>/ and
 // 0 on list views.
 func TestSB3CompatOptionBlock(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	main := "<!doctype html><html><body>\n" +
 		"<!-- BEGIN entry -->\n<article></article>\n<!-- END entry -->\n" +
@@ -158,6 +161,7 @@ func TestSB3CompatOptionBlock(t *testing.T) {
 // fragments when data is available. Uses the seed content (2 entries,
 // 1 category, 1 approved comment if we seed one).
 func TestSB3CompatSidebarBlocks(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// Plant one approved comment so recent_comment has something.
 	if _, err := a.DB.Exec(`INSERT INTO messages (wid, entry_id, status, posted_at, author_name, author_email, author_url, body, ip_address, user_agent, created_at, updated_at)
@@ -208,6 +212,7 @@ func TestSB3CompatSidebarBlocks(t *testing.T) {
 // with the SB3 `category_area` block populated — block count = 1
 // with the expected tags inside.
 func TestSB3CompatCategoryAreaBlock(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// Swap the active template to include the block.
 	main := "<!doctype html><html><body>\n" +

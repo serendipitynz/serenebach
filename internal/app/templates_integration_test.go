@@ -11,6 +11,7 @@ import (
 )
 
 func TestAdminTemplatesListRenders(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -31,6 +32,7 @@ func TestAdminTemplatesListRenders(t *testing.T) {
 }
 
 func TestAdminTemplatesActivateSwitchesActive(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -72,6 +74,7 @@ func TestAdminTemplatesActivateSwitchesActive(t *testing.T) {
 }
 
 func TestAdminTemplatesDeleteRefusesActive(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -96,6 +99,7 @@ func TestAdminTemplatesDeleteRefusesActive(t *testing.T) {
 }
 
 func TestAdminTemplatesDeleteInactiveRemoves(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -122,6 +126,7 @@ func TestAdminTemplatesDeleteInactiveRemoves(t *testing.T) {
 // ---- edit / save-as ----------------------------------------------------
 
 func TestAdminTemplatesEditFormRenders(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -156,6 +161,7 @@ func TestAdminTemplatesEditFormRenders(t *testing.T) {
 // design-settings list renders carries the parsed info metadata so
 // the i-icon modal has something to show.
 func TestAdminTemplatesListExposesInfoMetadata(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -186,6 +192,7 @@ func TestAdminTemplatesListExposesInfoMetadata(t *testing.T) {
 // export params land in the generated pack — name override in particular
 // since the Content-Disposition filename reflects it.
 func TestAdminTemplateExportOverrideName(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	var activeID int64
@@ -209,6 +216,7 @@ func TestAdminTemplateExportOverrideName(t *testing.T) {
 }
 
 func TestAdminTemplatesActiveShortcutRedirects(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	var activeID int64
@@ -225,6 +233,7 @@ func TestAdminTemplatesActiveShortcutRedirects(t *testing.T) {
 }
 
 func TestAdminTemplatesSavePersists(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	var activeID int64
@@ -261,6 +270,7 @@ func TestAdminTemplatesSavePersists(t *testing.T) {
 }
 
 func TestAdminTemplatesSaveRejectsBadSyntax(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	var activeID int64
@@ -284,6 +294,7 @@ func TestAdminTemplatesSaveRejectsBadSyntax(t *testing.T) {
 }
 
 func TestAdminTemplatesSaveAsCreatesNewRow(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	var activeID int64
@@ -326,6 +337,7 @@ func TestAdminTemplatesSaveAsCreatesNewRow(t *testing.T) {
 }
 
 func TestAdminTemplatesReorderPersists(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 

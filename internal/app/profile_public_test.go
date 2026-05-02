@@ -10,6 +10,7 @@ import (
 // TestProfileRouteRendersProfileArea confirms the /profile/{id}/ page
 // 200s and emits the profile_area block for a list_visible user.
 func TestProfileRouteRendersProfileArea(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	main := "<!doctype html><html><body>\n" +
@@ -46,6 +47,7 @@ func TestProfileRouteRendersProfileArea(t *testing.T) {
 // TestProfileRouteHiddenWhenListVisibleFalse: a user with
 // list_visible=0 should 404 on /profile/{id}/.
 func TestProfileRouteHiddenWhenListVisibleFalse(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	if _, err := a.DB.Exec(`UPDATE users SET list_visible = 0 WHERE id = 1`); err != nil {
 		t.Fatal(err)
@@ -63,6 +65,7 @@ func TestProfileRouteHiddenWhenListVisibleFalse(t *testing.T) {
 // ids in general), so we seed concrete legacy_id values and assert the
 // canonical Go id ends up in the Location header.
 func TestLegacyCGIRedirectsPerMode(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// Seed an entry whose Go id != SB3 legacy_id so the test would fail
@@ -120,6 +123,7 @@ func TestLegacyCGIRedirectsPerMode(t *testing.T) {
 // a second app pointed at the same DB so legacy_url is loaded into
 // the Handler.
 func TestLegacyStaticRedirects(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// Configure the weblog as if an SB3 import had run: Individual
 	// archive under /log/, default eid prefix, .html suffix.
@@ -199,6 +203,7 @@ func TestLegacyStaticRedirects(t *testing.T) {
 // TestLegacyCGICommentPostUses307 — POST body + method must survive the
 // redirect so the modern commentSubmit handler still owns the form.
 func TestLegacyCGICommentPostUses307(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	body := strings.NewReader("name=alice&description=hello")
 	req := httptest.NewRequest("POST", "/sb.cgi?mode=comment&eid=1", body)
@@ -216,6 +221,7 @@ func TestLegacyCGICommentPostUses307(t *testing.T) {
 // TestRSDXMLServesDiscoveryDoc — /rsd.xml responds with an RSD XML
 // body so imported templates' {site_rsd} tag points somewhere real.
 func TestRSDXMLServesDiscoveryDoc(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	w := httptest.NewRecorder()
 	a.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/rsd.xml", nil))

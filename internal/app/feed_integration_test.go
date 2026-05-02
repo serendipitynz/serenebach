@@ -11,6 +11,7 @@ import (
 // includes the seeded entries. Guards against regressions in both the
 // route mounting and the feed builder.
 func TestPublicRSSFeedServes(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	req := httptest.NewRequest("GET", "/rss.xml", nil)
 	w := httptest.NewRecorder()
@@ -36,6 +37,7 @@ func TestPublicRSSFeedServes(t *testing.T) {
 
 // TestPublicAtomFeedServes is the Atom counterpart.
 func TestPublicAtomFeedServes(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	req := httptest.NewRequest("GET", "/atom.xml", nil)
 	w := httptest.NewRecorder()

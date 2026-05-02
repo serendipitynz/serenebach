@@ -14,6 +14,7 @@ import (
 // links have been created yet — the seed doesn't populate the link
 // table, so the page should show the empty-state hint.
 func TestAdminLinksListEmptyState(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -34,6 +35,7 @@ func TestAdminLinksListEmptyState(t *testing.T) {
 // ?parent=<id> query param. The end state should have one visible
 // group row holding one visible link row.
 func TestAdminLinkCreateGroupThenLink(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -142,6 +144,7 @@ func TestAdminLinkCreateGroupThenLink(t *testing.T) {
 // the attribute is emitted because the CSS part is loaded separately
 // and can't be checked via HTTP response.
 func TestAdminLinkEditGroupHidesLinkFields(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -167,6 +170,7 @@ func TestAdminLinkEditGroupHidesLinkFields(t *testing.T) {
 // group listed as an <option>. Regression guard for a UI issue where the
 // selector was reportedly missing on the edit page.
 func TestAdminLinkEditFormShowsGroupSelector(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -221,6 +225,7 @@ func excerpt(s string, n int) string {
 // submitting an altered `kind` field is ignored (the form also hides
 // the radios, but a malicious client could still send one).
 func TestAdminLinkEditDoesNotFlipKind(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -254,6 +259,7 @@ func TestAdminLinkEditDoesNotFlipKind(t *testing.T) {
 // group row sets parent_id = 0 on every child link so they survive as
 // ungrouped root-level rows rather than orphaning against a dead id.
 func TestAdminLinkDeleteGroupDetachesMembers(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -294,6 +300,7 @@ func TestAdminLinkDeleteGroupDetachesMembers(t *testing.T) {
 // TestAdminLinkReorderPersistsOrder sends the JSON order the drag UI
 // would send and confirms sort_order is rewritten.
 func TestAdminLinkReorderPersistsOrder(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -349,6 +356,7 @@ func TestAdminLinkReorderPersistsOrder(t *testing.T) {
 // link -->` is installed. Covers sidebar.go::applyLinkBlock end-to-end
 // via the normal home-page render.
 func TestPublicLinkBlockRendersNestedGroup(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 

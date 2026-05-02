@@ -12,6 +12,7 @@ import (
 
 // A POST without any CSRF cookie at all must be rejected outright.
 func TestCSRFMissingCookieRejected(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	form := url.Values{"name": {"admin"}, "password": {"changeme"}}
@@ -28,6 +29,7 @@ func TestCSRFMissingCookieRejected(t *testing.T) {
 // A POST whose csrf_token doesn't match the sb_csrf cookie must be
 // rejected even when the cookie itself is attached.
 func TestCSRFMismatchedTokenRejected(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	form := url.Values{
@@ -49,6 +51,7 @@ func TestCSRFMismatchedTokenRejected(t *testing.T) {
 // Any safe method (GET, HEAD, OPTIONS) gets a CSRF cookie minted for it
 // without any challenge.
 func TestCSRFCookieSetOnPublicGET(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -70,6 +73,7 @@ func TestCSRFCookieSetOnPublicGET(t *testing.T) {
 // lands in the DB. Bare-token tests for admin endpoints live in the
 // admin integration suite, not here.
 func TestPublicMutationBlocksHeaderlessPOST(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	form := url.Values{
@@ -99,6 +103,7 @@ func TestPublicMutationBlocksHeaderlessPOST(t *testing.T) {
 // A "benign" Referer trailing it should NOT rescue the request —
 // Referer is only consulted when Origin is absent.
 func TestPublicMutationBlocksForeignOrigin(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	form := url.Values{

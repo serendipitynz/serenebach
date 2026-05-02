@@ -11,6 +11,7 @@ import (
 // pattern through the design-settings form and confirms the public
 // entry page renders with that pattern afterwards.
 func TestDateFormatSettingsRoundtripAndApply(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	csrfCookie, token := fetchCSRF(t, a.Handler())
@@ -79,6 +80,7 @@ func min(a, b int) int {
 // page exposes both the placeholder (= default) and the server-rendered
 // sample so the section is useful before any JS runs.
 func TestDateFormatSettingsPageRendersPreview(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	w := authedGET(t, a.Handler(), "/admin/templates/settings", cookies)

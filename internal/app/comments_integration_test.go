@@ -34,6 +34,7 @@ func submitComment(t *testing.T, h http.Handler, entryID int64, fields url.Value
 func formatUnix(t time.Time) string { return itoa(int(t.Unix())) }
 
 func TestCommentRequiresModeration(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	fields := url.Values{
@@ -54,6 +55,7 @@ func TestCommentRequiresModeration(t *testing.T) {
 }
 
 func TestCommentModerationFlow(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// 1. submit a comment (moderated mode → waiting)
@@ -84,6 +86,7 @@ func TestCommentModerationFlow(t *testing.T) {
 }
 
 func TestCommentOpenModeAutoPublishes(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// flip comment_mode to open so the POST handler publishes directly
@@ -103,6 +106,7 @@ func TestCommentOpenModeAutoPublishes(t *testing.T) {
 }
 
 func TestCommentClosedModeRejects(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	if _, err := a.DB.ExecContext(context.Background(),
@@ -126,6 +130,7 @@ func TestCommentClosedModeRejects(t *testing.T) {
 }
 
 func TestCommentHoneypotRejectedSilently(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	fields := url.Values{
@@ -149,6 +154,7 @@ func TestCommentHoneypotRejectedSilently(t *testing.T) {
 }
 
 func TestCommentRejectedWhenFormTooFresh(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	csrfCookie, token := fetchCSRF(t, a.Handler())
@@ -180,6 +186,7 @@ func TestCommentRejectedWhenFormTooFresh(t *testing.T) {
 }
 
 func TestCommentBlankFieldsRejected(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	w := submitComment(t, a.Handler(), 1, url.Values{

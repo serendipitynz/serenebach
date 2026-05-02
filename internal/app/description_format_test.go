@@ -14,6 +14,7 @@ import (
 // the stored values are right so that downstream render will be
 // correct once that route lands.
 func TestProfileDescriptionRoundtripsThroughSave(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	csrfCookie, token := fetchCSRF(t, a.Handler())
@@ -55,6 +56,7 @@ func TestProfileDescriptionRoundtripsThroughSave(t *testing.T) {
 // TestCategoryDescriptionMarkdownFormat confirms the same pipeline
 // works for categories.
 func TestCategoryDescriptionMarkdownFormat(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	csrfCookie, token := fetchCSRF(t, a.Handler())
@@ -101,6 +103,7 @@ func TestCategoryDescriptionMarkdownFormat(t *testing.T) {
 // role / delete — no dedicated edit column, since the username
 // itself is the edit link).
 func TestUsersListColumnsOrder(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	w := authedGET(t, a.Handler(), "/admin/users", cookies)

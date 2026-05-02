@@ -42,6 +42,7 @@ func entryLikesCount(t *testing.T, db *sql.DB, entryID int64) int64 {
 }
 
 func TestLikeIncrementsCounter(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	w := likeOnce(t, a.Handler(), 1, "Mozilla/5.0 (Macintosh)", nil)
@@ -67,6 +68,7 @@ func TestLikeIncrementsCounter(t *testing.T) {
 }
 
 func TestLikeCookieShortCircuitsRepeat(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	first := likeOnce(t, a.Handler(), 1, "Mozilla/5.0 (Macintosh)", nil)
@@ -89,6 +91,7 @@ func TestLikeCookieShortCircuitsRepeat(t *testing.T) {
 }
 
 func TestLikeFingerprintBlocksCookielessRepeat(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	likeOnce(t, a.Handler(), 1, "Mozilla/5.0 (Macintosh)", nil)
@@ -101,6 +104,7 @@ func TestLikeFingerprintBlocksCookielessRepeat(t *testing.T) {
 }
 
 func TestLikeAllowsDifferentVisitors(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	likeOnce(t, a.Handler(), 1, "Mozilla/5.0 (Macintosh)", nil)
@@ -112,6 +116,7 @@ func TestLikeAllowsDifferentVisitors(t *testing.T) {
 }
 
 func TestLikeUnknownEntryIs404(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	csrfCookie, token := fetchCSRF(t, a.Handler())
@@ -129,6 +134,7 @@ func TestLikeUnknownEntryIs404(t *testing.T) {
 }
 
 func TestLikeCountAppearsInPublicPages(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	likeOnce(t, a.Handler(), 1, "Mozilla/5.0 (Macintosh)", nil)

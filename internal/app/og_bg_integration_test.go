@@ -10,6 +10,7 @@ import (
 // settings form and wins over the embedded default when the OG
 // renderer is asked for a card.
 func TestOGBGPathRoundtripsThroughSettings(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// Seed a stored_path as if an image had been uploaded. The
@@ -34,6 +35,7 @@ func TestOGBGPathRoundtripsThroughSettings(t *testing.T) {
 // survives CreateEntry → EntryByID so the admin form can persist an
 // override that's read back for rendering.
 func TestEntryOGBGOverrideRoundtrips(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	if _, err := a.DB.ExecContext(context.Background(),
@@ -55,6 +57,7 @@ func TestEntryOGBGOverrideRoundtrips(t *testing.T) {
 // Uses a minimal sbtemplate that emits both so the assertion
 // reads straight off the rendered HTML.
 func TestPublicEntryExposesOGDimensionTags(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	body := "<!doctype html>\n<html>\n<body>\n" +

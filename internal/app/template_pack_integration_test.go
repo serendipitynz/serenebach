@@ -19,6 +19,7 @@ import (
 // endpoint produces a template.txt the templatepack parser can read
 // back without loss. Belt-and-suspenders for the format writer.
 func TestAdminTemplateExportRoundTripsThroughParser(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	var activeID int64
@@ -76,6 +77,7 @@ func TestAdminTemplateExportRoundTripsThroughParser(t *testing.T) {
 // with a pack built in-memory, then reads the DB to confirm every piece
 // landed correctly (template row, entry body, CSS, and on-disk assets).
 func TestAdminTemplateImportCreatesTemplateAndAssets(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -131,6 +133,7 @@ func TestAdminTemplateImportCreatesTemplateAndAssets(t *testing.T) {
 // base.html — the template would render nothing, so the import is
 // declined up-front rather than creating a dud row.
 func TestAdminTemplateImportRejectsMissingMainBody(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 

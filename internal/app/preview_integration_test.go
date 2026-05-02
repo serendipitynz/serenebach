@@ -14,6 +14,7 @@ import (
 // so a leaked URL can't expose unpublished content.
 
 func TestPreviewDraftRequiresAdminSession(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// Seeded entry 1 starts as published; flip to draft so the public
@@ -55,6 +56,7 @@ func TestPreviewDraftRequiresAdminSession(t *testing.T) {
 }
 
 func TestPreviewDraftWithoutFlagStill404(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	if _, err := a.DB.ExecContext(context.Background(),
 		`UPDATE entries SET status = 0 WHERE id = 1`); err != nil {
@@ -75,6 +77,7 @@ func TestPreviewDraftWithoutFlagStill404(t *testing.T) {
 }
 
 func TestPreviewTemplateOverrideRequiresAdminSession(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// Seed a second template with a distinctive marker in its MainBody
