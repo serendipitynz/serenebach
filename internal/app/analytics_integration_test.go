@@ -9,6 +9,7 @@ import (
 )
 
 func TestAnalyticsRecordsPublicGET(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -27,6 +28,7 @@ func TestAnalyticsRecordsPublicGET(t *testing.T) {
 }
 
 func TestAnalyticsExtractsEntryID(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	req := httptest.NewRequest("GET", "/entry/1/", nil)
@@ -45,6 +47,7 @@ func TestAnalyticsExtractsEntryID(t *testing.T) {
 }
 
 func TestAnalyticsSkipsAdmin(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	req := httptest.NewRequest("GET", "/admin/login", nil)
@@ -63,6 +66,7 @@ func TestAnalyticsSkipsAdmin(t *testing.T) {
 }
 
 func TestAnalyticsSkipsBotUA(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -80,6 +84,7 @@ func TestAnalyticsSkipsBotUA(t *testing.T) {
 }
 
 func TestAnalyticsSkipsPOSTs(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	req := httptest.NewRequest("POST", "/entry/1/like", nil)
@@ -99,6 +104,7 @@ func TestAnalyticsSkipsPOSTs(t *testing.T) {
 }
 
 func TestAnalyticsSetsVisitorCookie(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -119,6 +125,7 @@ func TestAnalyticsSetsVisitorCookie(t *testing.T) {
 }
 
 func TestAnalyticsSameVisitorReused(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// first request: cookie is minted
@@ -159,6 +166,7 @@ func TestAnalyticsSameVisitorReused(t *testing.T) {
 }
 
 func TestAdminAnalyticsDashboardRenders(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// seed a couple of pageviews so the dashboard has content

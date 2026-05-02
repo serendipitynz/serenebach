@@ -241,10 +241,12 @@ func TestSetupConcurrentSubmitCreatesOneAdmin(t *testing.T) {
 	const workers = 8
 	var (
 		wg      sync.WaitGroup
+		ready   sync.WaitGroup
 		mu      sync.Mutex
 		winners int
 	)
 	start := make(chan struct{})
+	ready.Add(workers)
 
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
@@ -255,6 +257,7 @@ func TestSetupConcurrentSubmitCreatesOneAdmin(t *testing.T) {
 			// GETs make sure we exercise the POST path with no
 			// inter-goroutine dependency.
 			token, cookie := setupCSRFToken(t, a)
+			ready.Done()
 			form := url.Values{
 				"csrf_token":       {token},
 				"name":             {fmt.Sprintf("admin%d", i)},
@@ -276,6 +279,7 @@ func TestSetupConcurrentSubmitCreatesOneAdmin(t *testing.T) {
 			}
 		}(i)
 	}
+	ready.Wait()
 	close(start)
 	wg.Wait()
 
@@ -309,16 +313,19 @@ func TestSetupConcurrentSubmitAcrossInstancesCreatesOneAdmin(t *testing.T) {
 	const perInstance = 4
 	var (
 		wg          sync.WaitGroup
+		ready       sync.WaitGroup
 		mu          sync.Mutex
 		winners     int
 		winnerName  string
 		winnerTitle string
 	)
 	start := make(chan struct{})
+	ready.Add(perInstance * 2)
 
 	fire := func(a *app.App, namePrefix, title string, i int) {
 		defer wg.Done()
 		token, cookie := setupCSRFToken(t, a)
+		ready.Done()
 		name := fmt.Sprintf("%s%d", namePrefix, i)
 		form := url.Values{
 			"csrf_token":       {token},
@@ -348,6 +355,7 @@ func TestSetupConcurrentSubmitAcrossInstancesCreatesOneAdmin(t *testing.T) {
 		go fire(a1, "alpha", fmt.Sprintf("Alpha %d", i), i)
 		go fire(a2, "beta", fmt.Sprintf("Beta %d", i), i)
 	}
+	ready.Wait()
 	close(start)
 	wg.Wait()
 

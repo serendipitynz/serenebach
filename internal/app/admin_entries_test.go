@@ -9,6 +9,7 @@ import (
 )
 
 func TestAdminEntriesListShowsSeededRows(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookie := login(t, a.Handler(), "admin", "changeme")
 
@@ -30,6 +31,7 @@ func TestAdminEntriesListShowsSeededRows(t *testing.T) {
 }
 
 func TestAdminEntriesListRequiresLogin(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	req := httptest.NewRequest("GET", "/admin/entries", nil)
 	w := httptest.NewRecorder()
@@ -43,6 +45,7 @@ func TestAdminEntriesListRequiresLogin(t *testing.T) {
 }
 
 func TestAdminEntryCreateAndEditRoundtrip(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookie := login(t, a.Handler(), "admin", "changeme")
 
@@ -94,6 +97,7 @@ func TestAdminEntryCreateAndEditRoundtrip(t *testing.T) {
 }
 
 func TestAdminEntryUpdateChangesContent(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookie := login(t, a.Handler(), "admin", "changeme")
 
@@ -117,6 +121,7 @@ func TestAdminEntryUpdateChangesContent(t *testing.T) {
 }
 
 func TestAdminEntryDeleteRemovesFromListing(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookie := login(t, a.Handler(), "admin", "changeme")
 
@@ -131,6 +136,7 @@ func TestAdminEntryDeleteRemovesFromListing(t *testing.T) {
 }
 
 func TestAdminEntryCreateRejectsEmptyTitle(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookie := login(t, a.Handler(), "admin", "changeme")
 
@@ -154,6 +160,7 @@ func TestAdminEntryCreateRejectsEmptyTitle(t *testing.T) {
 // title input, folding 追記, category/status/posted_at options row, and
 // the two save-mode buttons.
 func TestAdminEntryFormLayoutShape(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookie := login(t, a.Handler(), "admin", "changeme")
 
@@ -181,6 +188,7 @@ func TestAdminEntryFormLayoutShape(t *testing.T) {
 }
 
 func TestAdminEntryEdit404ForUnknownID(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookie := login(t, a.Handler(), "admin", "changeme")
 	w := authedGET(t, a.Handler(), "/admin/entries/9999/edit", cookie)
@@ -193,6 +201,7 @@ func TestAdminEntryEdit404ForUnknownID(t *testing.T) {
 // for both the GET form and the POST update: a regular user must not be
 // able to view or modify another author's entry.
 func TestAdminEntryEditForbiddenForOtherAuthor(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	adminCookie := login(t, a.Handler(), "admin", "changeme")
 

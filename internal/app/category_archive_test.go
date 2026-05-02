@@ -9,6 +9,7 @@ import (
 )
 
 func TestCategoryPageShowsFilteredEntries(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// seed places both sample entries into category id=1 ("お知らせ")
@@ -33,6 +34,7 @@ func TestCategoryPageShowsFilteredEntries(t *testing.T) {
 }
 
 func TestCategoryPage404ForUnknownID(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	req := httptest.NewRequest("GET", "/category/99999", nil)
 	w := httptest.NewRecorder()
@@ -43,6 +45,7 @@ func TestCategoryPage404ForUnknownID(t *testing.T) {
 }
 
 func TestCategoryPageHidesEntriesInOtherCategories(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// Insert a second category and a published entry belonging to it, so
@@ -88,6 +91,7 @@ func TestCategoryPageHidesEntriesInOtherCategories(t *testing.T) {
 }
 
 func TestArchiveYearFiltersByRange(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	year := time.Now().Year()
@@ -120,6 +124,7 @@ func TestArchiveYearFiltersByRange(t *testing.T) {
 }
 
 func TestArchiveMonth404ForBadParams(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	cases := []string{

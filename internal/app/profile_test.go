@@ -14,6 +14,7 @@ import (
 // gated to admins — a regular-tier session must be able to reach
 // their own profile editor.
 func TestProfileFormOpensForEveryRole(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	hash, _ := auth.HashPassword("secret")
 	if _, err := a.DB.Exec(`INSERT INTO users (wid, name, display_name, email, password_hash, role, created_at, updated_at, list_visible, description_format)
@@ -42,6 +43,7 @@ func TestProfileFormOpensForEveryRole(t *testing.T) {
 // the DB, the session user's password is replaced so login with the
 // new password works afterwards.
 func TestProfileSavePersistsFieldsAndOptionallyPassword(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	csrfCookie, token := fetchCSRF(t, a.Handler())
@@ -96,6 +98,7 @@ func TestProfileSavePersistsFieldsAndOptionallyPassword(t *testing.T) {
 // password-confirm mismatches, and the caller is informed. The prior
 // password must still work.
 func TestProfileSaveMismatchedPasswordKeepsProfileButNotPassword(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	csrfCookie, token := fetchCSRF(t, a.Handler())
@@ -142,6 +145,7 @@ func TestProfileSaveMismatchedPasswordKeepsProfileButNotPassword(t *testing.T) {
 // renders the username as an anchor pointing at /admin/profile — the
 // discoverability hook for self-edit.
 func TestLayoutHeaderLinksToProfile(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	w := authedGET(t, a.Handler(), "/admin/", cookies)
@@ -158,6 +162,7 @@ func TestLayoutHeaderLinksToProfile(t *testing.T) {
 // `{user_list}` tag inside it carries the <ul><li> fragment of their
 // anchor-wrapped display names.
 func TestProfileBlockEmitsUserList(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	newMain := "<!doctype html><html><body>\n" +

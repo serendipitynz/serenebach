@@ -15,6 +15,7 @@ import (
 // url.QueryEscape on top of html/template's URL-context encoding.
 // Regression guard: the post-login redirect MUST land on "/admin/".
 func TestLoginAfterUnauthenticatedAdminDoesNotDoubleEncodeNext(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// 1. Unauthenticated GET /admin → 302 to /admin/login?next=/admin/

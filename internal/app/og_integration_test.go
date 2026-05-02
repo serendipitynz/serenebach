@@ -15,6 +15,7 @@ import (
 // updating an entry writes an /img/og/<id>.png file to disk, and the
 // rendered permalink carries a matching <meta property="og:image">.
 func TestEntrySaveGeneratesOGCard(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -67,6 +68,7 @@ func TestEntrySaveGeneratesOGCard(t *testing.T) {
 
 // TestEntryDeleteRemovesOGCard — delete → file on disk is gone.
 func TestEntryDeleteRemovesOGCard(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 

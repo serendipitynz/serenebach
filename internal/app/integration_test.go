@@ -67,6 +67,7 @@ func newTestApp(t *testing.T) *app.App {
 }
 
 func TestHomeRendersSeededContent(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -98,6 +99,7 @@ func TestHomeRendersSeededContent(t *testing.T) {
 }
 
 func TestEntryPermalinkReturns200ForPublished(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	req := httptest.NewRequest("GET", "/entry/1", nil)
@@ -114,6 +116,7 @@ func TestEntryPermalinkReturns200ForPublished(t *testing.T) {
 }
 
 func TestEntryPermalink404ForUnknownID(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	req := httptest.NewRequest("GET", "/entry/9999", nil)
@@ -126,6 +129,7 @@ func TestEntryPermalink404ForUnknownID(t *testing.T) {
 }
 
 func TestEntryPermalink404ForBadID(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	req := httptest.NewRequest("GET", "/entry/notanumber", nil)
@@ -138,6 +142,7 @@ func TestEntryPermalink404ForBadID(t *testing.T) {
 }
 
 func TestEntryPermalink410ForClosedEntry(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// mark entry 1 as closed (status = -1)
@@ -156,6 +161,7 @@ func TestEntryPermalink410ForClosedEntry(t *testing.T) {
 }
 
 func TestSeedIsIdempotent(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 
 	// second call should be a no-op and must not error

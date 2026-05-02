@@ -32,6 +32,7 @@ func postStamp(t *testing.T, h http.Handler, entryID int64, kind string, extraCo
 }
 
 func TestStampPostIncrementsCounter(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	h := a.Handler()
 
@@ -54,6 +55,7 @@ func TestStampPostIncrementsCounter(t *testing.T) {
 }
 
 func TestStampPostAcceptsDifferentKindFromSameFingerprint(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	h := a.Handler()
 
@@ -68,6 +70,7 @@ func TestStampPostAcceptsDifferentKindFromSameFingerprint(t *testing.T) {
 }
 
 func TestStampPostRejectsInvalidKind(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	csrfCookie, token := fetchCSRF(t, a.Handler())
 	form := url.Values{
@@ -86,6 +89,7 @@ func TestStampPostRejectsInvalidKind(t *testing.T) {
 }
 
 func TestEntryPermalinkExposesStampTags(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -127,6 +131,7 @@ func TestEntryPermalinkExposesStampTags(t *testing.T) {
 }
 
 func TestAnalyticsTopEntriesSortByLikes(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// Nudge engagement: entry 2 has more likes, entry 1 has more stamps.
 	if _, err := a.DB.Exec(`UPDATE entries SET likes_count = 5 WHERE id = 1`); err != nil {

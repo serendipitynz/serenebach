@@ -15,6 +15,7 @@ import (
 //     resolve correctly
 //   - the `page` block renders (count=1) when total > 1 pages
 func TestPaginationHomeTagsAndOffset(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// Clean slate so only the deterministic entries below contribute.
 	if _, err := a.DB.Exec(`DELETE FROM entries`); err != nil {
@@ -82,6 +83,7 @@ func TestPaginationHomeTagsAndOffset(t *testing.T) {
 // TestPaginationOutOfRange404 confirms ?page=N past the last page
 // returns 404 instead of rendering an empty-but-200 list.
 func TestPaginationOutOfRange404(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	w := httptest.NewRecorder()
 	// Seed has 2 entries with size=10 → only page 1 exists.
@@ -94,6 +96,7 @@ func TestPaginationOutOfRange404(t *testing.T) {
 // TestPaginationNonNumeric404 confirms ?page=abc returns 404 — the
 // parser rejects non-numeric values rather than silently defaulting.
 func TestPaginationNonNumeric404(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	w := httptest.NewRecorder()
 	a.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/?page=abc", nil))
@@ -112,6 +115,7 @@ func TestPaginationNonNumeric404(t *testing.T) {
 // collapses to 0 when there's only one page — imported templates
 // shouldn't show empty pager UI on a short blog.
 func TestPaginationPageBlockStripsOnSinglePage(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	main := "<!doctype html><html><body>\n" +
 		"<!-- BEGIN entry -->\n<article></article>\n<!-- END entry -->\n" +

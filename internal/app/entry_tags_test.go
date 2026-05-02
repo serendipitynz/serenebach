@@ -11,6 +11,7 @@ import (
 // submitting the entry form with a comma-separated tags field creates
 // missing tags, reuses existing ones, and attaches them to the entry.
 func TestEntryTagsAutoCreateAndAssign(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	csrfCookie, token := fetchCSRF(t, a.Handler())
@@ -66,6 +67,7 @@ func TestEntryTagsAutoCreateAndAssign(t *testing.T) {
 // TestPublicTagPageServes confirms /tag/<slug>/ loads, renders the
 // listing, and 404s on unknown slugs.
 func TestPublicTagPageServes(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// Seed one tag + one entry association directly via SQL so the
 	// test doesn't have to go through the admin flow.
@@ -95,6 +97,7 @@ func TestPublicTagPageServes(t *testing.T) {
 // tags row and every entry_tags row that referenced it in one
 // transaction.
 func TestAdminTagDeleteCleansJoinRows(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	if _, err := a.DB.Exec(`INSERT INTO tags (wid, name, slug, created_at, updated_at) VALUES (1, 'doomed', 'doomed', strftime('%s','now'), strftime('%s','now'))`); err != nil {

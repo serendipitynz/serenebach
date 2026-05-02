@@ -11,6 +11,7 @@ import (
 // saves the description + the public /category/<id>/ page renders it
 // via {category_description}.
 func TestCategoryDescriptionSurfacesOnPublicPage(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -69,6 +70,7 @@ func TestCategoryDescriptionSurfacesOnPublicPage(t *testing.T) {
 // that template — overriding both the archive pin and the active
 // template.
 func TestCategoryTemplatePinOverridesArchivePin(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 

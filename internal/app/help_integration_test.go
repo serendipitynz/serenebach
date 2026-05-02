@@ -15,6 +15,7 @@ import (
 // the Japanese original and show a notice.
 
 func TestHelpIndexRendersSidebar(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -30,6 +31,7 @@ func TestHelpIndexRendersSidebar(t *testing.T) {
 }
 
 func TestHelpPageRenders(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -43,6 +45,7 @@ func TestHelpPageRenders(t *testing.T) {
 }
 
 func TestHelpUnknownSlug404s(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -53,6 +56,7 @@ func TestHelpUnknownSlug404s(t *testing.T) {
 }
 
 func TestHelpEnglishLocaleRendersTranslatedPage(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 

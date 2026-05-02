@@ -13,6 +13,7 @@ import (
 // entry_sort_order=asc, then confirm the home page honours both (fewer
 // entries, oldest-first).
 func TestDisplaySettingsApplyPageSizeAndSort(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// Start from a clean slate so the test asserts only on the rows
 	// it inserts — seed entries' posted_at is time.Now() which would
@@ -83,6 +84,7 @@ func TestDisplaySettingsApplyPageSizeAndSort(t *testing.T) {
 // shows all three inputs with the expected name attributes so the JS
 // live preview + the form POST can find them.
 func TestDisplaySettingsPageRendersControls(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	w := authedGET(t, a.Handler(), "/admin/templates/settings", cookies)

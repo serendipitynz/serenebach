@@ -8,6 +8,7 @@ import (
 )
 
 func TestAdminSettingsFormRendersCurrentWeblog(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -55,6 +56,7 @@ func TestAdminSettingsFormRendersCurrentWeblog(t *testing.T) {
 }
 
 func TestAdminSettingsPersistsChanges(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -100,6 +102,7 @@ func TestAdminSettingsPersistsChanges(t *testing.T) {
 }
 
 func TestAdminSettingsPreservesCommentFieldsFromOtherTab(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -125,6 +128,7 @@ func TestAdminSettingsPreservesCommentFieldsFromOtherTab(t *testing.T) {
 }
 
 func TestAdminSettingsRejectsBlankTitle(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -142,6 +146,7 @@ func TestAdminSettingsRejectsBlankTitle(t *testing.T) {
 }
 
 func TestAdminSettingsRejectsBadBaseURL(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -165,6 +170,7 @@ func TestAdminSettingsRejectsBadBaseURL(t *testing.T) {
 }
 
 func TestAdminCommentSettingsForm(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	w := authedGET(t, a.Handler(), "/admin/comments/settings", cookies)
@@ -185,6 +191,7 @@ func TestAdminCommentSettingsForm(t *testing.T) {
 }
 
 func TestAdminCommentSettingsPersists(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	form := url.Values{
@@ -203,6 +210,7 @@ func TestAdminCommentSettingsPersists(t *testing.T) {
 }
 
 func TestAdminCommentSettingsRejectsBadMode(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	form := url.Values{

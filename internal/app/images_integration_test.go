@@ -77,6 +77,7 @@ func postUpload(t *testing.T, h http.Handler, cookies []*http.Cookie, filename s
 }
 
 func TestImageUploadCreatesFilesAndRow(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -124,6 +125,7 @@ func TestImageUploadCreatesFilesAndRow(t *testing.T) {
 }
 
 func TestImageUploadRequiresLogin(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// Only a CSRF cookie, no session. The CSRF middleware still passes
 	// (cookie + form token match) so the request reaches the protected
@@ -145,6 +147,7 @@ func TestImageUploadRequiresLogin(t *testing.T) {
 }
 
 func TestImageUploadRequiresCSRF(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -163,6 +166,7 @@ func TestImageUploadRequiresCSRF(t *testing.T) {
 }
 
 func TestImageUploadRejectsWrongMIME(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -175,6 +179,7 @@ func TestImageUploadRejectsWrongMIME(t *testing.T) {
 }
 
 func TestImageUploadEnforcesMaxSize(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// Shrink the cap for this test so we don't need to generate a 10MB body.
 	for _, c := range []string{} {
@@ -204,6 +209,7 @@ func TestImageUploadEnforcesMaxSize(t *testing.T) {
 }
 
 func TestImageDeleteRemovesRowAndFiles(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -242,6 +248,7 @@ func TestImageDeleteRemovesRowAndFiles(t *testing.T) {
 }
 
 func TestImagesListJSONMatchesUploaded(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	_ = postUpload(t, a.Handler(), cookies, "one.png", pngBytes(t, 100, 100), true)
@@ -274,6 +281,7 @@ func TestImagesListJSONMatchesUploaded(t *testing.T) {
 }
 
 func TestImagesPagePaginatesAndTogglesView(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -321,6 +329,7 @@ func TestImagesPagePaginatesAndTogglesView(t *testing.T) {
 }
 
 func TestImagesPageLinksInSidebar(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	w := authedGET(t, a.Handler(), "/admin/images", cookies)

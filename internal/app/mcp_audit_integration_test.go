@@ -21,6 +21,7 @@ import (
 //   - the panel's localized heading appears even on an empty-log instance
 //     (regression guard — an earlier draft only rendered the table wrapper)
 func TestMCPAuditLogsPersistAcrossWriteTools(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	token, tokenID := issueMCPTokenWithScope(t, a, cookies, "audit-probe", "write")
@@ -87,6 +88,7 @@ func TestMCPAuditLogsPersistAcrossWriteTools(t *testing.T) {
 // surface the entries because it reads through the wired store rather
 // than querying the main DB directly.
 func TestMCPAuditLogExternalDBIsolatesAuditRows(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	externalAudit := filepath.Join(tmp, "audit.db")
 
@@ -156,6 +158,7 @@ func TestMCPAuditLogExternalDBIsolatesAuditRows(t *testing.T) {
 }
 
 func TestMCPAuditLogNotEmittedForReadOnlyCalls(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	token, _ := issueMCPToken(t, a, cookies, "read-probe")

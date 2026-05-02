@@ -11,6 +11,7 @@ import (
 // the footer build stamp so the user can tell at a glance which
 // version they're on.
 func TestAdminLayoutIncludesThemeAndVersion(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	w := authedGET(t, a.Handler(), "/admin/", cookies)
@@ -33,6 +34,7 @@ func TestAdminLayoutIncludesThemeAndVersion(t *testing.T) {
 }
 
 func TestAdminStaticLogosServe(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	for _, path := range []string{
 		"/admin/static/sb_logo_dark.svg",
@@ -50,6 +52,7 @@ func TestAdminStaticLogosServe(t *testing.T) {
 }
 
 func TestAdminSettingsIncludesAppearanceUI(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	// /admin/settings 302s admins to /settings/basic; the appearance

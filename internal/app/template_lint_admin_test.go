@@ -10,6 +10,7 @@ import (
 // edit page on a clean template should NOT surface the green
 // ✅ all-clear banner — it only appears after a manual recheck.
 func TestAdminTemplateEditStaysQuietOnCleanInitialLoad(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -42,6 +43,7 @@ func TestAdminTemplateEditStaysQuietOnCleanInitialLoad(t *testing.T) {
 // recheck button against a clean body DOES show the green ✅
 // banner — that's the affirmation the operator is asking for.
 func TestAdminTemplateRecheckShowsAllClearOnSuccess(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -72,6 +74,7 @@ func TestAdminTemplateRecheckShowsAllClearOnSuccess(t *testing.T) {
 // section, the unsupported findings inside the lint panel with line
 // numbers, and the differs-only site_mobile finding.
 func TestAdminTemplateEditFlagsTrackback(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -115,6 +118,7 @@ func TestAdminTemplateEditFlagsTrackback(t *testing.T) {
 // /recheck endpoint with new body content re-renders the form using
 // the submitted bytes — without saving to the DB.
 func TestAdminTemplateRecheckRunsAgainstSubmittedBody(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 

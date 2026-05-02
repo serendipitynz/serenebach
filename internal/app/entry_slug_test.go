@@ -11,6 +11,7 @@ import (
 // when a slug is assigned. Also guards against regressing the id route
 // for entries without a slug.
 func TestPublicEntryResolvesBySlug(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	if _, err := a.DB.Exec(`UPDATE entries SET slug = 'first-post' WHERE id = 1`); err != nil {
 		t.Fatalf("set slug: %v", err)
@@ -49,6 +50,7 @@ func TestPublicEntryResolvesBySlug(t *testing.T) {
 // stops bad slugs before they reach the DB. The error message surface
 // matters: an opaque 500 would hide the fix from the user.
 func TestAdminEntryCreateRejectsInvalidSlug(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	csrfCookie, token := fetchCSRF(t, a.Handler())
@@ -82,6 +84,7 @@ func TestAdminEntryCreateRejectsInvalidSlug(t *testing.T) {
 // TestAdminEntryUpdateRejectsDuplicateSlug confirms the partial unique
 // index + ErrSlugInUse error path is wired all the way back to the form.
 func TestAdminEntryUpdateRejectsDuplicateSlug(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	if _, err := a.DB.Exec(`UPDATE entries SET slug = 'first-post' WHERE id = 1`); err != nil {

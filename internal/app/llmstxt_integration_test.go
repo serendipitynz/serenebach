@@ -9,6 +9,7 @@ import (
 )
 
 func TestLLMsRoutes404WhenDisabled(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	// Seed default: llms_enabled = 0. Neither route exposes content.
 	for _, path := range []string{"/llms.txt", "/llms-full.txt"} {
@@ -22,6 +23,7 @@ func TestLLMsRoutes404WhenDisabled(t *testing.T) {
 }
 
 func TestLLMsRoutes200WhenEnabled(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	if _, err := a.DB.Exec(`UPDATE weblogs SET llms_enabled = 1 WHERE id = 1`); err != nil {
 		t.Fatal(err)
@@ -62,6 +64,7 @@ func TestLLMsRoutes200WhenEnabled(t *testing.T) {
 }
 
 func TestAdminSettingsTogglePersistsLLMSEnabled(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
@@ -109,6 +112,7 @@ func min2(a, b int) int {
 }
 
 func TestMCPHTTPGetAnalyticsAndListImages(t *testing.T) {
+	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	token, _ := issueMCPToken(t, a, cookies, "analytics-probe")
