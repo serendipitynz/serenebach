@@ -125,6 +125,16 @@ tasks:
     cmds:
       - go test ./...
 
+  test:short:
+    desc: Run tests excluding the slow internal/app integration suite
+    cmds:
+      - go test $(go list ./... | grep -v /internal/app)
+
+  test:app:
+    desc: Run only the internal/app integration suite
+    cmds:
+      - go test ./internal/app/
+
   tidy:
     desc: Sync go.mod / go.sum
     cmds:
