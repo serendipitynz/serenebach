@@ -93,7 +93,11 @@ func (v EntryView) Render() (string, error) {
 	timeStr := html.EscapeString(v.Site.FormatEntryTime(v.Entry.PostedAt))
 	c.Tag("entry_time", `<a href="`+permalink+`">`+timeStr+`</a>`)
 	c.Tag("entry_disp_time", timeStr)
-	c.Tag("entry_description", formatBody(v.Entry.Body, v.Entry.Format, "entry.body"))
+	body := formatBody(v.Entry.Body, v.Entry.Format, "entry.body")
+	if v.Entry.More != "" {
+		body += `<a id="sequel"></a>`
+	}
+	c.Tag("entry_description", body)
 	c.Tag("entry_sequel", formatBody(v.Entry.More, v.Entry.Format, "entry.more"))
 	c.Tag("entry_mode", "entry")
 	c.Tag("entry_likes_count", strconv.FormatInt(v.Entry.LikesCount, 10))
