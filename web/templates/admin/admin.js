@@ -40,27 +40,35 @@
   }
   var languageSelect = document.querySelector('[data-language-select]');
   if (languageSelect) {
-    var storedLang = safeRead('sb_admin_language') || 'ja';
-    languageSelect.value = storedLang;
-    // Keep the server-visible cookie in sync with localStorage on every
-    // page so a fresh install with localStorage pre-set immediately
-    // renders in the right locale.
-    syncLangCookie(storedLang);
+    // Initial selected value: prefer the cookie (= what the server
+    // actually rendered with). Fall back to ja so the dropdown is
+    // never blank on a fresh install.
+    var current = readCookie('sb_admin_lang') || 'ja';
+    languageSelect.value = current;
     languageSelect.addEventListener('change', function () {
       var v = languageSelect.value;
       if (v !== 'ja' && v !== 'en') return;
-      safeWrite('sb_admin_language', v);
-      syncLangCookie(v);
-      // Reload so the server re-renders in the new locale; the sidebar
-      // + content all update in one go rather than half-translated.
-      window.location.reload();
+      var body = new URLSearchParams({ lang: v, csrf_token: readCSRFToken() });
+      fetch('/admin/settings/language', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body,
+        credentials: 'same-origin',
+      }).then(function (res) {
+        if (res.ok) window.location.reload();
+      });
     });
   }
-  function syncLangCookie(v) {
-    try {
-      var secure = window.location.protocol === 'https:' ? '; Secure' : '';
-      document.cookie = 'sb_admin_lang=' + encodeURIComponent(v) + '; Path=/; Max-Age=31536000; SameSite=Lax' + secure;
-    } catch (e) { /* ignore */ }
+  function readCookie(name) {
+    var pairs = document.cookie ? document.cookie.split('; ') : [];
+    for (var i = 0; i < pairs.length; i++) {
+      var idx = pairs[i].indexOf('=');
+      if (idx > 0 && pairs[i].slice(0, idx) === name) {
+        try { return decodeURIComponent(pairs[i].slice(idx + 1)); }
+        catch (e) { return ''; }
+      }
+    }
+    return '';
   }
 
   function safeRead(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
