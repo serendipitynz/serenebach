@@ -160,8 +160,8 @@ func (a *App) seedDefaultTemplate(ctx context.Context, wid int64, spec SeedSpec,
 
 	if _, err := a.DB.ExecContext(ctx, `
 		INSERT INTO templates (wid, name, is_active, main_body, entry_body, css, info, created_at, updated_at)
-		VALUES (?, ?, 1, ?, '', ?, 'bundled default template', ?, ?)`,
-		wid, spec.TemplateName, templates.DefaultMain, templates.DefaultCSS, now, now); err != nil {
+		VALUES (?, ?, 1, ?, '', ?, ?, ?, ?)`,
+		wid, spec.TemplateName, templates.DefaultMain, templates.DefaultCSS, templates.DefaultInfo, now, now); err != nil {
 		return fmt.Errorf("seed: insert template: %w", err)
 	}
 	return nil

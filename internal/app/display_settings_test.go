@@ -60,7 +60,10 @@ func TestDisplaySettingsApplyPageSizeAndSort(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("home status = %d", w.Code)
 	}
-	body := w.Body.String()
+	// Scope to main content — the sidebar's {latest_entry_list} widget
+	// surfaces entries regardless of the page-size cap, so a body-wide
+	// strings.Contains would always trip on Extra 1 / Extra 2.
+	body := mainArea(w.Body.String())
 	pos3 := strings.Index(body, "Extra 3")
 	pos4 := strings.Index(body, "Extra 4")
 	if pos3 < 0 || pos4 < 0 {

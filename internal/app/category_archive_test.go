@@ -69,7 +69,10 @@ func TestCategoryPageHidesEntriesInOtherCategories(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}
-	if strings.Contains(w.Body.String(), "ELSEWHERE") {
+	// Check only the main content area — the default template's sidebar
+	// has a {latest_entry_list} widget that legitimately surfaces
+	// entries from every category.
+	if strings.Contains(mainArea(w.Body.String()), "ELSEWHERE") {
 		t.Errorf("entry from other category leaked into /category/1")
 	}
 
@@ -111,7 +114,7 @@ func TestArchiveYearFiltersByRange(t *testing.T) {
 	if w2.Code != 200 {
 		t.Fatalf("status = %d, want 200", w2.Code)
 	}
-	if strings.Contains(w2.Body.String(), "ようこそ Serene Bach へ") {
+	if strings.Contains(mainArea(w2.Body.String()), "ようこそ Serene Bach へ") {
 		t.Errorf("old-year archive should have no entries")
 	}
 }

@@ -1,0 +1,11 @@
+Name: default
+Author: takkyun
+Address: http://go.serenebach.net/
+Version: 0.01
+=====
+
+A default template for Serene Bach v4
+
+---
+
+Serene Bach v4 のデフォルトテンプレート
