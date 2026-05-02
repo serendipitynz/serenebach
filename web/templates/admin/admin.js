@@ -40,11 +40,11 @@
   }
   var languageSelect = document.querySelector('[data-language-select]');
   if (languageSelect) {
-    // Initial selected value: prefer the cookie (= what the server
-    // actually rendered with). Fall back to ja so the dropdown is
-    // never blank on a fresh install.
-    var current = readCookie('sb_admin_lang') || 'ja';
-    languageSelect.value = current;
+    // The server renders <option selected> via {{Locale}}, so the
+    // dropdown is already correct on first paint. No client-side
+    // state restoration is needed — and it would not work under
+    // Sakura's ENC_ cookie protection anyway (the value is encrypted
+    // opaque to JS).
     languageSelect.addEventListener('change', function () {
       var v = languageSelect.value;
       if (v !== 'ja' && v !== 'en') return;
@@ -58,21 +58,6 @@
         if (res.ok) window.location.reload();
       });
     });
-  }
-  function readCookie(name) {
-    var encName = 'ENC_' + name;
-    var pairs = document.cookie ? document.cookie.split('; ') : [];
-    for (var i = 0; i < pairs.length; i++) {
-      var idx = pairs[i].indexOf('=');
-      if (idx > 0) {
-        var cname = pairs[i].slice(0, idx);
-        if (cname === name || cname === encName) {
-          try { return decodeURIComponent(pairs[i].slice(idx + 1)); }
-          catch (e) { return ''; }
-        }
-      }
-    }
-    return '';
   }
 
   function safeRead(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }

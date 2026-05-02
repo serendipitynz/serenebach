@@ -28,8 +28,8 @@
       <div class="label">{{T "settings.admin.language"}}</div>
       <div>
         <select data-language-select>
-          <option value="ja">日本語</option>
-          <option value="en">English</option>
+          <option value="ja"{{if eq Locale "ja"}} selected{{end}}>日本語</option>
+          <option value="en"{{if eq Locale "en"}} selected{{end}}>English</option>
         </select>
         <p class="hint">{{T "settings.admin.languageHint"}}</p>
       </div>

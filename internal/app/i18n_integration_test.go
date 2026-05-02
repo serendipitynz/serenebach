@@ -203,6 +203,36 @@ func TestAdminLanguageEndpointRequiresCSRF(t *testing.T) {
 	}
 }
 
+// TestAdminLanguageSelectorReflectsLocale verifies the screen-settings
+// language <select> renders with the active locale as its selected
+// option, so JS doesn't have to decode the (Sakura-encrypted) cookie
+// to keep the dropdown in sync with the rest of the UI.
+func TestAdminLanguageSelectorReflectsLocale(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	cookies := login(t, a.Handler(), "admin", "changeme")
+
+	cases := []struct {
+		cookieVal  string
+		wantOption string // <option value="X" ... selected>
+	}{
+		{"en", `value="en" selected`},
+		{"ja", `value="ja" selected`},
+	}
+	for _, tc := range cases {
+		req := httptest.NewRequest("GET", "/admin/settings/screen", nil)
+		for _, c := range cookies {
+			req.AddCookie(c)
+		}
+		req.AddCookie(&http.Cookie{Name: "sb_admin_lang", Value: tc.cookieVal})
+		rec := httptest.NewRecorder()
+		a.Handler().ServeHTTP(rec, req)
+		if !strings.Contains(rec.Body.String(), tc.wantOption) {
+			t.Errorf("locale=%s: response missing %q", tc.cookieVal, tc.wantOption)
+		}
+	}
+}
+
 // extractCSRFToken pulls the value out of the first
 // <input name="csrf_token" value="..."> found in html.
 func extractCSRFToken(t *testing.T, html string) string {
