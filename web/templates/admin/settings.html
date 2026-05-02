@@ -7,6 +7,8 @@
   <a href="{{Root}}/admin/settings/screen"{{if eq .ActiveTab "screen"}} class="active"{{end}}>{{T "settings.tab.screen"}}</a>
 </nav>
 
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
 <div class="panel">
   <div class="panel-head"><h2>{{T "settings.admin"}}</h2></div>
   <div class="panel-body form-stack">
