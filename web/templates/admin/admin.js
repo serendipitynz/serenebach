@@ -186,6 +186,7 @@
       showPrintMargin: false,
       fontSize: 13,
       wrap: true,
+      useWorker: false,
     });
     applyAceTheme(editor);
 
