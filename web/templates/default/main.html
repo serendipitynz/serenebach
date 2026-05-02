@@ -2,49 +2,59 @@
 <html lang="{site_lang}">
 <head>
 <meta charset="{site_encoding}">
-<title>{site_title}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <link rel="stylesheet" href="{site_css}">
-<meta property="og:title" content="{entry_title}">
+<link rel="alternate" type="application/rss+xml" title="RSS" href="{site_rss}">
+<link rel="alternate" type="application/atom+xml" href="{site_atom}">
+<title>{site_title}</title>
+<!-- BEGIN sequel -->
+<meta property="og:title" content="{site_title}">
 <meta property="og:description" content="{blog_description}">
 <meta property="og:image" content="{entry_og_image}">
 <meta property="og:type" content="article">
 <meta name="twitter:card" content="summary_large_image">
+<!-- END sequel -->
 </head>
 <body>
-<header>
+<header class="title">
 <!-- BEGIN title -->
-<h1>{blog_name}</h1>
+<div class="title-inner">
+<h1 id="top">{blog_name}</h1>
 <p class="description">{blog_description}</p>
+</div>
 <!-- END title -->
 </header>
-<main>
+<div class="body">
+<div class="contents">
 <!-- BEGIN entry -->
 <article class="entry">
+<!-- BEGIN sequel -->
+<div class="entry_navi">{prev_entry} | <a href="{site_top}">main</a> | {next_entry}</div>
+<!-- END sequel -->
 <h2><a href="{entry_permalink}">{entry_title}</a></h2>
-<div class="meta">
-<time>{entry_date}</time>
-<span class="category">{category_name}</span>
-<span class="author">{user_disp_name}</span>
-</div>
-<div class="body">{entry_description}</div>
+<div class="entry_author">{entry_date} {entry_time} | posted by {user_name}</div>
+<div class="entry_body">{entry_description}</div>
+<!-- BEGIN sequel -->
+<div class="entry_more">{entry_sequel}</div>
+<!-- END sequel -->
+<div class="entry_state">
+<span class="entry_state_meta">{category_name} | {comment_num}</span>
 <form method="post" action="{entry_like_url}" class="like-form">
 <input type="hidden" name="csrf_token" value="{csrf_token}">
-<button type="submit" class="like-btn" aria-label="いいね">❤ {entry_likes_count}</button>
+<button type="submit" class="like-btn" aria-label="Like">❤ {entry_likes_count}</button>
 </form>
-<!-- BEGIN sequel -->
-<div class="sequel">{entry_sequel}</div>
-<nav class="entry-nav">{prev_entry} <a href="{site_top}">home</a> {next_entry}</nav>
-<!-- END sequel -->
-</article>
+</div>
+</article><!--_end_entry_-->
 <!-- END entry -->
 <!-- BEGIN comment_area -->
-<section class="comments">
-<h3>Comments</h3>
+<section class="comment">
+<h3 id="comments">Comments</h3>
 <!-- BEGIN comment -->
-<div class="comment">
-<p class="meta"><strong>{comment_name}</strong> <time>{comment_time}</time></p>
-<div class="body">{comment_description}</div>
-</div>
+<dl class="body">
+<dt>{comment_name} | {comment_time}</dt>
+<dd>{comment_description}</dd>
+</dl>
 <!-- END comment -->
 <form method="post" action="{comment_post_url}" class="comment-form">
 <p class="form-error">{comment_error}</p>
@@ -52,7 +62,7 @@
 <label>Email (optional) <input type="email" name="email" value="{cookie_email}"></label>
 <label>URL (optional) <input type="url" name="url" value="{cookie_url}"></label>
 <label>Comment <textarea name="description" rows="4" required></textarea></label>
-<label class="cookie-opt"><input type="checkbox" name="set_cookie" value="1"> 次回のために名前・メール・URL をブラウザに記憶する</label>
+<label class="cookie-opt"><input type="checkbox" name="set_cookie" value="1"> Remember name, email, and URL for next time</label>
 {turnstile_widget}
 <input type="hidden" name="entry_id" value="{entry_id}">
 <input type="hidden" name="_ts" value="{form_ts}">
@@ -60,11 +70,74 @@
 <input type="text" name="website" value="" tabindex="-1" autocomplete="off" style="display:none" aria-hidden="true">
 <button type="submit">Post comment</button>
 </form>
-</section>
+</section><!--_end_comment_-->
 <!-- END comment_area -->
-</main>
-<footer>
-<p>Powered by <a href="https://github.com/serendipitynz/serenebach">Serene Bach</a></p>
-</footer>
+<!-- BEGIN profile_area -->
+<section class="profile">
+<h2>{profile_name}'s profile</h2>
+<div class="profile_body">{profile_description}</div>
+</section><!--_end_profile_-->
+<!-- END profile_area -->
+<!-- BEGIN page -->
+<div class="page">
+{prev_page_link} {page_now}/{page_num} {next_page_link}
+</div>
+<!-- END page -->
+</div><!--_end_contents_-->
+
+<aside class="navigation">
+<!-- BEGIN latest_entry -->
+<dl class="recententry">
+<dt id="newentryname">Latest Entries</dt>
+<dd id="newentrylist">{latest_entry_list}
+</dd>
+</dl>
+<!-- END latest_entry -->
+<!-- BEGIN recent_comment -->
+<dl class="recentcomment">
+<dt id="commentname">Recent Comments</dt>
+<dd id="commentlist">{recent_comment_list}</dd>
+</dl>
+<!-- END recent_comment -->
+<!-- BEGIN category -->
+<dl class="category">
+<dt id="categoryname">Categories</dt>
+<dd id="categorylist">{subcategory_list}</dd>
+</dl>
+<!-- END category -->
+<!-- BEGIN archives -->
+<dl class="archives">
+<dt id="archivename">Archives</dt>
+<dd id="archivelist">{archives_list}</dd>
+</dl>
+<!-- END archives -->
+<!-- BEGIN link -->
+<dl class="links">
+<dt id="linkname">Links</dt>
+<dd id="linklist">{link_list}</dd>
+</dl>
+<!-- END link -->
+<!-- BEGIN profile -->
+<dl class="profiles">
+<dt id="profilename">Profile</dt>
+<dd id="profilelist">{user_list}</dd>
+</dl>
+<!-- END profile -->
+<dl class="extra">
+<dt id="extraname">Other</dt>
+<dd id="extralist">
+<ul>
+<li><a href="{site_rss}">RSS</a></li>
+<li><a href="{site_atom}">Atom</a></li>
+<li>Powered by <a href="{script_webpage}">{script_name} {script_version}</a></li>
+</ul>
+</dd>
+</dl>
+</aside><!--_end_navigation_-->
+</div><!--_end_body_-->
+<footer class="footer">
+<address>Copyright &copy; 2026 SimpleBoxes / SerendipityNZ.</address>
+<p id="link2top"><a href="#top">page top</a></p>
+</footer><!--_end_footer_-->
 </body>
 </html>
