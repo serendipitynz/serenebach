@@ -40,27 +40,25 @@
   }
   var languageSelect = document.querySelector('[data-language-select]');
   if (languageSelect) {
-    var storedLang = safeRead('sb_admin_language') || 'ja';
-    languageSelect.value = storedLang;
-    // Keep the server-visible cookie in sync with localStorage on every
-    // page so a fresh install with localStorage pre-set immediately
-    // renders in the right locale.
-    syncLangCookie(storedLang);
+    // The server renders <option selected> via {{Locale}}, so the
+    // dropdown is already correct on first paint. No client-side
+    // state restoration is needed — and it would not work under
+    // Sakura's ENC_ cookie protection anyway (the value is encrypted
+    // opaque to JS).
     languageSelect.addEventListener('change', function () {
       var v = languageSelect.value;
       if (v !== 'ja' && v !== 'en') return;
-      safeWrite('sb_admin_language', v);
-      syncLangCookie(v);
-      // Reload so the server re-renders in the new locale; the sidebar
-      // + content all update in one go rather than half-translated.
-      window.location.reload();
+      var body = new URLSearchParams({ lang: v, csrf_token: readCSRFToken() });
+      var endpoint = (window.__sbRoot || '') + '/admin/settings/language';
+      fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body,
+        credentials: 'same-origin',
+      }).then(function (res) {
+        if (res.ok) window.location.reload();
+      });
     });
-  }
-  function syncLangCookie(v) {
-    try {
-      var secure = window.location.protocol === 'https:' ? '; Secure' : '';
-      document.cookie = 'sb_admin_lang=' + encodeURIComponent(v) + '; Path=/; Max-Age=31536000; SameSite=Lax' + secure;
-    } catch (e) { /* ignore */ }
   }
 
   function safeRead(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }

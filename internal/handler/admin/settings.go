@@ -5,12 +5,14 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/serendipitynz/serenebach/internal/csrf"
 	"github.com/serendipitynz/serenebach/internal/domain"
+	"github.com/serendipitynz/serenebach/internal/i18n"
 	"github.com/serendipitynz/serenebach/internal/session"
 )
 
@@ -38,6 +40,7 @@ import (
 func (h *Handler) mountSettings(r chi.Router) {
 	r.Get("/settings", h.settingsRoot)
 	r.Get("/settings/screen", h.settingsScreenForm)
+	r.Post("/settings/language", h.settingsLanguageSubmit)
 	r.Group(func(gr chi.Router) {
 		gr.Use(h.requireDesign)
 		gr.Get("/settings/basic", h.settingsBasicForm)
@@ -137,6 +140,34 @@ func (h *Handler) settingsScreenForm(w http.ResponseWriter, r *http.Request) {
 	renderMain(w, r, pageSettings, settingsScreenPageData{
 		settingsPageBase: h.newSettingsBase(r, tr(r, "settings.tab.screen"), "screen"),
 	})
+}
+
+// settingsLanguageSubmit persists the operator's admin UI language
+// choice in a server-issued cookie. Browser-side document.cookie
+// writes don't survive Sakura's "ENC_" cookie protection layer, so
+// the language preference must round-trip through Set-Cookie like
+// any other server-managed cookie (sb_csrf / sb_session).
+func (h *Handler) settingsLanguageSubmit(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	lang := r.FormValue("lang")
+	if !slices.Contains(i18nBundle.Supported(), lang) {
+		http.Error(w, "unsupported lang", http.StatusBadRequest)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     i18n.LangCookieName,
+		Value:    lang,
+		Path:     "/",
+		MaxAge:   31536000,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil,
+		// HttpOnly: false — admin.js still wants to read the value
+		// for select-state restoration on reload (see (3)).
+	})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // --- 基本設定 tab (CanManageDesign) -----------------------------------
