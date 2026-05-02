@@ -1,11 +1,14 @@
 package app_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/serendipitynz/serenebach/internal/auth"
 )
 
 // TestAdminSidebarHonoursAcceptLanguage proves the i18n chain
@@ -203,33 +206,56 @@ func TestAdminLanguageEndpointRequiresCSRF(t *testing.T) {
 	}
 }
 
-// TestAdminLanguageSelectorReflectsLocale verifies the screen-settings
-// language <select> renders with the active locale as its selected
-// option, so JS doesn't have to decode the (Sakura-encrypted) cookie
-// to keep the dropdown in sync with the rest of the UI.
-func TestAdminLanguageSelectorReflectsLocale(t *testing.T) {
+// TestAdminLanguageEndpointFromSettingsRoot verifies that a regular user
+// (who sees the screen settings at /admin/settings without being redirected
+// to /settings/basic) can still toggle the language successfully. When the
+// endpoint was a relative "language", this page resolved it to /admin/language
+// and returned 404 only for regular users.
+func TestAdminLanguageEndpointFromSettingsRoot(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
-	cookies := login(t, a.Handler(), "admin", "changeme")
 
-	cases := []struct {
-		cookieVal  string
-		wantOption string // <option value="X" ... selected>
-	}{
-		{"en", `value="en" selected`},
-		{"ja", `value="ja" selected`},
+	// Create a regular user without design management permission.
+	ctx := context.Background()
+	hash, err := auth.HashPassword("regularpass")
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
 	}
-	for _, tc := range cases {
-		req := httptest.NewRequest("GET", "/admin/settings/screen", nil)
-		for _, c := range cookies {
-			req.AddCookie(c)
-		}
-		req.AddCookie(&http.Cookie{Name: "sb_admin_lang", Value: tc.cookieVal})
-		rec := httptest.NewRecorder()
-		a.Handler().ServeHTTP(rec, req)
-		if !strings.Contains(rec.Body.String(), tc.wantOption) {
-			t.Errorf("locale=%s: response missing %q", tc.cookieVal, tc.wantOption)
-		}
+	_, err = a.DB.ExecContext(ctx, `
+		INSERT INTO users (wid, name, display_name, email, password_hash, role,
+		                   list_visible, description_format, created_at, updated_at)
+		VALUES (1, 'regular', 'Regular User', '', ?, 3, 1, 'html', 0, 0)`,
+		hash)
+	if err != nil {
+		t.Fatalf("insert regular user: %v", err)
+	}
+
+	cookies := login(t, a.Handler(), "regular", "regularpass")
+
+	// Regular users stay on /admin/settings (no redirect to basic).
+	getReq := httptest.NewRequest("GET", "/admin/settings", nil)
+	for _, c := range cookies {
+		getReq.AddCookie(c)
+	}
+	getRec := httptest.NewRecorder()
+	a.Handler().ServeHTTP(getRec, getReq)
+	if getRec.Code != 200 {
+		t.Fatalf("GET /admin/settings status = %d, want 200", getRec.Code)
+	}
+
+	token := extractCSRFToken(t, getRec.Body.String())
+
+	// POST must reach the same absolute endpoint regardless of entry path.
+	body := strings.NewReader("lang=en&csrf_token=" + token)
+	postReq := httptest.NewRequest("POST", "/admin/settings/language", body)
+	postReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	for _, c := range cookies {
+		postReq.AddCookie(c)
+	}
+	postRec := httptest.NewRecorder()
+	a.Handler().ServeHTTP(postRec, postReq)
+	if postRec.Code != http.StatusNoContent {
+		t.Fatalf("POST status = %d, want 204", postRec.Code)
 	}
 }
 
