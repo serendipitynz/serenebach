@@ -49,7 +49,6 @@ func newUnseededTestApp(t *testing.T) *app.App {
 // (no users yet) bounces the home page to /setup, so the operator
 // always lands on the install screen.
 func TestSetupGateRedirectsHomeWhenNoAdmin(t *testing.T) {
-	t.Parallel()
 	a := newUnseededTestApp(t)
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -67,7 +66,6 @@ func TestSetupGateRedirectsHomeWhenNoAdmin(t *testing.T) {
 // TestSetupFormRendersWhenNoAdmin checks the GET /setup happy path —
 // form fields visible, CSRF token embedded.
 func TestSetupFormRendersWhenNoAdmin(t *testing.T) {
-	t.Parallel()
 	a := newUnseededTestApp(t)
 
 	req := httptest.NewRequest("GET", "/setup", nil)
@@ -98,7 +96,6 @@ func TestSetupFormRendersWhenNoAdmin(t *testing.T) {
 // credentials, expect a redirect to /admin/login, and verify the user
 // row plus password hash are correct.
 func TestSetupSubmitCreatesAdminAndRedirects(t *testing.T) {
-	t.Parallel()
 	a := newUnseededTestApp(t)
 
 	token, cookie := setupCSRFToken(t, a)
@@ -155,7 +152,6 @@ func TestSetupSubmitCreatesAdminAndRedirects(t *testing.T) {
 // TestSetupSubmitWithoutSampleEntries pins the checkbox-off path:
 // admin is created, demo content is *not*.
 func TestSetupSubmitWithoutSampleEntries(t *testing.T) {
-	t.Parallel()
 	a := newUnseededTestApp(t)
 
 	token, cookie := setupCSRFToken(t, a)
@@ -189,7 +185,6 @@ func TestSetupSubmitWithoutSampleEntries(t *testing.T) {
 // TestSetupReturns404OnceAdminExists verifies the gate flips off and
 // /setup is invisible after the install completes.
 func TestSetupReturns404OnceAdminExists(t *testing.T) {
-	t.Parallel()
 	a := newTestApp(t) // newTestApp seeds an admin
 
 	req := httptest.NewRequest("GET", "/setup", nil)
@@ -204,7 +199,6 @@ func TestSetupReturns404OnceAdminExists(t *testing.T) {
 // TestSetupMismatchedPasswordRendersError walks one validation branch
 // to make sure errors stay on the form (no admin created, no redirect).
 func TestSetupMismatchedPasswordRendersError(t *testing.T) {
-	t.Parallel()
 	a := newUnseededTestApp(t)
 
 	token, cookie := setupCSRFToken(t, a)
@@ -242,16 +236,17 @@ func TestSetupMismatchedPasswordRendersError(t *testing.T) {
 // response (302 to /admin/login for the winner, 404 for late
 // arrivals once the gate flips).
 func TestSetupConcurrentSubmitCreatesOneAdmin(t *testing.T) {
-	t.Parallel()
 	a := newUnseededTestApp(t)
 
 	const workers = 8
 	var (
 		wg      sync.WaitGroup
+		ready   sync.WaitGroup
 		mu      sync.Mutex
 		winners int
 	)
 	start := make(chan struct{})
+	ready.Add(workers)
 
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
@@ -262,6 +257,7 @@ func TestSetupConcurrentSubmitCreatesOneAdmin(t *testing.T) {
 			// GETs make sure we exercise the POST path with no
 			// inter-goroutine dependency.
 			token, cookie := setupCSRFToken(t, a)
+			ready.Done()
 			form := url.Values{
 				"csrf_token":       {token},
 				"name":             {fmt.Sprintf("admin%d", i)},
@@ -283,6 +279,7 @@ func TestSetupConcurrentSubmitCreatesOneAdmin(t *testing.T) {
 			}
 		}(i)
 	}
+	ready.Wait()
 	close(start)
 	wg.Wait()
 
@@ -309,7 +306,6 @@ func TestSetupConcurrentSubmitCreatesOneAdmin(t *testing.T) {
 // loser surfaces ErrAdminAlreadyExists which the Setup callback
 // translates to ErrSetupAlreadyDone (404).
 func TestSetupConcurrentSubmitAcrossInstancesCreatesOneAdmin(t *testing.T) {
-	t.Parallel()
 	dbPath := filepath.Join(t.TempDir(), "shared.db")
 	a1 := newAppPointingAt(t, dbPath)
 	a2 := newAppPointingAt(t, dbPath)
@@ -317,16 +313,19 @@ func TestSetupConcurrentSubmitAcrossInstancesCreatesOneAdmin(t *testing.T) {
 	const perInstance = 4
 	var (
 		wg          sync.WaitGroup
+		ready       sync.WaitGroup
 		mu          sync.Mutex
 		winners     int
 		winnerName  string
 		winnerTitle string
 	)
 	start := make(chan struct{})
+	ready.Add(perInstance * 2)
 
 	fire := func(a *app.App, namePrefix, title string, i int) {
 		defer wg.Done()
 		token, cookie := setupCSRFToken(t, a)
+		ready.Done()
 		name := fmt.Sprintf("%s%d", namePrefix, i)
 		form := url.Values{
 			"csrf_token":       {token},
@@ -356,6 +355,7 @@ func TestSetupConcurrentSubmitAcrossInstancesCreatesOneAdmin(t *testing.T) {
 		go fire(a1, "alpha", fmt.Sprintf("Alpha %d", i), i)
 		go fire(a2, "beta", fmt.Sprintf("Beta %d", i), i)
 	}
+	ready.Wait()
 	close(start)
 	wg.Wait()
 
