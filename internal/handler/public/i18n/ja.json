@@ -8,5 +8,6 @@
   "comment.error.turnstileFail": "チャレンジに通過できませんでした。もう一度お試しください。",
   "comment.error.rateLimit": "投稿が多すぎます。しばらく待ってから再送してください。",
   "sidebar.recent.noName": "(名前なし)",
-  "comment.numLabel": "コメント"
+  "comment.numLabel": "コメント",
+  "entry.readMore": "続きを読む …"
 }

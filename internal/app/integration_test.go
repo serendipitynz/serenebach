@@ -76,7 +76,7 @@ func TestHomeRendersSeededContent(t *testing.T) {
 		`<h1><a href="/">Serene Bach</a></h1>`,
 		`ようこそ Serene Bach へ`,
 		`カテゴリとテンプレートについて`,
-		`<span class="category">お知らせ</span>`,
+		`<span class="category"><a href="/category/1/">お知らせ</a></span>`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("home body missing %q\nfull body:\n%s", want, body)

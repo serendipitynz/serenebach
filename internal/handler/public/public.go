@@ -60,6 +60,7 @@ func commentNumLabel(lang string) string {
 func siteWithLabel(w domain.Weblog, lang string) content.Site {
 	s := content.NewSite(w)
 	s.CommentNumLabel = commentNumLabel(lang)
+	s.ReadMoreLabel = publicBundle.T(lang, "entry.readMore")
 	return s
 }
 

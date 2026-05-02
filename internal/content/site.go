@@ -201,11 +201,17 @@ type Site struct {
 	// Resolved from the public i18n bundle via the "comment.numLabel"
 	// key. Empty falls back to "Comments".
 	CommentNumLabel string
+	// ReadMoreLabel is the localised text for the {entry_sequel}
+	// "read more" anchor on list pages (e.g. "read more ..." or
+	// "続きを読む …"). Resolved from the public i18n bundle via the
+	// "entry.readMore" key. Empty falls back to "read more ...".
+	ReadMoreLabel string
 }
 
 func NewSite(w domain.Weblog) Site {
 	s := Site{Weblog: w, Encoding: "utf-8"}
 	s.CommentNumLabel = commentLabelForLang(w.Lang)
+	s.ReadMoreLabel = readMoreLabelForLang(w.Lang)
 	return s
 }
 
@@ -219,6 +225,18 @@ func commentLabelForLang(lang string) string {
 		return "Comments"
 	default:
 		return "コメント"
+	}
+}
+
+// readMoreLabelForLang returns the "read more ..." label for the
+// {entry_sequel} anchor on list pages. The handler layer can override
+// Site.ReadMoreLabel with a value from the public i18n bundle.
+func readMoreLabelForLang(lang string) string {
+	switch lang {
+	case "en":
+		return "read more ..."
+	default:
+		return "続きを読む …"
 	}
 }
 

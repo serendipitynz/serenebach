@@ -90,7 +90,9 @@ func (v ListView) Render() (string, error) {
 	// list kinds — home, tag, archive — leave the tags empty and
 	// the block stripped.
 	if v.Category != nil {
-		c.Tag("category_name", v.Category.Name)
+		catLink := html.EscapeString(v.Site.CategoryPermalink(*v.Category))
+		catName := html.EscapeString(v.Category.Name)
+		c.Tag("category_name", `<a href="`+catLink+`">`+catName+`</a>`)
 		c.Tag("category_description", renderDescription(v.Category.Description, v.Category.DescriptionFormat))
 	}
 	applyCategoryAreaBlock(v.Site, c, tmpl, v.Category, v.Categories)
@@ -104,10 +106,20 @@ func (v ListView) Render() (string, error) {
 		c.Tag("entry_permalink", v.Site.EntryPermalink(e))
 		c.Tag("entry_title", e.Title)
 		c.Tag("entry_date", v.Site.FormatListDate(e.PostedAt))
-		c.Tag("entry_time", v.Site.FormatEntryTime(e.PostedAt))
-		c.Tag("entry_disp_time", v.Site.FormatEntryTime(e.PostedAt))
+		permalink := html.EscapeString(v.Site.EntryPermalink(e))
+		timeStr := html.EscapeString(v.Site.FormatEntryTime(e.PostedAt))
+		c.Tag("entry_time", `<a href="`+permalink+`">`+timeStr+`</a>`)
+		c.Tag("entry_disp_time", timeStr)
 		c.Tag("entry_description", formatBody(e.Body, e.Format, "list.body"))
-		c.Tag("entry_sequel", formatBody(e.More, e.Format, "list.more"))
+		if e.More != "" {
+			label := v.Site.ReadMoreLabel
+			if label == "" {
+				label = "read more ..."
+			}
+			c.Tag("entry_sequel", `<a href="`+permalink+`#sequel">`+html.EscapeString(label)+`</a>`)
+		} else {
+			c.Tag("entry_sequel", "")
+		}
 		c.Tag("entry_mode", "list")
 		c.Tag("entry_likes_count", strconv.FormatInt(e.LikesCount, 10))
 		c.Tag("entry_like_url", v.Site.EntryPermalink(e)+"like")
@@ -130,13 +142,15 @@ func (v ListView) Render() (string, error) {
 		c.Tag("sb_entry_marking", `<a id="mark`+strconv.FormatInt(e.ID, 10)+`"></a>`)
 
 		if cat, ok := v.Categories[e.CategoryID]; ok {
-			c.Tag("category_name", cat.Name)
+			catLink := html.EscapeString(v.Site.CategoryPermalink(cat))
+			catName := html.EscapeString(cat.Name)
+			c.Tag("category_name", `<a href="`+catLink+`">`+catName+`</a>`)
 			c.Tag("category_id", strconv.FormatInt(cat.ID, 10))
 			c.Tag("category_disp_name", cat.Name)
 		} else {
-			c.Tag("category_name", "")
+			c.Tag("category_name", "-")
 			c.Tag("category_id", "")
-			c.Tag("category_disp_name", "")
+			c.Tag("category_disp_name", "-")
 		}
 		if u, ok := v.Users[e.AuthorID]; ok {
 			// See entry.go for the SB3 semantics — user_name is the

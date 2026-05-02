@@ -45,7 +45,7 @@ func TestEntryViewRendersWithSequelBlock(t *testing.T) {
 	}
 	for _, want := range []string{
 		`<h1>Main</h1>`,
-		`<p>body</p>`,
+		`<p>body</p><a id="sequel"></a>`,
 		`<div class="sequel"><p>追記</p></div>`,
 		`<a href="https://example.com/entry/99/">« Older</a>`,
 		`<a href="https://example.com/entry/101/">Newer »</a>`,
