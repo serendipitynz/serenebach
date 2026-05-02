@@ -92,9 +92,10 @@
   var aceReadyResolve = null;
   var aceReady = new Promise(function (res) { aceReadyResolve = res; });
   if (codeTargets.length > 0) {
-    loadScript('/admin/static/ace/ace.js').then(function () {
+    var aceBase = (window.__sbRoot || '') + '/admin/static/ace/';
+    loadScript(aceBase + 'ace.js').then(function () {
       if (!window.ace) { aceReadyResolve(false); return; }
-      window.ace.config.set('basePath', '/admin/static/ace/');
+      window.ace.config.set('basePath', aceBase);
       codeTargets.forEach(upgradeTextareaToAce);
       aceReadyResolve(true);
     }).catch(function () {
