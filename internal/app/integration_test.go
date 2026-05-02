@@ -18,6 +18,18 @@ import (
 // uses in place of CSRF tokens for reader-facing endpoints.
 const testPublicOrigin = "http://example.com"
 
+// mainArea returns the substring of body up to the sidebar <aside>,
+// or the whole body if no sidebar marker is found. Tests that assert
+// "entry X must not appear" should scope to this — the default
+// template's sidebar widgets ({latest_entry_list}, {category_list}, …)
+// legitimately surface entries from outside the current page filter.
+func mainArea(body string) string {
+	if i := strings.Index(body, `<aside`); i >= 0 {
+		return body[:i]
+	}
+	return body
+}
+
 // newTestApp spins up a full App against a fresh temp-dir SQLite file,
 // runs migrations, and seeds in demo data so the home page has content.
 // Honours SB_REBUILD_OUT so tests that exercise the admin rebuild trigger
@@ -73,10 +85,10 @@ func TestHomeRendersSeededContent(t *testing.T) {
 
 	for _, want := range []string{
 		`<title>Serene Bach</title>`,
-		`<h1><a href="/">Serene Bach</a></h1>`,
+		`<h1 id="top"><a href="/">Serene Bach</a></h1>`,
 		`ようこそ Serene Bach へ`,
 		`カテゴリとテンプレートについて`,
-		`<span class="category"><a href="/category/1/">お知らせ</a></span>`,
+		`<span class="entry_state_meta"><a href="/category/1/">お知らせ</a>`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("home body missing %q\nfull body:\n%s", want, body)
