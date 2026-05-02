@@ -60,12 +60,16 @@
     });
   }
   function readCookie(name) {
+    var encName = 'ENC_' + name;
     var pairs = document.cookie ? document.cookie.split('; ') : [];
     for (var i = 0; i < pairs.length; i++) {
       var idx = pairs[i].indexOf('=');
-      if (idx > 0 && pairs[i].slice(0, idx) === name) {
-        try { return decodeURIComponent(pairs[i].slice(idx + 1)); }
-        catch (e) { return ''; }
+      if (idx > 0) {
+        var cname = pairs[i].slice(0, idx);
+        if (cname === name || cname === encName) {
+          try { return decodeURIComponent(pairs[i].slice(idx + 1)); }
+          catch (e) { return ''; }
+        }
       }
     }
     return '';
