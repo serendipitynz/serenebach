@@ -57,8 +57,10 @@ the Taskfile is optional — use it if you like typing less.
 | `task seed` | Create / update the admin user, bundled template, and sample entries |
 | `task migrate` | Apply pending migrations (also runs on every startup) |
 | `task build-site` | Render the whole site to static HTML under `./data/public` |
+| `task extract-assets` | Write embedded admin assets to `./admin-static` for Apache direct serving in CGI mode |
 | `task import -- <path>` | Import from a legacy SereneBach v3 SQLite database |
 | `./bin/serenebach mcp serve` | Start the MCP server over stdio — exposes the read tools to Claude Code / Cursor / Zed |
+| `./bin/serenebach extract-assets` | Write embedded admin assets (`admin.css`, `admin.js`, logos, favicon) to disk so Apache can serve them directly in CGI mode. See [docs/deployment.md](docs/deployment.md) |
 | `task test` | `go test ./...` |
 | `task tidy` | `go mod tidy` |
 | `task clean` | Remove `./bin` and `./data` |

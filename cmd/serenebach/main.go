@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/http/cgi"
 	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/serendipitynz/serenebach/internal/app"
 	"github.com/serendipitynz/serenebach/internal/config"
@@ -16,6 +18,8 @@ import (
 	"github.com/serendipitynz/serenebach/internal/importer"
 	"github.com/serendipitynz/serenebach/internal/mcp"
 	"github.com/serendipitynz/serenebach/internal/rebuild"
+	"github.com/serendipitynz/serenebach/internal/version"
+	admintpl "github.com/serendipitynz/serenebach/web/templates/admin"
 )
 
 // inCGI is set once at startup: true when GATEWAY_INTERFACE is present,
@@ -112,8 +116,10 @@ func main() {
 			log.Fatalf("mcp: usage: serenebach mcp serve")
 		}
 		runMCPServe(a)
+	case "extract-assets":
+		runExtractAssets(subArgs)
 	default:
-		log.Fatalf("unknown subcommand: %q (want: serve | seed | migrate | import | build)", subcmd)
+		log.Fatalf("unknown subcommand: %q (want: serve | seed | migrate | import | build | extract-assets)", subcmd)
 	}
 }
 
@@ -147,6 +153,50 @@ func serve(a *app.App, cfg *config.Config) error {
 	}
 	srv := &http.Server{Addr: cfg.Addr, Handler: h}
 	return srv.ListenAndServe()
+}
+
+// runExtractAssets writes the embedded admin static files (admin.css,
+// admin.js, logos, favicon) to disk so Apache can serve them directly
+// in CGI deployments. This is opt-in — operators on memory-constrained
+// shared hosting (e.g. Sakura) pair this with an .htaccess RewriteRule
+// that excludes /admin/static/ from the CGI handler. Other deployments
+// don't need to run it; the embedded path keeps working as a fallback.
+func runExtractAssets(args []string) {
+	fs := flag.NewFlagSet("extract-assets", flag.ExitOnError)
+	out := fs.String("out", "./admin-static", "directory to write the embedded admin assets to")
+	_ = fs.Parse(args)
+
+	files := []struct {
+		name   string // path within the admin template FS
+		outRel string // path relative to --out
+	}{
+		{"admin.css", "admin.css"},
+		{"admin.js", "admin.js"},
+		{"assets/sb_logo_dark.svg", "sb_logo_dark.svg"},
+		{"assets/sb_logo_light.svg", "sb_logo_light.svg"},
+		{"assets/sb_logo_gray.svg", "sb_logo_gray.svg"},
+		{"assets/favicon.png", "favicon.png"},
+	}
+	if err := os.MkdirAll(*out, 0o755); err != nil {
+		log.Fatalf("extract-assets: mkdir: %v", err)
+	}
+	for _, f := range files {
+		body, err := admintpl.Raw(f.name)
+		if err != nil {
+			log.Fatalf("extract-assets: %s: %v", f.name, err)
+		}
+		full := filepath.Join(*out, f.outRel)
+		if err := os.WriteFile(full, body, 0o644); err != nil {
+			log.Fatalf("extract-assets: write %s: %v", full, err)
+		}
+		fmt.Fprintf(os.Stderr, "extract-assets: wrote %s (%d bytes)\n", full, len(body))
+	}
+	// Write a MANIFEST so operators can verify version alignment after
+	// a binary upgrade.
+	manifest := fmt.Sprintf("serenebach %s\nextracted: %s\n",
+		version.Full(), time.Now().UTC().Format(time.RFC3339))
+	_ = os.WriteFile(filepath.Join(*out, "MANIFEST"), []byte(manifest), 0o644)
+	fmt.Fprintln(os.Stderr, "extract-assets: ok")
 }
 
 func runBuild(a *app.App, subArgs []string) {

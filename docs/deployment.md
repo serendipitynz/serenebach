@@ -50,6 +50,41 @@ For CGI hosting, copy the appropriate binary to the host and
 rename it (typically to `serenebach.cgi`) to match the web server's
 CGI configuration.
 
+### Speeding up admin static assets in CGI mode
+
+In CGI mode every request starts a new process. Admin assets (`admin.css`,
+`admin.js`, logos) therefore pay the binary-load + goose-check overhead on
+every page load. Two mitigations are built in:
+
+1. **ETag / 304** — the binary already returns `ETag` headers and answers
+   `If-None-Match` with `304 Not Modified`. After the first load, refreshing
+   the admin page reuses the browser cache and the CGI process exits almost
+   immediately (~80–100 ms TTFB instead of ~500 ms).
+
+2. **`extract-assets` subcommand** — for hosts where you can place extra
+   files alongside the CGI binary, run:
+
+   ```bash
+   ./serenebach extract-assets --out=./admin-static
+   ```
+
+   Then add an `.htaccess` rule (or equivalent) so Apache serves those files
+   directly without invoking the CGI handler:
+
+   ```apache
+   RewriteEngine On
+   RewriteRule ^admin/static/(.+)$  admin-static/$1  [L]
+
+   <Directory "admin-static">
+       SetHandler default-handler
+       Options -ExecCGI
+   </Directory>
+   ```
+
+   This drops TTFB for assets to ~5–10 ms. The binary keeps working as a
+   fallback for any asset you didn't extract. Re-run `extract-assets` after
+   every binary upgrade because the ETag changes with the build.
+
 ### First-run setup over the browser
 
 A fresh deploy with no `users` row yet auto-redirects every request to **`/setup`**. Drop the binary + `.htaccess` onto the host, open the URL once, and the admin form lets you set a username, password, and site title without ever touching SSH or `task seed`. Once the admin row exists the gate flips off and `/setup` returns 404 for the rest of the install's life. The CLI `seed` subcommand still works and remains the recommended path for environments without browser access (FTP-only shared hosts, kiosk reinstalls, scripted provisioning).
