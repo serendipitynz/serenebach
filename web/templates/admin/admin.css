@@ -1038,11 +1038,23 @@ table.listing td.cell-clamp-host {
 .ace_editor .ace_sb_block { color: #268bd2; font-weight: 600; } /* Solarized blue */
 
 /* Markdown headings — Ace's Solarized theme paints them the same
-   weight as body text, which reads flat. Keep font-size stable so
-   the monospace grid holds, but bold + accent-colour so the `#`
-   marker and title text read as headings. Ace tokens markdown H1-H6
-   as `markup.heading.<level>` → `.ace_markup.ace_heading`. */
+    weight as body text, which reads flat. Keep font-size stable so
+    the monospace grid holds, but bold + accent-colour so the `#`
+    marker and title text read as headings. Ace tokens markdown H1-H6
+    as `markup.heading.<level>` → `.ace_markup.ace_heading`. */
 .ace_editor .ace_markup.ace_heading { color: #268bd2; font-weight: 700; }
+
+/* Ace's markdown mode tokenises the marker (`## `) as
+   `markup.heading` but the remainder of the line falls back to
+   `defaultToken: "heading"` → `.ace_heading` without the
+   `.ace_markup` prefix.  Include that class so the whole heading
+   line is styled consistently. */
+.ace_editor .ace_heading { color: #268bd2; font-weight: 700; }
+
+/* Markdown strong emphasis — `**text**` and `__text__` should render
+   in bold so the operator can distinguish emphasis from body text
+   at a glance. Ace marks these as `.ace_strong`. */
+.ace_editor .ace_strong { font-weight: 700; }
 
 /* === entry form ====================================================== */
 
@@ -1409,6 +1421,10 @@ table.listing td.cell-clamp-host {
 .image-picker[hidden] { display: none; }
 .image-picker .image-gallery { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
 .image-picker img { height: 96px; cursor: pointer; }
+.image-picker-dragover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
 
 /* === tab bar (design settings etc.) ================================= */
 
