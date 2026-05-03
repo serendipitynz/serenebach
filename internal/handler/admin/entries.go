@@ -33,6 +33,7 @@ func (h *Handler) mountEntries(r chi.Router) {
 	r.Get("/entries/{id}/edit", h.entryEditForm)
 	r.Post("/entries/{id}/edit", h.entryUpdate)
 	r.Post("/entries/{id}/delete", h.entryDelete)
+	r.Post("/entries/{id}/og", h.entryOGRegenerate)
 }
 
 // ---- list ---------------------------------------------------------------
@@ -112,6 +113,10 @@ type entryFormPageData struct {
 	TagsCSV string
 	Error   string
 	Flash   string
+	// OGCardTS is the mtime (unix seconds) of the entry's OG card
+	// file, used as a cache-busting query param on the preview img.
+	// Zero means the file doesn't exist yet.
+	OGCardTS int64
 }
 
 // buildFormatOptions exposes the formatter catalogue to the template with
@@ -134,7 +139,7 @@ func (h *Handler) entryNewForm(w http.ResponseWriter, r *http.Request) {
 		Status:     domain.EntryDraft,
 		PostedAt:   now,
 	}
-	h.renderEntryForm(w, r, "/admin/entries/new", entry, "", "", tr(r, "entries.form.titleNew"), "entry-new")
+	h.renderEntryForm(w, r, "/admin/entries/new", entry, "", "", tr(r, "entries.form.titleNew"), "entry-new", 0)
 }
 
 func (h *Handler) entryEditForm(w http.ResponseWriter, r *http.Request) {
@@ -169,7 +174,14 @@ func (h *Handler) entryEditForm(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("admin.entryEditForm: tags: %v", err)
 	}
-	h.renderEntryForm(w, r, fmt.Sprintf("/admin/entries/%d/edit", id), *e, tagsToCSV(tags), "", tr(r, "entries.form.titleEditPlain"), "entries")
+	var ogCardTS int64
+	if h.ImageDir != "" && e.ID > 0 {
+		ogPath := filepath.Join(h.ImageDir, "og", strconv.FormatInt(e.ID, 10)+".png")
+		if info, err := os.Stat(ogPath); err == nil {
+			ogCardTS = info.ModTime().Unix()
+		}
+	}
+	h.renderEntryForm(w, r, fmt.Sprintf("/admin/entries/%d/edit", id), *e, tagsToCSV(tags), "", tr(r, "entries.form.titleEditPlain"), "entries", ogCardTS)
 }
 
 // tagsToCSV renders a tag slice as the comma-separated input value used
@@ -209,7 +221,7 @@ func parseTagNames(raw string) (names []string, csv string) {
 	return names, csv
 }
 
-func (h *Handler) renderEntryForm(w http.ResponseWriter, r *http.Request, action string, entry domain.Entry, tagsCSV, errMsg, title, activeMenu string) {
+func (h *Handler) renderEntryForm(w http.ResponseWriter, r *http.Request, action string, entry domain.Entry, tagsCSV, errMsg, title, activeMenu string, ogCardTS int64) {
 	cats, err := h.Store.AllCategories(r.Context(), h.wid())
 	if err != nil {
 		log.Printf("admin.renderEntryForm: %v", err)
@@ -231,6 +243,7 @@ func (h *Handler) renderEntryForm(w http.ResponseWriter, r *http.Request, action
 		TagsCSV:       tagsCSV,
 		Error:         errMsg,
 		Flash:         r.URL.Query().Get("ok"),
+		OGCardTS:      ogCardTS,
 	})
 }
 
@@ -327,13 +340,13 @@ func (h *Handler) entryCreate(w http.ResponseWriter, r *http.Request) {
 	entry, errMsg := parseEntryForm(r, base)
 	tagNames, tagsCSV := parseTagNames(r.PostFormValue("tags"))
 	if errMsg != "" {
-		h.renderEntryForm(w, r, "/admin/entries/new", entry, tagsCSV, errMsg, tr(r, "entries.form.titleNew"), "entry-new")
+		h.renderEntryForm(w, r, "/admin/entries/new", entry, tagsCSV, errMsg, tr(r, "entries.form.titleNew"), "entry-new", 0)
 		return
 	}
 	id, err := h.Store.CreateEntry(r.Context(), entry)
 	if err != nil {
 		if errors.Is(err, repo.ErrSlugInUse) {
-			h.renderEntryForm(w, r, "/admin/entries/new", entry, tagsCSV, tr(r, "entries.form.error.slugInUse"), tr(r, "entries.form.titleNew"), "entry-new")
+			h.renderEntryForm(w, r, "/admin/entries/new", entry, tagsCSV, tr(r, "entries.form.error.slugInUse"), tr(r, "entries.form.titleNew"), "entry-new", 0)
 			return
 		}
 		log.Printf("admin.entryCreate: %v", err)
@@ -392,12 +405,12 @@ func (h *Handler) entryUpdate(w http.ResponseWriter, r *http.Request) {
 	entry, errMsg := parseEntryForm(r, *existing)
 	tagNames, tagsCSV := parseTagNames(r.PostFormValue("tags"))
 	if errMsg != "" {
-		h.renderEntryForm(w, r, fmt.Sprintf("/admin/entries/%d/edit", id), entry, tagsCSV, errMsg, tr(r, "entries.form.titleEditPlain"), "entries")
+		h.renderEntryForm(w, r, fmt.Sprintf("/admin/entries/%d/edit", id), entry, tagsCSV, errMsg, tr(r, "entries.form.titleEditPlain"), "entries", 0)
 		return
 	}
 	if err := h.Store.UpdateEntry(r.Context(), entry); err != nil {
 		if errors.Is(err, repo.ErrSlugInUse) {
-			h.renderEntryForm(w, r, fmt.Sprintf("/admin/entries/%d/edit", id), entry, tagsCSV, tr(r, "entries.form.error.slugInUse"), tr(r, "entries.form.titleEditPlain"), "entries")
+			h.renderEntryForm(w, r, fmt.Sprintf("/admin/entries/%d/edit", id), entry, tagsCSV, tr(r, "entries.form.error.slugInUse"), tr(r, "entries.form.titleEditPlain"), "entries", 0)
 			return
 		}
 		log.Printf("admin.entryUpdate: save: %v", err)
@@ -475,7 +488,7 @@ func (h *Handler) ogCardPath(entryID int64) (absDir, absFile, urlPath string) {
 // → the embedded default; paths resolve against ImageDir to match the
 // uploaded-images storage layout.
 func (h *Handler) regenerateOGCard(ctx context.Context, entry domain.Entry) {
-	if h.OG == nil || h.ImageDir == "" {
+	if h.OG == nil || h.ImageDir == "" || !h.AutoOG {
 		return
 	}
 	weblog, err := h.Store.WeblogByID(ctx, h.wid())
@@ -525,6 +538,68 @@ func (h *Handler) removeOGCard(entryID int64) {
 	}
 	_, absFile, _ := h.ogCardPath(entryID)
 	_ = os.Remove(absFile)
+}
+
+// entryOGRegenerate is the manual "build OG card now" endpoint.
+// CGI deployments disable AutoOG to avoid OOM-killing the request
+// process during save, so operators trigger generation here when
+// they want a card on disk. Server-mode deployments use this as
+// a "rebuild this one card" affordance after editing the title or
+// background. Response is a tiny JSON payload so cgi.Serve's
+// response buffering doesn't compound the RenderCard memory peak.
+func (h *Handler) entryOGRegenerate(w http.ResponseWriter, r *http.Request) {
+	if h.OG == nil || h.ImageDir == "" {
+		http.Error(w, "og disabled", http.StatusServiceUnavailable)
+		return
+	}
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || id <= 0 {
+		http.Error(w, "bad id", http.StatusBadRequest)
+		return
+	}
+	entry, err := h.Store.EntryByID(r.Context(), h.wid(), id)
+	if err != nil {
+		log.Printf("admin.entryOGRegenerate: load: %v", err)
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	weblog, err := h.Store.WeblogByID(r.Context(), h.wid())
+	if err != nil {
+		log.Printf("admin.entryOGRegenerate: load weblog: %v", err)
+		http.Error(w, "internal", http.StatusInternalServerError)
+		return
+	}
+	absDir, absFile, urlPath := h.ogCardPath(entry.ID)
+	if err := os.MkdirAll(absDir, 0o755); err != nil {
+		log.Printf("admin.entryOGRegenerate: mkdir: %v", err)
+		http.Error(w, "fs", http.StatusInternalServerError)
+		return
+	}
+	f, err := os.Create(absFile)
+	if err != nil {
+		log.Printf("admin.entryOGRegenerate: create: %v", err)
+		http.Error(w, "fs", http.StatusInternalServerError)
+		return
+	}
+	defer f.Close()
+	bgPath := h.resolveOGBG(entry.OGBGImagePath, weblog.OGBGImagePath)
+	if err := h.OG.RenderCard(f, entry.Title, weblog.Title, og.Options{
+		BGPath:    bgPath,
+		TextColor: weblog.OGTextColor,
+	}); err != nil {
+		log.Printf("admin.entryOGRegenerate: render: %v", err)
+		http.Error(w, "render", http.StatusInternalServerError)
+		return
+	}
+	// Cache-bust the preview by appending the file's mtime — the
+	// <img src> on the form caches aggressively otherwise.
+	info, _ := f.Stat()
+	var ts int64
+	if info != nil {
+		ts = info.ModTime().Unix()
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	fmt.Fprintf(w, `{"ok":true,"url":%q,"ts":%d}`, root(r)+urlPath, ts)
 }
 
 // wid pins admin pages to the app's default weblog while multi-blog UX is

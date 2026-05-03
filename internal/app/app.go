@@ -88,20 +88,13 @@ func New(cfg *config.Config) (*App, error) {
 	// startup. A failure here (missing embedded asset, bad font) logs
 	// and skips the feature rather than refusing to boot — the card
 	// generation is nice-to-have, not load-bearing.
-	// OG card generation is skipped in CGI mode: cgi.Serve buffers the
-	// entire response before writing to stdout, so heavy image processing
-	// (1200×630 RGBA + CatmullRom scale + PNG encode) inside the handler
-	// runs before any response bytes reach Apache. On memory-constrained
-	// shared hosting this causes the process to be OOM-killed mid-handler,
-	// leaving stdout empty and producing Apache's "End of script output
-	// before headers" error. Cards generated in server mode persist on
-	// disk and are served as static files by Apache in CGI deployments.
-	var ogRenderer *og.Renderer
-	if cfg.Mode != config.ModeCGI {
-		ogRenderer, err = og.New()
-		if err != nil {
-			log.Printf("app: OG renderer disabled: %v", err)
-		}
+	// Renderer is built in every mode (cost is small: font parse + one
+	// PNG decode, ~1 ms). Auto-regeneration on save is gated separately
+	// by Handler.AutoOG so CGI mode avoids the OOM risk while still
+	// allowing explicit manual generation via POST /admin/entries/{id}/og.
+	ogRenderer, err := og.New()
+	if err != nil {
+		log.Printf("app: OG renderer disabled: %v", err)
 	}
 
 	rebuilder := admin.NewRebuilderWithImages(cfg.RebuildOutDir, cfg.ImageDir, cfg.TemplateDir, cfg.BasePath)
@@ -119,6 +112,7 @@ func New(cfg *config.Config) (*App, error) {
 		AnalyticsDBPath:     cfg.AnalyticsDBPath,
 		MCPAuditDBPath:      cfg.MCPAuditDBPath,
 		OG:                  ogRenderer,
+		AutoOG:              cfg.Mode != config.ModeCGI,
 	}
 	publicH := &public.Handler{Store: store, WID: DefaultWID, Turnstile: cfVerifier, TrustedProxies: cfg.TrustedProxies}
 	// Load SB3 legacy URL inputs once at startup. A weblog never
