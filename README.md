@@ -10,7 +10,7 @@ A self-hostable Go weblog engine — a lighter path between WordPress and Hugo. 
 - Single statically-linked Go binary, no CGO
 - SQLite via [`modernc.org/sqlite`](https://modernc.org/sqlite) (pure Go) — no separate database server
 - Runs as a long-lived HTTP server, **or** as a CGI program on traditional shared hosting
-- Embedded admin UI, MCP server, and end-user help — nothing extra to deploy
+- Embedded admin UI, MCP server, MCP OAuth proxy, and end-user help — nothing extra to deploy
 - Static rebuild for hybrid hosting (CDN / static front, dynamic admin behind)
 - Imports content from legacy Serene Bach v2 (flat-file) and v3 (SQLite) installations
 
@@ -26,6 +26,13 @@ Open <http://localhost:8080/> in a browser. The first request to a database with
 Prefer the CLI? `task seed` still works — it creates the dev DB and seeds an admin (`admin` / `changeme` by default; override via `SB_ADMIN_NAME` / `SB_ADMIN_PASSWORD`) without going through the browser flow.
 
 A `.env` template ships at `.env.example`. Copy it to `.env` and fill in `SB_AI_SECRET` if you plan to enable the AI writing assists.
+
+## Companion tools
+
+| Tool | What it does |
+|---|---|
+| `./bin/serenebach mcp serve` | Start the MCP server over stdio for Claude Code / Cursor / Zed |
+| `task build-proxy` | Build the MCP OAuth proxy (`bin/mcp-oauth-proxy`) — bridges ChatGPT's OAuth-only MCP client to Serene Bach's Bearer-token `/mcp` endpoint. See `cmd/mcp-oauth-proxy/README.md` for env vars and ChatGPT configuration. |
 
 ## Documentation
 

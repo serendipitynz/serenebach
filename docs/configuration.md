@@ -25,6 +25,21 @@ Every knob the running binary respects, plus the `task` shortcuts the dev workfl
 | `SB_TRUSTED_PROXIES` | CIDRs whose `X-Forwarded-For` headers are honoured (comma-separated). Leave empty for direct-to-internet deployments |
 | `SB_PUBLIC_ALLOWED_ORIGINS` | Additional origins permitted on reader-facing POSTs (comments, likes, stamps). Comma-separated, full `scheme://host[:port]` |
 
+### MCP OAuth proxy env vars
+
+These are read by `cmd/mcp-oauth-proxy`, not the main binary. Set them when running the proxy standalone.
+
+| Variable | Purpose |
+|---|---|
+| `UPSTREAM_URL` | Base URL of the Serene Bach instance the proxy forwards to (e.g. `https://blog.example.com`) |
+| `MCP_BEARER_TOKEN` | Static Bearer token minted in `/admin/settings/ai` → **MCPトークン管理** |
+| `OAUTH_CLIENT_ID` | Client ID registered in ChatGPT's MCP settings (e.g. `chatgpt_mcp`) |
+| `OAUTH_REDIRECT_URIS` | **Recommended for public deployments.** Comma-separated allowlist of `redirect_uri` values. When empty, any URI is accepted (development only). |
+| `AUTH_PIN` | **Recommended for public deployments.** If set, the `/authorize` page requires this PIN before issuing a code |
+| `BASE_URL` | Public URL of the proxy itself, used in OAuth metadata (default `http://localhost:8080`) |
+| `PROXY_LISTEN_ADDR` | Listen address for the proxy (default `:8080`) |
+| `TOKEN_TTL` | Access-token lifetime (default `24h`) |
+
 ## Top-level flags
 
 | Flag | Purpose |
@@ -53,6 +68,7 @@ Everything below is a `go run` or `go build` under the hood, so the Taskfile is 
 | `task build-site` | Render the whole site to static HTML under `./data/public` |
 | `task extract-assets` | Write embedded admin assets to `./admin-static` for Apache direct serving in CGI mode |
 | `task import -- <path>` | Import from a legacy SereneBach v3 SQLite database |
+| `task build-proxy` | Build the MCP OAuth proxy at `./bin/mcp-oauth-proxy`. Bridges ChatGPT's OAuth-only MCP client to Serene Bach's Bearer-token `/mcp` endpoint. See `cmd/mcp-oauth-proxy/README.md` for env vars and ChatGPT configuration. |
 | `./bin/serenebach mcp serve` | Start the MCP server over stdio — exposes the read tools to Claude Code / Cursor / Zed |
 | `./bin/serenebach extract-assets` | Write embedded admin assets (`admin.css`, `admin.js`, logos, favicon) to disk so Apache can serve them directly in CGI mode. See [docs/deployment.md](docs/deployment.md) |
 | `task test` | `go test ./...` |
