@@ -1255,6 +1255,83 @@
     });
   }
 
+  // ---- image picker drag-and-drop upload ------------------------------
+  // Dropping files directly onto the open picker panel uploads them
+  // through the same /admin/images endpoint used by the dedicated
+  // upload page. After the batch finishes (including optional auto-alt
+  // generation) the picker refreshes so the new images appear
+  // immediately without requiring a page reload.
+  if (picker) {
+    picker.addEventListener('dragover', function (e) {
+      if (!e.dataTransfer) return;
+      if (hasFiles(e.dataTransfer)) {
+        e.preventDefault();
+        picker.classList.add('image-picker-dragover');
+      }
+    });
+    picker.addEventListener('dragleave', function (e) {
+      picker.classList.remove('image-picker-dragover');
+    });
+    picker.addEventListener('drop', function (e) {
+      if (!e.dataTransfer) return;
+      picker.classList.remove('image-picker-dragover');
+      if (!hasFiles(e.dataTransfer)) return;
+      e.preventDefault();
+
+      var token = readCSRFToken();
+      var files = e.dataTransfer.files;
+      var total = files.length;
+      var done = 0;
+      var errors = [];
+      var altPending = [];
+
+      if (pickerBody) {
+        pickerBody.textContent = sbT('js.upload.uploading', 0, total);
+      }
+
+      var chain = Promise.resolve();
+      Array.prototype.slice.call(files).forEach(function (file) {
+        chain = chain.then(function () {
+          return uploadFile(file, token).then(function (result) {
+            done += 1;
+            if (!result.ok) {
+              errors.push((file.name || 'file') + ': ' + (result.body && result.body.error || ('HTTP ' + result.status)));
+            } else if (result.body && result.body.auto_alt_requested && result.body.id) {
+              altPending.push(result.body.id);
+            }
+            if (pickerBody) pickerBody.textContent = sbT('js.upload.uploading', done, total);
+          });
+        });
+      });
+
+      chain.then(function () {
+        if (errors.length) { alert(errors.join('\n')); }
+        if (altPending.length === 0) {
+          loadPickerImages();
+          return;
+        }
+        if (pickerBody) pickerBody.textContent = sbT('js.ai.altGenerating', altPending.length);
+        var altPromises = altPending.map(function (id) {
+          return fetch('/admin/images/' + id + '/alt', {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': token, 'Accept': 'application/json' },
+            credentials: 'same-origin'
+          }).then(function (res) { return res.json().catch(function () { return { ok: false }; }); })
+            .catch(function () { return { ok: false }; });
+        });
+        Promise.all(altPromises).then(function (results) {
+          var failed = results.filter(function (r) { return !r.ok; }).length;
+          if (failed > 0) {
+            showToast(sbT('js.ai.altFail', failed));
+          } else {
+            showToast(sbT('js.ai.altDone', results.length));
+          }
+          loadPickerImages();
+        });
+      });
+    });
+  }
+
   // Cached picker items so the filter input can narrow without
   // re-fetching. Populated on first picker open.
   var pickerItems = null;
