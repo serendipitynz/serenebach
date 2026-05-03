@@ -249,8 +249,8 @@ func TestAdminEntryOGRegenerateRequiresCSRF(t *testing.T) {
 }
 
 // TestAdminEntryEditForbiddenForOtherAuthor pins the authorization rule
-// for both the GET form and the POST update: a regular user must not be
-// able to view or modify another author's entry.
+// for the GET form, POST update, and POST /og endpoints: a regular user
+// must not be able to view or modify another author's entry.
 func TestAdminEntryEditForbiddenForOtherAuthor(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
@@ -288,6 +288,12 @@ func TestAdminEntryEditForbiddenForOtherAuthor(t *testing.T) {
 	}
 	if w := authedPOSTForm(t, a.Handler(), "/admin/entries/1/edit", updateForm, aliceCookie); w.Code != http.StatusForbidden {
 		t.Errorf("POST update: status = %d, want 403", w.Code)
+	}
+
+	// The OG regeneration endpoint must also be guarded — otherwise a
+	// regular user could overwrite another author's OG card image.
+	if w := authedPOSTForm(t, a.Handler(), "/admin/entries/1/og", url.Values{}, aliceCookie); w.Code != http.StatusForbidden {
+		t.Errorf("POST og: status = %d, want 403", w.Code)
 	}
 
 	// Confirm the row was not modified.

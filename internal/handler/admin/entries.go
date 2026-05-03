@@ -563,6 +563,11 @@ func (h *Handler) entryOGRegenerate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+	u := session.UserFrom(r.Context())
+	if u == nil || !u.CanEditEntry(entry.AuthorID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
 	weblog, err := h.Store.WeblogByID(r.Context(), h.wid())
 	if err != nil {
 		log.Printf("admin.entryOGRegenerate: load weblog: %v", err)
