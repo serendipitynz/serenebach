@@ -66,6 +66,12 @@ type Handler struct {
 	// OG owns Open Graph card generation. May be nil if OG is disabled —
 	// callers fall back to skipping card updates, not erroring the save.
 	OG *og.Renderer
+	// AutoOG controls whether save/publish handlers regenerate the OG
+	// card automatically. False in CGI mode — under cgi.Serve the
+	// PNG encode peak (~10 MB+) on top of buffered response bytes
+	// can OOM-kill shared-hosting processes mid-handler. CGI operators
+	// trigger generation explicitly via POST /admin/entries/{id}/og.
+	AutoOG bool
 	// Setup runs the first-run install against the application. nil
 	// disables the /setup endpoint entirely (MountSetup becomes a
 	// no-op). app.New populates this with a closure around app.Seed

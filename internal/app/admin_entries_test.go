@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -197,9 +199,58 @@ func TestAdminEntryEdit404ForUnknownID(t *testing.T) {
 	}
 }
 
+func TestAdminEntryOGRegenerate(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	cookie := login(t, a.Handler(), "admin", "changeme")
+
+	// POST to regenerate OG card for entry 1
+	w := authedPOSTForm(t, a.Handler(), "/admin/entries/1/og", url.Values{}, cookie)
+	if w.Code != 200 {
+		t.Fatalf("status = %d, want 200; body:\n%s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, `"ok":true`) {
+		t.Errorf("missing ok=true in response: %s", body)
+	}
+
+	// File should exist on disk
+	ogPath := filepath.Join(a.Config.ImageDir, "og", "1.png")
+	if _, err := os.Stat(ogPath); err != nil {
+		t.Errorf("OG card not written to disk: %v", err)
+	}
+}
+
+func TestAdminEntryOGRegenerate404ForUnknownID(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	cookie := login(t, a.Handler(), "admin", "changeme")
+
+	w := authedPOSTForm(t, a.Handler(), "/admin/entries/9999/og", url.Values{}, cookie)
+	if w.Code != 404 {
+		t.Fatalf("status = %d, want 404", w.Code)
+	}
+}
+
+func TestAdminEntryOGRegenerateRequiresCSRF(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	cookies := login(t, a.Handler(), "admin", "changeme")
+
+	req := httptest.NewRequest("POST", "/admin/entries/1/og", nil)
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
+	w := httptest.NewRecorder()
+	a.Handler().ServeHTTP(w, req)
+	if w.Code != 403 {
+		t.Fatalf("status = %d, want 403 (CSRF missing)", w.Code)
+	}
+}
+
 // TestAdminEntryEditForbiddenForOtherAuthor pins the authorization rule
-// for both the GET form and the POST update: a regular user must not be
-// able to view or modify another author's entry.
+// for the GET form, POST update, and POST /og endpoints: a regular user
+// must not be able to view or modify another author's entry.
 func TestAdminEntryEditForbiddenForOtherAuthor(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
@@ -237,6 +288,12 @@ func TestAdminEntryEditForbiddenForOtherAuthor(t *testing.T) {
 	}
 	if w := authedPOSTForm(t, a.Handler(), "/admin/entries/1/edit", updateForm, aliceCookie); w.Code != http.StatusForbidden {
 		t.Errorf("POST update: status = %d, want 403", w.Code)
+	}
+
+	// The OG regeneration endpoint must also be guarded — otherwise a
+	// regular user could overwrite another author's OG card image.
+	if w := authedPOSTForm(t, a.Handler(), "/admin/entries/1/og", url.Values{}, aliceCookie); w.Code != http.StatusForbidden {
+		t.Errorf("POST og: status = %d, want 403", w.Code)
 	}
 
 	// Confirm the row was not modified.

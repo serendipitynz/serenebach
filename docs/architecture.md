@@ -103,7 +103,7 @@ Admin analytics (`/admin/analytics`) shows PV / いいね / スタンプ as thre
 
 ## Open Graph cards
 
-Every published entry gets a 1200×630 PNG card at `<SB_IMAGE_DIR>/og/<entry_id>.png`. The card is regenerated on entry create / update and removed on delete. The default template emits the standard meta tags in `<head>`:
+Every published entry gets a 1200×630 PNG card at `<SB_IMAGE_DIR>/og/<entry_id>.png`. The card is regenerated on entry create / update (server mode) and removed on delete. The default template emits the standard meta tags in `<head>`:
 
 ```html
 <meta property="og:title" content="{entry_title}">
@@ -121,6 +121,8 @@ The renderer is pure Go — Noto Sans JP (Medium) and the SB default background 
 - Blog-wide background and text colour at `/admin/templates/og`. Off-aspect backgrounds are centre-cropped (CSS `object-fit: cover` semantics); text colour applies to both the entry title and the site name.
 - Per-entry override on the entry editor (`OG カード背景` field).
 - Resolution priority at render time: entry → weblog → embedded default. Decode failures silently fall through.
+
+**CGI mode note:** `cgi.Serve` buffers the entire response before writing to stdout, so the memory spike during PNG encoding can OOM-kill shared-hosting processes. To avoid this, auto-regeneration on save is disabled in CGI mode. Operators can still generate cards explicitly via the **OG カードを生成** button on the entry editor, which posts to `POST /admin/entries/{id}/og` and returns a small JSON payload so the buffer stays tiny.
 
 Static rebuild mirrors `<SB_IMAGE_DIR>` (including `og/`) into `<OutDir>/img/`, so a statically-deployed site carries the cards alongside the HTML.
 

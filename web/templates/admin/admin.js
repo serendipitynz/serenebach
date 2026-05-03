@@ -1176,6 +1176,44 @@
     });
   });
 
+  // ---- OG card manual generation ---------------------------------------
+  var ogGenerateBtn = document.querySelector('[data-og-card-generate]');
+  if (ogGenerateBtn) {
+    ogGenerateBtn.addEventListener('click', function () {
+      var match = window.location.pathname.match(/\/admin\/entries\/(\d+)\/edit$/);
+      if (!match) return;
+      var entryID = match[1];
+      var statusEl = document.querySelector('[data-og-card-status]');
+      var preview = document.querySelector('[data-og-card-preview]');
+      ogGenerateBtn.disabled = true;
+      if (statusEl) {
+        statusEl.hidden = false;
+        statusEl.textContent = '...';
+      }
+      var body = new URLSearchParams({ csrf_token: readCSRFToken() });
+      fetch(window.location.pathname.replace(/\/edit$/, '/og'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body,
+        credentials: 'same-origin',
+      })
+        .then(function (res) { return res.ok ? res.json() : Promise.reject(res); })
+        .then(function (data) {
+          if (preview && data && data.url) {
+            preview.src = data.url + (data.url.indexOf('?') >= 0 ? '&' : '?') + 'ts=' + data.ts;
+            preview.hidden = false;
+          }
+          if (statusEl) statusEl.textContent = 'OK';
+        })
+        .catch(function () {
+          if (statusEl) statusEl.textContent = 'NG';
+        })
+        .finally(function () {
+          ogGenerateBtn.disabled = false;
+        });
+    });
+  }
+
   // OG text-color controls — checkbox toggles picker enable state,
   // Clear wipes both and flips the unset marker so the server stores
   // empty (== "use defaults") rather than whatever hex the picker

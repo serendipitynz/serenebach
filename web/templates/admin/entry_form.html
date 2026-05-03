@@ -111,6 +111,20 @@
         <button type="button" class="link" data-og-bg-clear>{{T "entries.form.ogBg.clear"}}</button>
       </div>
       <p class="hint">{{T "entries.form.ogBgHint"}}</p>
+
+      {{if .Entry.ID}}
+      <div class="og-card-row" data-og-card-row>
+        <img class="og-card-preview" data-og-card-preview
+             src="{{Root}}/img/og/{{.Entry.ID}}.png?ts={{.OGCardTS}}"
+             alt="" loading="lazy"
+             onerror="this.hidden = true">
+        <button type="button" class="btn-secondary" data-og-card-generate>
+          {{T "entries.form.ogCard.generate"}}
+        </button>
+        <span class="og-card-status" data-og-card-status hidden></span>
+      </div>
+      <p class="hint">{{T "entries.form.ogCardHint"}}</p>
+      {{end}}
     </div>
   </div>
 

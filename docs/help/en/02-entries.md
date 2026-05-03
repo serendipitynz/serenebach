@@ -35,7 +35,7 @@ The "more" section holds a longer continuation that's revealed on the individual
 | Posted at | The timestamp shown on the entry. Future dates are allowed |
 | Slug | A short URL component used in place of the numeric ID |
 | Keywords | Used for `<meta name="keywords">` in supported templates |
-| OG card background | Override the social-share card background per entry |
+| OG card background | Override the social-share card background per entry. After saving, use the **Generate OG card** button to rebuild it manually |
 
 ## Entry status
 

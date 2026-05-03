@@ -77,6 +77,8 @@ If the deployment is fresh, you can rerun `seed` to recreate the initial admin u
 
 Saving an entry usually refreshes its OG card image. If a social network is still showing an old card, it's likely the social network's own cache.
 
+You can also regenerate a card manually from the entry editor using the **Generate OG card** button. In CGI deployments this is the only way an OG card gets written to disk, because auto-generation on save is disabled to avoid OOM kills.
+
 Changing the blog-wide OG background or text colour kicks off a regeneration that takes a moment. For static deployments, run a rebuild as well.
 
 ## Checking the version

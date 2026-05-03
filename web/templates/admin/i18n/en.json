@@ -267,6 +267,8 @@
   "entries.form.ogBg.pick": "Choose image",
   "entries.form.ogBg.clear": "Clear",
   "entries.form.ogBgHint": "Background image for this entry's OG card. If unset, falls back to the blog-wide default.",
+  "entries.form.ogCard.generate": "Generate OG card",
+  "entries.form.ogCardHint": "Use this button to rebuild the card after changing the title or background. In CGI deployments this is the only way an OG card gets written to disk.",
   "entries.form.saveDraft": "Save as draft",
   "entries.form.savePublish": "Save & publish",
   "entries.form.imgFilter": "Filter by filename",
