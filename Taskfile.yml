@@ -26,6 +26,11 @@ tasks:
     cmds:
       - go build -o {{.OUT}} {{.PKG}}
 
+  build-proxy:
+    desc: Build the MCP OAuth proxy
+    cmds:
+      - go build -o bin/mcp-oauth-proxy ./cmd/mcp-oauth-proxy
+
   # Cross-compilation targets are named by build configuration
   # (GOOS-GOARCH) rather than by use case. Pure-Go SQLite
   # (modernc.org/sqlite) keeps CGO_ENABLED=0 viable on every target.
