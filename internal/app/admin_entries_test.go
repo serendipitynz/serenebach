@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -194,6 +196,55 @@ func TestAdminEntryEdit404ForUnknownID(t *testing.T) {
 	w := authedGET(t, a.Handler(), "/admin/entries/9999/edit", cookie)
 	if w.Code != 404 {
 		t.Fatalf("status = %d, want 404", w.Code)
+	}
+}
+
+func TestAdminEntryOGRegenerate(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	cookie := login(t, a.Handler(), "admin", "changeme")
+
+	// POST to regenerate OG card for entry 1
+	w := authedPOSTForm(t, a.Handler(), "/admin/entries/1/og", url.Values{}, cookie)
+	if w.Code != 200 {
+		t.Fatalf("status = %d, want 200; body:\n%s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, `"ok":true`) {
+		t.Errorf("missing ok=true in response: %s", body)
+	}
+
+	// File should exist on disk
+	ogPath := filepath.Join(a.Config.ImageDir, "og", "1.png")
+	if _, err := os.Stat(ogPath); err != nil {
+		t.Errorf("OG card not written to disk: %v", err)
+	}
+}
+
+func TestAdminEntryOGRegenerate404ForUnknownID(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	cookie := login(t, a.Handler(), "admin", "changeme")
+
+	w := authedPOSTForm(t, a.Handler(), "/admin/entries/9999/og", url.Values{}, cookie)
+	if w.Code != 404 {
+		t.Fatalf("status = %d, want 404", w.Code)
+	}
+}
+
+func TestAdminEntryOGRegenerateRequiresCSRF(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	cookies := login(t, a.Handler(), "admin", "changeme")
+
+	req := httptest.NewRequest("POST", "/admin/entries/1/og", nil)
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
+	w := httptest.NewRecorder()
+	a.Handler().ServeHTTP(w, req)
+	if w.Code != 403 {
+		t.Fatalf("status = %d, want 403 (CSRF missing)", w.Code)
 	}
 }
 
