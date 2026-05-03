@@ -7,10 +7,12 @@ import (
 	"strings"
 )
 
-// Public is the human-facing version shown on every admin page. Bump it
-// manually on notable releases — kept as a string so date-suffix schemes
-// (e.g. "4.0-preview") are free to land without code changes.
-const Public = "4.0"
+// Public is the human-facing version shown on every admin page.
+// Format: SemVer pre-release style — "4.0.0-beta.N" during beta, "4.0.0" at GA.
+// Bump this BEFORE running "task release"; the tag is derived from this value.
+// After publishing a release on GitHub, immediately bump to the next beta so
+// main always reflects what the next release will be.
+const Public = "4.0.0-beta.1"
 
 // Build returns a short commit-hash-like build identifier pulled from
 // the Go toolchain's embedded VCS stamp. Empty when the binary was
