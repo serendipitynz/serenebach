@@ -2,6 +2,8 @@ package admin
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io/fs"
 	"log"
@@ -133,6 +135,15 @@ func (h *Handler) MountProtected(r chi.Router) {
 	r.Post("/ai/compose", h.aiCompose)
 }
 
+// assetETag computes a stable ETag from the embedded asset bytes.
+// The bytes are immutable for the lifetime of the binary, so the
+// hash is computed once at first call and reused. Quotes are part
+// of the RFC 7232 strong-validator format.
+func assetETag(body []byte) string {
+	sum := sha256.Sum256(body)
+	return `"` + hex.EncodeToString(sum[:8]) + `"` // 16 hex chars is plenty
+}
+
 // serveAsset reads one embedded admin asset and writes it with the given
 // Content-Type. The file list is fixed at build time so there's no path
 // traversal surface to worry about.
@@ -143,9 +154,17 @@ func serveAsset(name, contentType string) http.HandlerFunc {
 			http.Error(w, "admin asset missing", http.StatusInternalServerError)
 		}
 	}
+	etag := assetETag(body)
 	return func(w http.ResponseWriter, r *http.Request) {
+		if match := r.Header.Get("If-None-Match"); match != "" && match == etag {
+			w.Header().Set("ETag", etag)
+			w.Header().Set("Cache-Control", "public, max-age=300")
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
 		w.Header().Set("Content-Type", contentType)
 		w.Header().Set("Cache-Control", "public, max-age=300")
+		w.Header().Set("ETag", etag)
 		_, _ = w.Write(body)
 	}
 }
@@ -161,9 +180,17 @@ func serveEmbedded(name, contentType string) http.HandlerFunc {
 			http.Error(w, "admin asset missing", http.StatusInternalServerError)
 		}
 	}
+	etag := assetETag(body)
 	return func(w http.ResponseWriter, r *http.Request) {
+		if match := r.Header.Get("If-None-Match"); match != "" && match == etag {
+			w.Header().Set("ETag", etag)
+			w.Header().Set("Cache-Control", "public, max-age=86400")
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
 		w.Header().Set("Content-Type", contentType)
 		w.Header().Set("Cache-Control", "public, max-age=86400")
+		w.Header().Set("ETag", etag)
 		_, _ = w.Write(body)
 	}
 }

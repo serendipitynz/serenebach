@@ -5,10 +5,14 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"net/http/cgi"
 	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/serendipitynz/serenebach/internal/app"
 	"github.com/serendipitynz/serenebach/internal/config"
@@ -16,6 +20,8 @@ import (
 	"github.com/serendipitynz/serenebach/internal/importer"
 	"github.com/serendipitynz/serenebach/internal/mcp"
 	"github.com/serendipitynz/serenebach/internal/rebuild"
+	"github.com/serendipitynz/serenebach/internal/version"
+	admintpl "github.com/serendipitynz/serenebach/web/templates/admin"
 )
 
 // inCGI is set once at startup: true when GATEWAY_INTERFACE is present,
@@ -59,6 +65,14 @@ func main() {
 	cfg, subcmd, subArgs, err := config.Load(os.Args[1:])
 	if err != nil {
 		fatal("config: %v", err)
+	}
+
+	// extract-assets is a pure file-extraction command: it never
+	// touches the database, so dispatch it before newApp to avoid
+	// creating / migrating a DB that the operator doesn't need.
+	if subcmd == "extract-assets" {
+		runExtractAssets(subArgs)
+		return
 	}
 
 	a, err := newApp(cfg)
@@ -113,7 +127,7 @@ func main() {
 		}
 		runMCPServe(a)
 	default:
-		log.Fatalf("unknown subcommand: %q (want: serve | seed | migrate | import | build)", subcmd)
+		log.Fatalf("unknown subcommand: %q (want: serve | seed | migrate | import | build | extract-assets)", subcmd)
 	}
 }
 
@@ -147,6 +161,92 @@ func serve(a *app.App, cfg *config.Config) error {
 	}
 	srv := &http.Server{Addr: cfg.Addr, Handler: h}
 	return srv.ListenAndServe()
+}
+
+// runExtractAssets writes the embedded admin static files (admin.css,
+// admin.js, logos, favicon, and the Ace editor bundle) to disk so
+// Apache can serve them directly in CGI deployments. This is opt-in —
+// operators on memory-constrained shared hosting (e.g. Sakura) pair
+// this with an .htaccess RewriteRule that forwards /admin/static/*
+// to the extracted directory. Other deployments don't need to run it;
+// the embedded path keeps working as a fallback.
+func runExtractAssets(args []string) {
+	fset := flag.NewFlagSet("extract-assets", flag.ExitOnError)
+	out := fset.String("out", "./admin-static", "directory to write the embedded admin assets to")
+	_ = fset.Parse(args)
+
+	files := []struct {
+		name   string // path within the admin template FS
+		outRel string // path relative to --out
+	}{
+		{"admin.css", "admin.css"},
+		{"admin.js", "admin.js"},
+		{"assets/sb_logo_dark.svg", "sb_logo_dark.svg"},
+		{"assets/sb_logo_light.svg", "sb_logo_light.svg"},
+		{"assets/sb_logo_gray.svg", "sb_logo_gray.svg"},
+		{"assets/favicon.png", "favicon.png"},
+	}
+	if err := os.MkdirAll(*out, 0o755); err != nil {
+		log.Fatalf("extract-assets: mkdir: %v", err)
+	}
+	for _, f := range files {
+		body, err := admintpl.Raw(f.name)
+		if err != nil {
+			log.Fatalf("extract-assets: %s: %v", f.name, err)
+		}
+		full := filepath.Join(*out, f.outRel)
+		if err := os.WriteFile(full, body, 0o644); err != nil {
+			log.Fatalf("extract-assets: write %s: %v", full, err)
+		}
+		fmt.Fprintf(os.Stderr, "extract-assets: wrote %s (%d bytes)\n", full, len(body))
+	}
+
+	// Recursively extract assets/ace/ (Ace editor bundle) so the
+	// template editor's lazy-loaded mode/theme files are available
+	// when Apache serves /admin/static/ace/* directly.
+	aceRoot := "assets/ace"
+	entries, err := fs.ReadDir(admintpl.FS(), aceRoot)
+	if err != nil {
+		log.Fatalf("extract-assets: readdir %s: %v", aceRoot, err)
+	}
+	var walk func(dir string, entries []fs.DirEntry)
+	walk = func(dir string, entries []fs.DirEntry) {
+		for _, e := range entries {
+			pathInFS := dir + "/" + e.Name()
+			outRel := strings.TrimPrefix(pathInFS, "assets/")
+			full := filepath.Join(*out, outRel)
+			if e.IsDir() {
+				if err := os.MkdirAll(full, 0o755); err != nil {
+					log.Fatalf("extract-assets: mkdir %s: %v", full, err)
+				}
+				sub, err := fs.ReadDir(admintpl.FS(), pathInFS)
+				if err != nil {
+					log.Fatalf("extract-assets: readdir %s: %v", pathInFS, err)
+				}
+				walk(pathInFS, sub)
+				continue
+			}
+			if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+				log.Fatalf("extract-assets: mkdir %s: %v", filepath.Dir(full), err)
+			}
+			body, err := admintpl.Raw(pathInFS)
+			if err != nil {
+				log.Fatalf("extract-assets: %s: %v", pathInFS, err)
+			}
+			if err := os.WriteFile(full, body, 0o644); err != nil {
+				log.Fatalf("extract-assets: write %s: %v", full, err)
+			}
+			fmt.Fprintf(os.Stderr, "extract-assets: wrote %s (%d bytes)\n", full, len(body))
+		}
+	}
+	walk(aceRoot, entries)
+
+	// Write a MANIFEST so operators can verify version alignment after
+	// a binary upgrade.
+	manifest := fmt.Sprintf("serenebach %s\nextracted: %s\n",
+		version.Full(), time.Now().UTC().Format(time.RFC3339))
+	_ = os.WriteFile(filepath.Join(*out, "MANIFEST"), []byte(manifest), 0o644)
+	fmt.Fprintln(os.Stderr, "extract-assets: ok")
 }
 
 func runBuild(a *app.App, subArgs []string) {

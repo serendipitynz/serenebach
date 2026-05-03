@@ -120,6 +120,11 @@ tasks:
     cmds:
       - go run {{.PKG}} --db=./data/dev.db build --out=./data/public
 
+  extract-assets:
+    desc: Write embedded admin assets to disk for Apache direct serving in CGI mode
+    cmds:
+      - go run {{.PKG}} extract-assets --out=./admin-static
+
   test:
     desc: Run the Go test suite
     cmds:
