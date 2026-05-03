@@ -7,19 +7,22 @@
 // requests to the upstream Serene Bach /mcp endpoint.
 //
 // Required env vars:
-//   UPSTREAM_URL       Base URL of the Serene Bach instance (e.g. https://blog.example.com)
-//   MCP_BEARER_TOKEN   Static token the proxy attaches to upstream requests
-//   OAUTH_CLIENT_ID    Client ID that ChatGPT is configured with
+//
+//	UPSTREAM_URL       Base URL of the Serene Bach instance (e.g. https://blog.example.com)
+//	MCP_BEARER_TOKEN   Static token the proxy attaches to upstream requests
+//	OAUTH_CLIENT_ID    Client ID that ChatGPT is configured with
 //
 // Optional env vars:
-//   PROXY_LISTEN_ADDR  Listen address (default ":8080")
-//   BASE_URL           Public URL of this proxy, used in metadata (default "http://localhost:8080")
-//   AUTH_PIN           If set, the /authorize page asks for this PIN before issuing a code
-//   TOKEN_TTL          Access-token lifetime (default "24h")
+//
+//	PROXY_LISTEN_ADDR  Listen address (default ":8080")
+//	BASE_URL           Public URL of this proxy, used in metadata (default "http://localhost:8080")
+//	AUTH_PIN           If set, the /authorize page asks for this PIN before issuing a code
+//	TOKEN_TTL          Access-token lifetime (default "24h")
 //
 // Usage:
-//   go run ./cmd/mcp-oauth-proxy
-//   MCP_BEARER_TOKEN=sb_tok_xxx UPSTREAM_URL=https://blog.example.com OAUTH_CLIENT_ID=chatgpt_mcp go run ./cmd/mcp-oauth-proxy
+//
+//	go run ./cmd/mcp-oauth-proxy
+//	MCP_BEARER_TOKEN=sb_tok_xxx UPSTREAM_URL=https://blog.example.com OAUTH_CLIENT_ID=chatgpt_mcp go run ./cmd/mcp-oauth-proxy
 package main
 
 import (
@@ -40,12 +43,12 @@ import (
 )
 
 var (
-	upstreamURL    string
-	bearerToken    string
+	upstreamURL   string
+	bearerToken   string
 	oauthClientID string
-	baseURL        string
-	authPIN        string
-	tokenTTL       time.Duration
+	baseURL       string
+	authPIN       string
+	tokenTTL      time.Duration
 )
 
 func main() {
