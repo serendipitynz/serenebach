@@ -1,7 +1,6 @@
 # Configuration reference
 
-Every knob the running binary respects, plus the `task` shortcuts
-the dev workflow leans on.
+Every knob the running binary respects, plus the `task` shortcuts the dev workflow leans on.
 
 ## Environment variables
 
@@ -36,16 +35,11 @@ the dev workflow leans on.
 
 ## `.env` loading
 
-`Taskfile.yml` loads a project-root `.env` into every task's
-environment. Copy `.env.example` to `.env` and fill in values
-— most notably `SB_AI_SECRET` (required to enable the AI writing
-assists). Shell-level `VAR=x task dev` always wins over the file,
-so the two paths compose without surprises.
+`Taskfile.yml` loads a project-root `.env` into every task's environment. Copy `.env.example` to `.env` and fill in values — most notably `SB_AI_SECRET` (required to enable the AI writing assists). Shell-level `VAR=x task dev` always wins over the file, so the two paths compose without surprises.
 
 ## Task shortcuts
 
-Everything below is a `go run` or `go build` under the hood, so
-the Taskfile is optional — use it if you like typing less.
+Everything below is a `go run` or `go build` under the hood, so the Taskfile is optional — use it if you like typing less.
 
 | Command | What it does |
 |---|---|
@@ -67,12 +61,7 @@ the Taskfile is optional — use it if you like typing less.
 
 ## What lives in the UI vs the env
 
-The admin Settings page edits per-weblog content values (title,
-description, base URL, language, comment mode, spam words). Operational
-configuration — anything secret-bearing or path-bearing — stays in
-environment variables by design. The settings page surfaces the
-read-only env snapshot in 基本設定 so you can confirm what's in effect
-without SSHing in.
+The admin Settings page edits per-weblog content values (title, description, base URL, language, comment mode, spam words). Operational configuration — anything secret-bearing or path-bearing — stays in environment variables by design. The settings page surfaces the read-only env snapshot in 基本設定 so you can confirm what's in effect without SSHing in.
 
 | Edited via UI | Stays in env |
 |---|---|
@@ -81,6 +70,4 @@ without SSHing in.
 | Comment mode | `SB_REBUILD_OUT` |
 | Spam-words list / IP blacklist | `SB_ANALYTICS_*` |
 
-Changes take effect immediately for dynamic rendering. After editing
-content settings, run a static rebuild (`/admin/rebuild`) to
-regenerate the on-disk HTML with the new values.
+Changes take effect immediately for dynamic rendering. After editing content settings, run a static rebuild (`/admin/rebuild`) to regenerate the on-disk HTML with the new values.

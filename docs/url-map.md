@@ -1,10 +1,6 @@
 # URL map
 
-Every route the running server exposes, split between the public
-surface and the admin UI. Trailing slashes are accepted with or
-without (chi `middleware.StripSlashes`); the canonical form carries
-the slash so static rebuilds (`<path>/index.html`) and dynamic
-routes line up.
+Every route the running server exposes, split between the public surface and the admin UI. Trailing slashes are accepted with or without (chi `middleware.StripSlashes`); the canonical form carries the slash so static rebuilds (`<path>/index.html`) and dynamic routes line up.
 
 ## Public (server-rendered or statically built)
 
