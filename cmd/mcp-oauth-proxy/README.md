@@ -43,29 +43,36 @@ The proxy is a single statically-linked Go binary (`CGO_ENABLED=0` is fine).
 | `PROXY_LISTEN_ADDR` | `:8080` | Address to listen on |
 | `BASE_URL` | `http://localhost:8080` | Public URL of this proxy (used in OAuth metadata) |
 | `AUTH_PIN` | *(empty)* | If set, the `/authorize` page requires this PIN before issuing a code |
+| `OAUTH_REDIRECT_URIS` | *(empty)* | Comma-separated allowlist of `redirect_uri` values. **Strongly recommended for public deployments.** When empty, any URI is accepted (development only). |
 | `TOKEN_TTL` | `24h` | Access-token lifetime |
 
 ## Run
 
-### Quick start (auto-approve, no PIN)
+### Quick start (development / localhost)
+
+```bash
+export UPSTREAM_URL=https://blog.example.com
+export MCP_BEARER_TOKEN=sb_tok_xxxxxxxxxxxxxxxx
+export OAUTH_CLIENT_ID=chatgpt_mcp
+export BASE_URL=http://localhost:8080
+
+./bin/mcp-oauth-proxy
+```
+
+### Production (PIN + redirect URI allowlist)
 
 ```bash
 export UPSTREAM_URL=https://blog.example.com
 export MCP_BEARER_TOKEN=sb_tok_xxxxxxxxxxxxxxxx
 export OAUTH_CLIENT_ID=chatgpt_mcp
 export BASE_URL=https://mcp-proxy.example.com
+export AUTH_PIN=$(openssl rand -hex 4)               # e.g. 1a2b3c4d
+export OAUTH_REDIRECT_URIS="https://chatgpt.com/..." # ChatGPT's redirect URI
 
 ./bin/mcp-oauth-proxy
 ```
 
-### With PIN protection (recommended)
-
-```bash
-export AUTH_PIN=$(openssl rand -hex 4)   # e.g. 1a2b3c4d
-./bin/mcp-oauth-proxy
-```
-
-When a user (you) first connects ChatGPT, the proxy shows a simple HTML form asking for the PIN.  This prevents anyone who knows the proxy URL from obtaining an access token.
+When you first connect ChatGPT, the proxy shows a simple HTML form asking for the PIN.  This prevents anyone who knows the proxy URL from obtaining an access token.  The `OAUTH_REDIRECT_URIS` allowlist ensures that even if the `client_id` is leaked, an attacker cannot redirect the authorization code to their own endpoint.
 
 ## ChatGPT configuration
 
@@ -85,9 +92,10 @@ The first time ChatGPT connects, open the authorization URL in your browser, ent
 ## Security notes
 
 1. **Always run this behind HTTPS** in production.  Bearer tokens and authorization codes must never travel over plain HTTP.
-2. **Use `AUTH_PIN`** unless the proxy is firewalled to your own IP.  Without a PIN, anyone who discovers the proxy URL can complete the OAuth flow and obtain an access token.
+2. **Set `AUTH_PIN` and `OAUTH_REDIRECT_URIS`** for any public-facing deployment.  Without a PIN, anyone who discovers the proxy URL can complete the OAuth flow.  Without a redirect URI allowlist, anyone who knows the `client_id` can receive the authorization code on their own endpoint.
 3. **Token storage is in-memory only**.  Restarting the proxy invalidates all outstanding access tokens.  ChatGPT will simply re-run the OAuth flow.
 4. The proxy strips the upstream `WWW-Authenticate` header so Serene Bach’s internal Bearer realm is never exposed to the client.
+5. Request bodies are capped at **1 MiB** and upstream requests time out after **30 seconds** to prevent resource exhaustion.
 
 ## Endpoints
 
