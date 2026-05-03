@@ -19,6 +19,8 @@ func TestRunExtractAssetsWritesAllFiles(t *testing.T) {
 		"sb_logo_gray.svg",
 		"favicon.png",
 		"MANIFEST",
+		// Ace editor bundle (at least the core file).
+		"ace/ace.js",
 	}
 	for _, name := range want {
 		full := filepath.Join(outDir, name)

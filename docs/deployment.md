@@ -46,16 +46,14 @@ In CGI mode every request starts a new process. Admin assets (`admin.css`, `admi
    ./serenebach extract-assets --out=./admin-static
    ```
 
-   Then add an `.htaccess` rule (or equivalent) so Apache serves those files directly without invoking the CGI handler:
+   This writes `admin.css`, `admin.js`, logos, favicon, and the Ace editor bundle (`ace/*.js`) to disk.
+
+   Then add an `.htaccess` rule (or equivalent) so Apache serves extracted files directly without invoking the CGI handler, while falling back to the CGI handler for anything that wasn't extracted:
 
    ```apache
    RewriteEngine On
+   RewriteCond %{DOCUMENT_ROOT}/admin-static/$1 -f
    RewriteRule ^admin/static/(.+)$  admin-static/$1  [L]
-
-   <Directory "admin-static">
-       SetHandler default-handler
-       Options -ExecCGI
-   </Directory>
    ```
 
    This drops TTFB for assets to ~5–10 ms. The binary keeps working as a fallback for any asset you didn't extract. Re-run `extract-assets` after every binary upgrade because the ETag changes with the build.
