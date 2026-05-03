@@ -14,10 +14,11 @@
 //
 // Optional env vars:
 //
-//	PROXY_LISTEN_ADDR  Listen address (default ":8080")
-//	BASE_URL           Public URL of this proxy, used in metadata (default "http://localhost:8080")
-//	AUTH_PIN           If set, the /authorize page asks for this PIN before issuing a code
-//	TOKEN_TTL          Access-token lifetime (default "24h")
+//	PROXY_LISTEN_ADDR   Listen address (default ":8080")
+//	BASE_URL            Public URL of this proxy, used in metadata (default "http://localhost:8080")
+//	AUTH_PIN            If set, the /authorize page asks for this PIN before issuing a code
+//	OAUTH_REDIRECT_URIS Comma-separated allowlist of redirect_uris. When empty, any uri is accepted (dev only).
+//	TOKEN_TTL           Access-token lifetime (default "24h")
 //
 // Usage:
 //
@@ -42,13 +43,22 @@ import (
 	"time"
 )
 
+const (
+	maxBodyBytes      = 1 << 20 // 1 MiB cap on MCP JSON-RPC payloads
+	upstreamTimeout   = 30 * time.Second
+	readHeaderTimeout = 10 * time.Second
+	readTimeout       = 30 * time.Second
+)
+
 var (
-	upstreamURL   string
-	bearerToken   string
-	oauthClientID string
-	baseURL       string
-	authPIN       string
-	tokenTTL      time.Duration
+	upstreamURL         string
+	bearerToken         string
+	oauthClientID       string
+	baseURL             string
+	authPIN             string
+	tokenTTL            time.Duration
+	allowedRedirectURIs []string
+	upstreamClient      *http.Client
 )
 
 func main() {
@@ -57,6 +67,12 @@ func main() {
 	oauthClientID = os.Getenv("OAUTH_CLIENT_ID")
 	baseURL = os.Getenv("BASE_URL")
 	authPIN = os.Getenv("AUTH_PIN")
+	if v := os.Getenv("OAUTH_REDIRECT_URIS"); v != "" {
+		allowedRedirectURIs = strings.Split(v, ",")
+		for i := range allowedRedirectURIs {
+			allowedRedirectURIs[i] = strings.TrimSpace(allowedRedirectURIs[i])
+		}
+	}
 
 	if upstreamURL == "" || bearerToken == "" || oauthClientID == "" {
 		fmt.Fprintln(os.Stderr, "env UPSTREAM_URL, MCP_BEARER_TOKEN and OAUTH_CLIENT_ID are required")
@@ -70,6 +86,10 @@ func main() {
 		tokenTTL = d
 	}
 
+	upstreamClient = &http.Client{
+		Timeout: upstreamTimeout,
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/.well-known/oauth-authorization-server", handleMetadata)
 	mux.HandleFunc("/authorize", handleAuthorize)
@@ -81,8 +101,16 @@ func main() {
 		addr = ":8080"
 	}
 	log.Printf("mcp-oauth-proxy listening on %s", addr)
-	log.Printf("upstream: %s  client_id: %s  pin_required: %v", upstreamURL, oauthClientID, authPIN != "")
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	log.Printf("upstream: %s  client_id: %s  pin_required: %v  redirect_uris: %d",
+		upstreamURL, oauthClientID, authPIN != "", len(allowedRedirectURIs))
+
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+	}
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -134,6 +162,11 @@ func handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	redirectURI := q.Get("redirect_uri")
 	if redirectURI == "" {
 		http.Error(w, "missing redirect_uri", http.StatusBadRequest)
+		return
+	}
+	// When an allowlist is configured, reject unknown redirect_uris.
+	if len(allowedRedirectURIs) > 0 && !sliceContains(allowedRedirectURIs, redirectURI) {
+		http.Error(w, "invalid redirect_uri", http.StatusBadRequest)
 		return
 	}
 	state := q.Get("state")
@@ -346,7 +379,7 @@ func handleMCPProxy(w http.ResponseWriter, r *http.Request) {
 		go sweepExpiredTokens()
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
 	if err != nil {
 		http.Error(w, "read body", http.StatusBadRequest)
 		return
@@ -372,7 +405,7 @@ func handleMCPProxy(w http.ResponseWriter, r *http.Request) {
 		req.Header.Set("Accept", ae)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := upstreamClient.Do(req)
 	if err != nil {
 		log.Printf("proxy upstream error: %v", err)
 		http.Error(w, "upstream error", http.StatusBadGateway)
@@ -423,4 +456,13 @@ func randInt(n int) int {
 	b := make([]byte, 1)
 	_, _ = rand.Read(b)
 	return int(b[0]) % n
+}
+
+func sliceContains(haystack []string, needle string) bool {
+	for _, s := range haystack {
+		if s == needle {
+			return true
+		}
+	}
+	return false
 }
