@@ -1188,6 +1188,30 @@ table.listing td.cell-clamp-host {
   background: var(--surface-alt);
 }
 
+/* OG card preview + generate button on the entry form. Preview is
+   1200×630 in reality but constrained here so it doesn't blow out
+   the form width; the aspect-ratio keeps it readable. */
+.og-card-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+.og-card-preview {
+  width: 240px;
+  height: auto;
+  aspect-ratio: 1200 / 630;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+}
+.og-card-status {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
 .og-text-color-row {
   display: flex;
   align-items: center;
