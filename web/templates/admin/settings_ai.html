@@ -186,7 +186,7 @@
           <td class="col-date col-hide-mobile">{{.CreatedAtFmt}}</td>
           <td class="col-date col-hide-mobile">{{.LastUsedAtFmt}}</td>
           <td class="col-id" data-label="{{T `settings.ops.mcp.col.status`}}">{{if .Active}}<span class="badge approved">{{T "status.active"}}</span>{{else}}<span class="badge hidden">{{T "status.revoked"}}</span>{{end}}</td>
-          <td class="col-id">
+          <td class="col-actions">
             {{if .Active}}
             <form method="post" action="{{Root}}/admin/settings/mcp/{{.ID}}/revoke" class="inline" onsubmit="return confirm('{{T `settings.ops.mcp.revokeConfirm`}}')">
               <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
