@@ -350,6 +350,69 @@ func TestAdminLinkReorderPersistsOrder(t *testing.T) {
 	}
 }
 
+// TestAdminLinkMemberReorderPersistsOrder sends the JSON order the
+// drag UI would send for members inside a group and confirms
+// sort_order is rewritten only for those rows.
+func TestAdminLinkMemberReorderPersistsOrder(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	cookies := login(t, a.Handler(), "admin", "changeme")
+
+	// Create a group.
+	if w := authedPOSTForm(t, a.Handler(), "/admin/links/new",
+		url.Values{"name": {"G"}, "kind": {"group"}}, cookies); w.Code != http.StatusFound {
+		t.Fatalf("group create: %d", w.Code)
+	}
+	var groupID int64
+	_ = a.DB.QueryRow(`SELECT id FROM links WHERE kind='group' AND name='G'`).Scan(&groupID)
+
+	// Create three links under the group.
+	for _, n := range []string{"alpha", "bravo", "charlie"} {
+		_ = authedPOSTForm(t, a.Handler(), "/admin/links/new",
+			url.Values{"name": {n}, "kind": {"link"}, "url": {"https://ex.example/" + n}, "parent_id": {itoa64(groupID)}}, cookies)
+	}
+	rows, err := a.DB.Query(`SELECT id FROM links WHERE parent_id = ? ORDER BY id`, groupID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		_ = rows.Scan(&id)
+		ids = append(ids, id)
+	}
+	if len(ids) < 3 {
+		t.Fatalf("expected 3 members, got %d", len(ids))
+	}
+	reversed := make([]int64, len(ids))
+	for i, id := range ids {
+		reversed[len(ids)-1-i] = id
+	}
+
+	payload, _ := json.Marshal(struct {
+		IDs []int64 `json:"ids"`
+	}{IDs: reversed})
+	req := httptest.NewRequest("POST", "/admin/links/"+itoa64(groupID)+"/members/reorder", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-CSRF-Token", csrfTokenFromJar(cookies))
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
+	w := httptest.NewRecorder()
+	a.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("member reorder: %d; body:\n%s", w.Code, w.Body.String())
+	}
+	for i, id := range reversed {
+		var got int
+		_ = a.DB.QueryRow(`SELECT sort_order FROM links WHERE id = ?`, id).Scan(&got)
+		if got != i {
+			t.Errorf("id=%d sort_order = %d, want %d", id, got, i)
+		}
+	}
+}
+
 // TestPublicLinkBlockRendersNestedGroup asserts the public sidebar
 // `{link_list}` tag surfaces both a grouped child and a root-level
 // link when a template with `<!-- BEGIN link -->{link_list}<!-- END
