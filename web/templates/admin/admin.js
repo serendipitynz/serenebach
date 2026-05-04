@@ -1890,6 +1890,13 @@
     copyBtn.textContent = sbT('js.ai.copy');
     insertBtn.textContent = sbT('js.ai.insert');
 
+    function svgIcon(paths) {
+      return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + paths + '</svg>';
+    }
+    var iconMinus = svgIcon('<path d="M5 12h14"/>');
+    var iconPlus = svgIcon('<path d="M5 12h14"/><path d="M12 5v14"/>');
+    minimizeBtn.innerHTML = iconMinus;
+
     var currentText = '';
     var currentEditor = null;
     var currentAction = '';
@@ -1916,7 +1923,7 @@
     minimizeBtn.addEventListener('click', function () {
       minimized = !minimized;
       root.classList.toggle('ai-popup--minimized', minimized);
-      minimizeBtn.textContent = minimized ? '[+]' : '[-]';
+      minimizeBtn.innerHTML = minimized ? iconPlus : iconMinus;
       minimizeBtn.setAttribute('aria-label', minimized ? 'restore' : 'minimize');
     });
 
@@ -1940,7 +1947,7 @@
     }
 
     header.addEventListener('pointerdown', function (e) {
-      if (e.target === minimizeBtn) return;
+      if (e.target.closest('.ai-popup-minimize')) return;
       dragging = true;
       var rect = root.getBoundingClientRect();
       dragOffsetX = e.clientX - rect.left;
@@ -1969,7 +1976,7 @@
         insertBtn.disabled = true;
         minimized = false;
         root.classList.remove('ai-popup--minimized');
-        minimizeBtn.textContent = '[-]';
+        minimizeBtn.innerHTML = iconMinus;
         minimizeBtn.setAttribute('aria-label', 'minimize');
         root.hidden = false;
         // Center on first open; subsequent opens keep last position unless closed

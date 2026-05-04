@@ -1071,16 +1071,18 @@ table.listing td.cell-clamp-host {
   flex-shrink: 0;
 }
 .ai-popup-minimize {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   color: var(--text-muted);
-  font-family: monospace;
-  font-size: 0.9rem;
   cursor: pointer;
-  padding: 0.1rem 0.3rem;
+  padding: 0.15rem;
   line-height: 1;
+  border-radius: var(--radius-sm);
 }
-.ai-popup-minimize:hover { color: var(--text); }
+.ai-popup-minimize:hover { color: var(--text); background: var(--surface-sunken); }
 
 .ai-popup-body {
   padding: 0.75rem;
