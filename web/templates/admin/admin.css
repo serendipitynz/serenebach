@@ -569,8 +569,6 @@ table.listing td.actions { white-space: nowrap; }
 /* MCP token list: name column shouldn't eat the whole row and push
    the date / status / delete columns to single-character widths. */
 .mcp-token-list { table-layout: fixed; }
-.mcp-token-list th:nth-child(2),
-.mcp-token-list td:nth-child(2) { width: 14rem; }
 .mcp-token-list th:nth-child(3),
 .mcp-token-list td:nth-child(3) { width: auto; word-break: break-all; }
 
