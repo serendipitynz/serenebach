@@ -1920,10 +1920,25 @@
       minimizeBtn.setAttribute('aria-label', minimized ? 'restore' : 'minimize');
     });
 
-    // Drag handling
+    // Drag handling — document-level listeners so the popup only moves
+    // while the pointer is actually held down. Avoids pointer-capture
+    // quirks where hovering the header can trigger movement.
     var dragging = false;
     var dragOffsetX = 0;
     var dragOffsetY = 0;
+
+    function onPopupDragMove(e) {
+      if (!dragging) return;
+      root.style.left = (e.clientX - dragOffsetX) + 'px';
+      root.style.top = (e.clientY - dragOffsetY) + 'px';
+    }
+    function onPopupDragUp() {
+      if (!dragging) return;
+      dragging = false;
+      document.removeEventListener('pointermove', onPopupDragMove);
+      document.removeEventListener('pointerup', onPopupDragUp);
+    }
+
     header.addEventListener('pointerdown', function (e) {
       if (e.target === minimizeBtn) return;
       dragging = true;
@@ -1933,18 +1948,9 @@
       root.style.transform = 'none';
       root.style.left = rect.left + 'px';
       root.style.top = rect.top + 'px';
-      root.setPointerCapture(e.pointerId);
+      document.addEventListener('pointermove', onPopupDragMove);
+      document.addEventListener('pointerup', onPopupDragUp);
       e.preventDefault();
-    });
-    header.addEventListener('pointermove', function (e) {
-      if (!dragging) return;
-      root.style.left = (e.clientX - dragOffsetX) + 'px';
-      root.style.top = (e.clientY - dragOffsetY) + 'px';
-    });
-    header.addEventListener('pointerup', function (e) {
-      if (!dragging) return;
-      dragging = false;
-      try { root.releasePointerCapture(e.pointerId); } catch (_) {}
     });
 
     aiPopupInstance = {
