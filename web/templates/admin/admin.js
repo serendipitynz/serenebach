@@ -1854,6 +1854,7 @@
   // Floating popup that shows AI-generated text with copy/insert
   // actions. Draggable header, minimizable, reusable singleton.
   var aiPopupInstance = null;
+  var aiPopupRequestCounter = 0;
 
   function getAIPopup() {
     if (aiPopupInstance) return aiPopupInstance;
@@ -1901,6 +1902,7 @@
     var currentEditor = null;
     var currentAction = '';
     var currentSelection = '';
+    var currentRequestId = 0;
     var minimized = false;
 
     function updateButtons() {
@@ -1962,7 +1964,8 @@
 
     aiPopupInstance = {
       el: root,
-      open: function (title, editor, action, selection) {
+      open: function (title, editor, action, selection, requestId) {
+        currentRequestId = requestId;
         currentEditor = editor || null;
         currentAction = action || '';
         currentSelection = selection || '';
@@ -1985,14 +1988,16 @@
           root.style.top = Math.max(16, Math.round((window.innerHeight - 240) / 2)) + 'px';
         }
       },
-      setContent: function (text) {
+      setContent: function (text, requestId) {
+        if (requestId !== currentRequestId) return;
         currentText = text || '';
         textEl.textContent = currentText;
         textEl.className = 'ai-popup-text';
         spinnerEl.style.display = 'none';
         updateButtons();
       },
-      setError: function (msg) {
+      setError: function (msg, requestId) {
+        if (requestId !== currentRequestId) return;
         currentText = '';
         textEl.textContent = msg || sbT('js.ai.err.provider_error');
         textEl.className = 'ai-popup-text ai-popup-text--error';
@@ -2035,8 +2040,9 @@
     }
 
     var popup = getAIPopup();
+    var requestId = ++aiPopupRequestCounter;
     var titleKey = 'js.ai.popupTitle.' + action;
-    popup.open(sbT(titleKey), editor, action, selection);
+    popup.open(sbT(titleKey), editor, action, selection, requestId);
 
     var restore = setButtonLoading(btn);
 
@@ -2053,12 +2059,12 @@
       .then(function (data) {
         if (!data || !data.ok) {
           var key = (data && data.error) || 'provider_error';
-          popup.setError(sbT('js.ai.err.' + key));
+          popup.setError(sbT('js.ai.err.' + key), requestId);
           return;
         }
-        popup.setContent(data.text || '');
+        popup.setContent(data.text || '', requestId);
       })
-      .catch(function () { popup.setError(sbT('js.ai.err.provider_error')); })
+      .catch(function () { popup.setError(sbT('js.ai.err.provider_error'), requestId); })
       .then(restore);
   }
 
