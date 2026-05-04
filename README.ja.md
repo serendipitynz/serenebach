@@ -10,7 +10,7 @@
 - 単一の静的 Go バイナリ (CGO 不要)
 - SQLite (Pure Go: [`modernc.org/sqlite`](https://modernc.org/sqlite)) — DB サーバ別建て不要
 - 常駐 HTTP サーバ・もしくは従来型レンタルサーバの CGI として動作
-- 管理画面 UI / MCP サーバ / MCP OAuth プロキシ / 管理画面ヘルプ もすべてバイナリに同梱
+- 管理画面 UI / MCP サーバ / 管理画面ヘルプ もすべてバイナリに同梱
 - ハイブリッド配信向けの静的サイト生成 (CDN 前段 + 動的管理画面)
 - 旧 Serene Bach v2 (テキストファイル) / v3 (SQLite) (Perl 版) からのインポートに対応
 

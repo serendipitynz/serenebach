@@ -10,7 +10,7 @@ A self-hostable Go weblog engine — a lighter path between WordPress and Hugo. 
 - Single statically-linked Go binary, no CGO
 - SQLite via [`modernc.org/sqlite`](https://modernc.org/sqlite) (pure Go) — no separate database server
 - Runs as a long-lived HTTP server, **or** as a CGI program on traditional shared hosting
-- Embedded admin UI, MCP server, MCP OAuth proxy, and end-user help — nothing extra to deploy
+- Embedded admin UI, MCP server, and end-user help — nothing extra to deploy
 - Static rebuild for hybrid hosting (CDN / static front, dynamic admin behind)
 - Imports content from legacy Serene Bach v2 (flat-file) and v3 (SQLite) installations
 
