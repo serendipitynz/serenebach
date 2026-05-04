@@ -6,9 +6,10 @@ services:
     volumes:
       - serenebach-data:/home/nonroot/data
     environment:
-      # Minimum: set a strong secret for AI credential encryption.
-      # If you do not use AI features, any non-empty string is fine.
-      - SB_AI_SECRET=change-me-to-a-long-random-string
+      # To enable AI features, set SB_AI_SECRET to a long random string.
+      # Leaving it undefined or empty disables AI entirely.
+      # - SB_AI_SECRET=${SB_AI_SECRET}
+      #
       # Uncomment and adjust any other variables from .env.example as needed:
       # - SB_ANALYTICS_DB=/home/nonroot/data/analytics.db
       # - SB_ANALYTICS_RETENTION_DAYS=30

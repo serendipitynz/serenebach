@@ -5,6 +5,12 @@ dist/
 # Local data (databases, images, templates, static rebuild output)
 data/
 
+# SQLite transient files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
 # Git
 .git/
 .gitignore
@@ -22,7 +28,7 @@ docs/*
 !README.ja.md
 !LICENSE
 
-# IDE
+# IDE / editor
 .idea/
 .vscode/
 *.swp
@@ -31,6 +37,14 @@ docs/*
 
 # OS
 .DS_Store
+
+# Owner-local directories (unpublished SB3 source, sandboxes)
+_base/
+_sandbox/
+
+# Claude Code personal overrides
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 # Docker itself
 Dockerfile
