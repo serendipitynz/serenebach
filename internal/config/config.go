@@ -77,6 +77,9 @@ type Config struct {
 	// SB_BASE_PATH; in CGI mode it is auto-detected from SCRIPT_NAME
 	// when SB_BASE_PATH is not set.
 	BasePath string
+	// DevMode disables template and i18n caching so edits on disk are
+	// reflected on the next request. Intended for local development only.
+	DevMode bool
 }
 
 // Load parses top-level flags and returns the resulting Config, the name of
@@ -109,6 +112,7 @@ func Load(args []string) (*Config, string, []string, error) {
 		ImageDir:               envOr("SB_IMAGE_DIR", "./data/img"),
 		TemplateDir:            envOr("SB_TEMPLATE_DIR", "./data/templates"),
 		UploadMaxBytes:         parseUploadMaxBytes(os.Getenv("SB_UPLOAD_MAX_MB")),
+		DevMode:                os.Getenv("SB_DEV") == "1",
 	}
 
 	resolver, err := clientip.Parse(os.Getenv("SB_TRUSTED_PROXIES"))
