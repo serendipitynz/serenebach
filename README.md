@@ -27,6 +27,13 @@ Prefer the CLI? `task seed` still works — it creates the dev DB and seeds an a
 
 A `.env` template ships at `.env.example`. Copy it to `.env` and fill in `SB_AI_SECRET` if you plan to enable the AI writing assists.
 
+## Companion tools
+
+| Tool | What it does |
+|---|---|
+| `./bin/serenebach mcp serve` | Start the MCP server over stdio for Claude Code / Cursor / Zed |
+| `task build-proxy` | Build the MCP OAuth proxy (`bin/mcp-oauth-proxy`) — bridges ChatGPT's OAuth-only MCP client to Serene Bach's Bearer-token `/mcp` endpoint. See `cmd/mcp-oauth-proxy/README.md` for env vars and ChatGPT configuration. |
+
 ## Documentation
 
 | Topic | Link |
