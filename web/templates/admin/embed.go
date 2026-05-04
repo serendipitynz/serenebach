@@ -6,7 +6,14 @@ package admintpl
 import (
 	"embed"
 	"io/fs"
+	"os"
+	"path/filepath"
 )
+
+// DevRoot, when non-empty, causes FS(), Raw(), and I18nCatalogues() to
+// read from disk instead of the embedded FS. Set this during local
+// development so template edits are reflected without rebuilding.
+var DevRoot string
 
 //go:embed *.html *.css *.js assets i18n
 var files embed.FS
@@ -17,7 +24,13 @@ var files embed.FS
 // templates they serve.
 func I18nCatalogues() (map[string][]byte, error) {
 	out := map[string][]byte{}
-	entries, err := files.ReadDir("i18n")
+	var entries []fs.DirEntry
+	var err error
+	if DevRoot != "" {
+		entries, err = os.ReadDir(filepath.Join(DevRoot, "i18n"))
+	} else {
+		entries, err = files.ReadDir("i18n")
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -25,7 +38,12 @@ func I18nCatalogues() (map[string][]byte, error) {
 		if e.IsDir() {
 			continue
 		}
-		data, err := files.ReadFile("i18n/" + e.Name())
+		var data []byte
+		if DevRoot != "" {
+			data, err = os.ReadFile(filepath.Join(DevRoot, "i18n", e.Name()))
+		} else {
+			data, err = files.ReadFile("i18n/" + e.Name())
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -49,11 +67,19 @@ func lastDot(s string) int {
 
 // FS returns the embedded filesystem so handler code can parse templates
 // and static handlers can serve assets out of it.
-func FS() fs.FS { return files }
+func FS() fs.FS {
+	if DevRoot != "" {
+		return os.DirFS(DevRoot)
+	}
+	return files
+}
 
 // Raw returns the bytes of one embedded asset. Convenient for the
 // admin.css / admin.js endpoints so they don't need a generic file
 // server — we know exactly which two files are public.
 func Raw(name string) ([]byte, error) {
+	if DevRoot != "" {
+		return os.ReadFile(filepath.Join(DevRoot, name))
+	}
 	return files.ReadFile(name)
 }
