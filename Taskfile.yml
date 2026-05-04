@@ -18,6 +18,8 @@ tasks:
 
   dev:
     desc: Run serenebach on :8080 with dev database
+    env:
+      SB_DEV: '1'
     cmds:
       - go run {{.PKG}} --addr=:8080 --db=./data/dev.db
 

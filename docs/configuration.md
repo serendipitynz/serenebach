@@ -24,6 +24,7 @@ Every knob the running binary respects, plus the `task` shortcuts the dev workfl
 | `SB_MCP_AUDIT_DB` | Path to a separate SQLite file for the MCP write-tool audit log (default: use the main DB) |
 | `SB_TRUSTED_PROXIES` | CIDRs whose `X-Forwarded-For` headers are honoured (comma-separated). Leave empty for direct-to-internet deployments |
 | `SB_PUBLIC_ALLOWED_ORIGINS` | Additional origins permitted on reader-facing POSTs (comments, likes, stamps). Comma-separated, full `scheme://host[:port]` |
+| `SB_DEV` | Set to `1` to disable template and i18n caching so admin UI edits are reflected on the next request without restarting. `task dev` sets this automatically |
 
 ### MCP OAuth proxy env vars
 
@@ -58,7 +59,7 @@ Everything below is a `go run` or `go build` under the hood, so the Taskfile is 
 
 | Command | What it does |
 |---|---|
-| `task dev` | Run the server on `:8080` against `./data/dev.db` |
+| `task dev` | Run the server on `:8080` against `./data/dev.db`. Automatically sets `SB_DEV=1` so admin template edits are hot-reloaded |
 | `task build` | Build a native binary at `./bin/serenebach` |
 | `task build-{os}-{arch}` | Cross-compile for a specific target. `{os}` ∈ `linux` / `freebsd` / `windows` / `darwin`, `{arch}` ∈ `amd64` / `arm64`. Output: `bin/serenebach-{os}-{arch}` (`.exe` on Windows). Run `task --list` for the full set. |
 | `task build-all` | Cross-compile all eight targets into `bin/` in parallel. |

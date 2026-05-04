@@ -228,12 +228,45 @@ const (
 	pageHelp             = "help"
 )
 
+// DevMode disables template and i18n caching. When true, every request
+// re-parses templates and catalogues from disk. Set this during local
+// development (e.g. SB_DEV=1) so edits are reflected without restarting.
+var DevMode bool
+
 var (
 	mainTemplates = loadMainTemplates()
 	loginTemplate = loadLoginTemplate()
 	setupTemplate = loadSetupTemplate()
 	i18nBundle    = loadI18nBundle()
 )
+
+func getMainTemplates() map[string]*template.Template {
+	if DevMode {
+		return loadMainTemplates()
+	}
+	return mainTemplates
+}
+
+func getLoginTemplate() *template.Template {
+	if DevMode {
+		return loadLoginTemplate()
+	}
+	return loginTemplate
+}
+
+func getSetupTemplate() *template.Template {
+	if DevMode {
+		return loadSetupTemplate()
+	}
+	return setupTemplate
+}
+
+func getI18nBundle() *i18n.Bundle {
+	if DevMode {
+		return loadI18nBundle()
+	}
+	return i18nBundle
+}
 
 // loadI18nBundle parses every JSON file under admintpl's embedded
 // i18n/ directory into an i18n.Bundle. "ja" is the source-of-truth
@@ -286,7 +319,7 @@ func loadSetupTemplate() *template.Template {
 // (shallow copy of parse trees) and safe for concurrent use.
 func renderMain(w http.ResponseWriter, r *http.Request, page string, data any) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	base, ok := mainTemplates[page]
+	base, ok := getMainTemplates()[page]
 	if !ok {
 		http.Error(w, "admin: unknown template "+page, http.StatusInternalServerError)
 		return
@@ -307,22 +340,24 @@ func renderMain(w http.ResponseWriter, r *http.Request, page string, data any) {
 // handing them off to a template (login errors, for example, where
 // the field is just a plain Error string on the data struct).
 func tr(r *http.Request, key string) string {
+	bundle := getI18nBundle()
 	locale := i18n.LocaleFrom(r.Context())
 	if locale == "" {
-		locale = i18nBundle.Resolve(r)
+		locale = bundle.Resolve(r)
 	}
-	return i18nBundle.T(locale, key)
+	return bundle.T(locale, key)
 }
 
 // trf is the formatted variant of tr — feeds the resolved string into
 // fmt.Sprintf with the given args. Mirrors i18n.Bundle.Tf so callers
 // don't have to plumb the locale themselves.
 func trf(r *http.Request, key string, args ...any) string {
+	bundle := getI18nBundle()
 	locale := i18n.LocaleFrom(r.Context())
 	if locale == "" {
-		locale = i18nBundle.Resolve(r)
+		locale = bundle.Resolve(r)
 	}
-	return i18nBundle.Tf(locale, key, args...)
+	return bundle.Tf(locale, key, args...)
 }
 
 // localeFuncs returns T / Tf / THTML / Locale closures bound to the
@@ -333,18 +368,19 @@ func trf(r *http.Request, key string, args ...any) string {
 // wiring — the bundle's Resolve handles cookie + Accept-Language on
 // every call.
 func localeFuncs(r *http.Request) template.FuncMap {
+	bundle := getI18nBundle()
 	locale := i18n.LocaleFrom(r.Context())
 	if locale == "" {
-		locale = i18nBundle.Resolve(r)
+		locale = bundle.Resolve(r)
 	}
 	return template.FuncMap{
-		"T":  func(key string) string { return i18nBundle.T(locale, key) },
-		"Tf": func(key string, args ...any) string { return i18nBundle.Tf(locale, key, args...) },
+		"T":  func(key string) string { return bundle.T(locale, key) },
+		"Tf": func(key string, args ...any) string { return bundle.Tf(locale, key, args...) },
 		"THTML": func(key string) template.HTML {
-			return template.HTML(i18nBundle.T(locale, key))
+			return template.HTML(bundle.T(locale, key))
 		},
 		"THTMLf": func(key string, args ...any) template.HTML {
-			return template.HTML(i18nBundle.Tf(locale, key, args...))
+			return template.HTML(bundle.Tf(locale, key, args...))
 		},
 		// JSBundle emits a pre-resolved JSON object carrying every
 		// `js.*` key for the active locale. layout.html drops this
@@ -353,7 +389,7 @@ func localeFuncs(r *http.Request) template.FuncMap {
 		// browser. Returned as template.JS so the JSON renders
 		// inline without escaping.
 		"JSBundle": func() template.JS {
-			return template.JS(i18nBundle.JSCatalogueJSON(locale, "js."))
+			return template.JS(bundle.JSCatalogueJSON(locale, "js."))
 		},
 		"Locale": func() string { return locale },
 		"Root":   func() string { return basepath.FromContext(r.Context()) },
@@ -366,7 +402,7 @@ func localeFuncs(r *http.Request) template.FuncMap {
 		},
 		"humanTime": func(t time.Time) string {
 			if t.IsZero() {
-				return i18nBundle.T(locale, "humanTime.never")
+				return bundle.T(locale, "humanTime.never")
 			}
 			return t.Format("2006-01-02 15:04 MST")
 		},
@@ -378,7 +414,8 @@ func localeFuncs(r *http.Request) template.FuncMap {
 // static `statusLabel` stub so tests and templates get identical
 // behaviour, just with locale awareness.
 func localizedStatusLabel(locale string, s any) string {
-	unknown := i18nBundle.T(locale, "status.unknown")
+	bundle := getI18nBundle()
+	unknown := bundle.T(locale, "status.unknown")
 	switch v := s.(type) {
 	case domain.EntryStatus:
 		return entryStatusKey(locale, v, unknown)
@@ -391,25 +428,27 @@ func localizedStatusLabel(locale string, s any) string {
 }
 
 func entryStatusKey(locale string, s domain.EntryStatus, fallback string) string {
+	bundle := getI18nBundle()
 	switch s {
 	case domain.EntryPublished:
-		return i18nBundle.T(locale, "status.published")
+		return bundle.T(locale, "status.published")
 	case domain.EntryDraft:
-		return i18nBundle.T(locale, "status.draft")
+		return bundle.T(locale, "status.draft")
 	case domain.EntryClosed:
-		return i18nBundle.T(locale, "status.closed")
+		return bundle.T(locale, "status.closed")
 	}
 	return fallback
 }
 
 func messageStatusKey(locale string, s domain.MessageStatus, fallback string) string {
+	bundle := getI18nBundle()
 	switch s {
 	case domain.MessageApproved:
-		return i18nBundle.T(locale, "status.message.approved")
+		return bundle.T(locale, "status.message.approved")
 	case domain.MessageWaiting:
-		return i18nBundle.T(locale, "status.message.waiting")
+		return bundle.T(locale, "status.message.waiting")
 	case domain.MessageHidden:
-		return i18nBundle.T(locale, "status.message.hidden")
+		return bundle.T(locale, "status.message.hidden")
 	}
 	return fallback
 }
@@ -417,7 +456,7 @@ func messageStatusKey(locale string, s domain.MessageStatus, fallback string) st
 // renderLogin writes the standalone login page (no sidebar / topbar).
 func renderLogin(w http.ResponseWriter, r *http.Request, data any) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	tmpl, err := loginTemplate.Clone()
+	tmpl, err := getLoginTemplate().Clone()
 	if err != nil {
 		http.Error(w, "admin: clone login template: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -430,7 +469,7 @@ func renderLogin(w http.ResponseWriter, r *http.Request, data any) {
 // the layout chrome — there is no session / sidebar yet.
 func renderSetup(w http.ResponseWriter, r *http.Request, data any) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	tmpl, err := setupTemplate.Clone()
+	tmpl, err := getSetupTemplate().Clone()
 	if err != nil {
 		http.Error(w, "admin: clone setup template: "+err.Error(), http.StatusInternalServerError)
 		return
