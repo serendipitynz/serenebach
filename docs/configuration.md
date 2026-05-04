@@ -74,6 +74,8 @@ Everything below is a `go run` or `go build` under the hood, so the Taskfile is 
 | `task test` | `go test ./...` |
 | `task tidy` | `go mod tidy` |
 | `task clean` | Remove `./bin` and `./data` |
+| `docker build -t serenebach .` | Build a container image (see [docs/deployment.md](docs/deployment.md)) |
+| `docker compose up -d` | Run the server via Docker Compose with persistent volume |
 
 ## What lives in the UI vs the env
 

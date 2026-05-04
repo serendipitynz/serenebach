@@ -10,6 +10,34 @@ The default. Deploy on a VPS, Fly.io, Pikapods, a Raspberry Pi, etc. Supervise w
 ./serenebach --addr=:8080 --db=/var/lib/serenebach/blog.db
 ```
 
+## Docker
+
+A `Dockerfile` and `docker-compose.yml` are provided for containerized deployments.
+
+```bash
+# Build
+docker build -t serenebach .
+
+# First run: start the server and open the URL in a browser to complete /setup
+docker run -d -p 8080:8080 -v serenebach-data:/home/nonroot/data --name serenebach serenebach serve
+# Then open http://localhost:8080/setup in a browser
+
+# Alternatively, use the CLI seed with an explicit password (not recommended for public deployments without changing the default)
+docker run --rm -v serenebach-data:/home/nonroot/data -e SB_ADMIN_PASSWORD=<strong-secret> serenebach seed
+```
+
+The runtime image is based on `gcr.io/distroless/static-debian12:nonroot` (~24 MB). No shell, no root user, minimal attack surface. HTTPS traffic to AI providers works because the CA certificate bundle is included in the distroless base.
+
+### docker-compose
+
+```bash
+docker compose up -d
+```
+
+Edit `docker-compose.yml` to set environment variables. `SB_AI_SECRET` is commented out by default; uncomment and set it to a long random string only if you plan to use the AI writing assists. Leaving it undefined or empty disables AI features entirely.
+
+Data is persisted in a Docker volume named `serenebach-data`.
+
 ## CGI
 
 If the `GATEWAY_INTERFACE` environment variable is set (every CGI-compliant web server sets it), the binary serves one request over stdin/stdout and exits. Useful for traditional shared hosting like さくらのレンタルサーバ.
