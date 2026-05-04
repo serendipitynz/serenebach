@@ -204,6 +204,41 @@ func (s *Store) ReorderLinks(ctx context.Context, wid int64, orderedIDs []int64)
 	return nil
 }
 
+// ReorderLinksInGroup rewrites sort_order for the given ids scoped to a
+// specific group. Only rows matching wid + parent_id are updated; ids
+// that don't belong to the group are silently skipped.
+func (s *Store) ReorderLinksInGroup(ctx context.Context, wid, groupID int64, orderedIDs []int64) error {
+	if len(orderedIDs) == 0 {
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("repo: ReorderLinksInGroup begin: %w", err)
+	}
+	defer func() {
+		if tx != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	stmt, err := tx.PrepareContext(ctx,
+		`UPDATE links SET sort_order = ?, updated_at = ? WHERE wid = ? AND parent_id = ? AND id = ?`)
+	if err != nil {
+		return fmt.Errorf("repo: ReorderLinksInGroup prepare: %w", err)
+	}
+	defer stmt.Close()
+	now := time.Now().Unix()
+	for i, id := range orderedIDs {
+		if _, err := stmt.ExecContext(ctx, i, now, wid, groupID, id); err != nil {
+			return fmt.Errorf("repo: ReorderLinksInGroup update id=%d: %w", id, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repo: ReorderLinksInGroup commit: %w", err)
+	}
+	tx = nil
+	return nil
+}
+
 // CountLinksInGroup returns how many link rows currently belong to the
 // given group. The admin list page uses this to print "リンク数: N" next
 // to group rows.

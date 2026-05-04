@@ -1624,7 +1624,7 @@
     var status = table.parentNode.querySelector('[data-reorder-status]');
     var token = table.getAttribute('data-csrf') || '';
     var idAttr = 'data-' + kind + '-id';
-    var endpoint = '/admin/' + kind + 's/reorder';
+    var endpoint = table.getAttribute('data-sort-endpoint') || '/admin/' + kind + 's/reorder';
     if (!tbody) return;
 
     var dragged = null;

@@ -75,9 +75,10 @@
   </div>
   <div class="panel-body">
     {{if .Members}}
-    <table class="listing">
+    <table class="listing sortable" data-link-sortable data-csrf="{{.CSRFToken}}" data-sort-endpoint="{{Root}}/admin/links/{{.Link.ID}}/members/reorder">
       <thead><tr>
-        <th class="col-id">{{T "common.col.id"}}</th>
+        <th class="col-drag col-hide-mobile"></th>
+        <th class="col-id col-hide-mobile">{{T "common.col.id"}}</th>
         <th class="col-flex-wide">{{T "links.col.site"}}</th>
         <th class="col-flex-wide">{{T "links.col.url"}}</th>
         <th class="col-status">{{T "links.col.status"}}</th>
@@ -85,8 +86,9 @@
       </tr></thead>
       <tbody>
       {{range .Members}}
-        <tr>
-          <td class="num col-id">{{.ID}}</td>
+        <tr data-link-id="{{.ID}}" draggable="true">
+          <td class="drag-handle col-drag col-hide-mobile" title="{{T `common.dragToReorder`}}" aria-label="{{T `common.dragToReorder`}}">≡</td>
+          <td class="num col-id col-hide-mobile">{{.ID}}</td>
           <td class="col-flex-wide"><a href="{{Root}}/admin/links/{{.ID}}/edit">{{.Name}}</a></td>
           <td class="col-flex-wide">{{if .URL}}<a href="{{.URL}}" target="_blank" rel="noopener">{{.URL}}</a>{{else}}<span class="hint">{{T "common.dash"}}</span>{{end}}</td>
           <td class="col-status">{{if eq .Disp 0}}{{T "status.visible"}}{{else}}<span class="hint">{{T "status.hidden"}}</span>{{end}}</td>
@@ -100,6 +102,7 @@
       {{end}}
       </tbody>
     </table>
+    <p class="reorder-status" data-reorder-status hidden></p>
     {{else}}
       <p class="hint">{{T "links.form.membersEmpty"}}</p>
     {{end}}

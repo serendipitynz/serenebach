@@ -30,6 +30,7 @@ func (h *Handler) mountLinks(r chi.Router) {
 		gr.Post("/links/{id}/edit", h.linkUpdate)
 		gr.Post("/links/{id}/delete", h.linkDelete)
 		gr.Post("/links/reorder", h.linkReorder)
+		gr.Post("/links/{id}/members/reorder", h.linkMemberReorder)
 	})
 }
 
@@ -49,6 +50,46 @@ func (h *Handler) linkReorder(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.Store.ReorderLinks(r.Context(), h.wid(), payload.IDs); err != nil {
 		log.Printf("admin.linkReorder: %v", err)
+		http.Error(w, "failed to reorder", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_, _ = w.Write([]byte(`{"ok":true}`))
+}
+
+func (h *Handler) linkMemberReorder(w http.ResponseWriter, r *http.Request) {
+	groupID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || groupID <= 0 {
+		http.Error(w, "bad id", http.StatusBadRequest)
+		return
+	}
+	g, err := h.Store.LinkByID(r.Context(), h.wid(), groupID)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		log.Printf("admin.linkMemberReorder: load group: %v", err)
+		http.Error(w, "failed to load group", http.StatusInternalServerError)
+		return
+	}
+	if !g.IsGroup() {
+		http.Error(w, "not a group", http.StatusBadRequest)
+		return
+	}
+	var payload struct {
+		IDs []int64 `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "bad JSON", http.StatusBadRequest)
+		return
+	}
+	if len(payload.IDs) == 0 {
+		http.Error(w, "empty ids", http.StatusBadRequest)
+		return
+	}
+	if err := h.Store.ReorderLinksInGroup(r.Context(), h.wid(), groupID, payload.IDs); err != nil {
+		log.Printf("admin.linkMemberReorder: %v", err)
 		http.Error(w, "failed to reorder", http.StatusInternalServerError)
 		return
 	}
