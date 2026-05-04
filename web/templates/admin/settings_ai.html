@@ -169,11 +169,11 @@
         <th>{{T "settings.ops.mcp.col.name"}}</th>
         <th>{{T "settings.ops.mcp.col.scope"}}</th>
         <th>{{T "settings.ops.mcp.col.author"}}</th>
-        <th class="col-hide-mobile">{{T "settings.ops.mcp.col.prefix"}}</th>
-        <th class="col-datetime col-hide-mobile">{{T "settings.ops.mcp.col.createdAt"}}</th>
-        <th class="col-datetime col-hide-mobile">{{T "settings.ops.mcp.col.lastUsed"}}</th>
+        <th class="col-role col-hide-mobile">{{T "settings.ops.mcp.col.prefix"}}</th>
+        <th class="col-date col-hide-mobile">{{T "settings.ops.mcp.col.createdAt"}}</th>
+        <th class="col-date col-hide-mobile">{{T "settings.ops.mcp.col.lastUsed"}}</th>
         <th class="col-status">{{T "settings.ops.mcp.col.status"}}</th>
-        <th class="col-actions">{{T "settings.ops.mcp.col.delete"}}</th>
+        <th class="col-actions col-id">{{T "settings.ops.mcp.col.delete"}}</th>
       </tr></thead>
       <tbody>
       {{range .Tokens}}
@@ -183,8 +183,8 @@
           <td data-label="{{T `settings.ops.mcp.col.scope`}}">{{if eq (printf "%s" .Scope) "write"}}<span class="badge waiting">{{T "settings.ops.mcp.scope.write"}}</span>{{else}}<span class="badge approved">{{T "settings.ops.mcp.scope.read"}}</span>{{end}}</td>
           <td data-label="{{T `settings.ops.mcp.col.author`}}">{{.AuthorLabel}}</td>
           <td class="col-hide-mobile"><code>{{.Prefix}}…</code></td>
-          <td class="col-datetime col-hide-mobile">{{.CreatedAtFmt}}</td>
-          <td class="col-datetime col-hide-mobile">{{.LastUsedAtFmt}}</td>
+          <td class="col-date col-hide-mobile">{{.CreatedAtFmt}}</td>
+          <td class="col-date col-hide-mobile">{{.LastUsedAtFmt}}</td>
           <td class="col-status" data-label="{{T `settings.ops.mcp.col.status`}}">{{if .Active}}<span class="badge approved">{{T "status.active"}}</span>{{else}}<span class="badge hidden">{{T "status.revoked"}}</span>{{end}}</td>
           <td class="col-actions">
             {{if .Active}}
@@ -216,8 +216,8 @@
         <th class="col-datetime">{{T "settings.ops.audit.col.createdAt"}}</th>
         <th>{{T "settings.ops.audit.col.tool"}}</th>
         <th class="col-id">{{T "settings.ops.audit.col.target"}}</th>
-        <th>{{T "settings.ops.audit.col.token"}}</th>
-        <th>{{T "settings.ops.audit.col.author"}}</th>
+        <th class="col-id">{{T "settings.ops.audit.col.token"}}</th>
+        <th class="col-id">{{T "settings.ops.audit.col.author"}}</th>
         <th>{{T "settings.ops.audit.col.detail"}}</th>
       </tr></thead>
       <tbody>
