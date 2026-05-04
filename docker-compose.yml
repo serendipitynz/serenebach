@@ -5,18 +5,12 @@ services:
       - "8080:8080"
     volumes:
       - serenebach-data:/home/nonroot/data
-    environment:
-      # To enable AI features, set SB_AI_SECRET to a long random string.
-      # Leaving it undefined or empty disables AI entirely.
-      # - SB_AI_SECRET=${SB_AI_SECRET}
-      #
-      # Uncomment and adjust any other variables from .env.example as needed:
-      # - SB_ANALYTICS_DB=/home/nonroot/data/analytics.db
-      # - SB_ANALYTICS_RETENTION_DAYS=30
-      # - SB_UPLOAD_MAX_MB=10
-      # - SB_TURNSTILE_SITEKEY=
-      # - SB_TURNSTILE_SECRET=
-      # - SB_TRUSTED_PROXIES=10.0.0.0/8
+    # Uncomment to set environment variables (see .env.example for available options).
+    # environment:
+    #   SB_AI_SECRET: ${SB_AI_SECRET}
+    #   SB_ANALYTICS_DB: /home/nonroot/data/analytics.db
+    #   SB_ANALYTICS_RETENTION_DAYS: "30"
+    #   SB_UPLOAD_MAX_MB: "10"
     restart: unless-stopped
 
 volumes:

@@ -33,9 +33,11 @@ A `.env` template ships at `.env.example`. Copy it to `.env` and fill in `SB_AI_
 # Build
 docker build -t serenebach .
 
-# Run (seed on first launch, then serve)
-docker run --rm -v serenebach-data:/home/nonroot/data serenebach seed
+# Run: start the server and open http://localhost:8080/setup to create the admin user
 docker run -d -p 8080:8080 -v serenebach-data:/home/nonroot/data serenebach
+
+# Or seed via CLI with an explicit password
+docker run --rm -v serenebach-data:/home/nonroot/data -e SB_ADMIN_PASSWORD=<secret> serenebach seed
 ```
 
 Or use the bundled `docker-compose.yml`:
