@@ -27,6 +27,25 @@ Prefer the CLI? `task seed` still works — it creates the dev DB and seeds an a
 
 A `.env` template ships at `.env.example`. Copy it to `.env` and fill in `SB_AI_SECRET` if you plan to enable the AI writing assists.
 
+## Docker
+
+```bash
+# Build
+docker build -t serenebach .
+
+# Run (seed on first launch, then serve)
+docker run --rm -v serenebach-data:/home/nonroot/data serenebach seed
+docker run -d -p 8080:8080 -v serenebach-data:/home/nonroot/data serenebach
+```
+
+Or use the bundled `docker-compose.yml`:
+
+```bash
+docker compose up -d
+```
+
+See [docs/deployment.md](docs/deployment.md) for details.
+
 ## Companion tools
 
 | Tool | What it does |
