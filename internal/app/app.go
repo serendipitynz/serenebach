@@ -29,6 +29,7 @@ import (
 	"github.com/serendipitynz/serenebach/internal/storage/repo"
 	"github.com/serendipitynz/serenebach/internal/storage/sqlite"
 	"github.com/serendipitynz/serenebach/internal/turnstile"
+	admintpl "github.com/serendipitynz/serenebach/web/templates/admin"
 )
 
 // DefaultWID is the weblog id every handler binds to while multi-blog UX is
@@ -98,6 +99,13 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	rebuilder := admin.NewRebuilderWithImages(cfg.RebuildOutDir, cfg.ImageDir, cfg.TemplateDir, cfg.BasePath)
+	if cfg.DevMode {
+		admintpl.DevRoot = "web/templates/admin"
+		admin.DevMode = true
+	} else {
+		admintpl.DevRoot = ""
+		admin.DevMode = false
+	}
 	adminH := &admin.Handler{
 		Store:               store,
 		Sessions:            sessions,
