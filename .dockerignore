@@ -1,0 +1,38 @@
+# Binaries
+bin/
+dist/
+
+# Local data (databases, images, templates, static rebuild output)
+data/
+
+# Git
+.git/
+.gitignore
+
+# Environment
+.env
+.env.*
+
+# Documentation markdown files (not needed for build)
+docs/*
+!docs/help
+!docs/help/**
+*.md
+!README.md
+!README.ja.md
+!LICENSE
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+
+# Docker itself
+Dockerfile
+.dockerignore
+docker-compose*.yml
