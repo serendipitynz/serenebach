@@ -16,8 +16,9 @@
 
 ## クイックスタート
 
+[Go](https://go.dev/doc/install) と [Task](https://taskfile.dev/installation/) が必要です。
+
 ```bash
-go mod tidy
 task dev    # :8080 でサーバ起動 (DB は最初のリクエストで自動作成)
 ```
 

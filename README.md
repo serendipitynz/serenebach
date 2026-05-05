@@ -16,8 +16,9 @@ A self-hostable Go weblog engine — a lighter path between WordPress and Hugo. 
 
 ## Quick start
 
+Requires [Go](https://go.dev/doc/install) and [Task](https://taskfile.dev/installation/).
+
 ```bash
-go mod tidy
 task dev    # serves on :8080 (auto-creates the dev DB on first request)
 ```
 
