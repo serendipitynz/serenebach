@@ -12,7 +12,7 @@ import (
 // Bump this BEFORE running "task release"; the tag is derived from this value.
 // After publishing a release on GitHub, immediately bump to the next beta so
 // main always reflects what the next release will be.
-const Public = "4.0.0-beta.2"
+const Public = "4.0.0-beta.3"
 
 // Build returns a short commit-hash-like build identifier pulled from
 // the Go toolchain's embedded VCS stamp. Empty when the binary was
