@@ -28,6 +28,31 @@ docker run --rm -v serenebach-data:/home/nonroot/data -e SB_ADMIN_PASSWORD=<stro
 
 The runtime image is based on `gcr.io/distroless/static-debian12:nonroot` (~24 MB). No shell, no root user, minimal attack surface. HTTPS traffic to AI providers works because the CA certificate bundle is included in the distroless base.
 
+### Pre-built image
+
+Pre-built multi-arch images are published to GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/serendipitynz/serenebach:4.0.0-beta.3
+```
+
+If an anonymous pull returns `unauthorized`, the GHCR package exists but is not public. In GitHub, open the package settings for `serenebach` and change **Package visibility** to public before documenting the image as publicly installable.
+
+Supported platforms are `linux/amd64` and `linux/arm64`, so the same image works on typical Intel/AMD VPSes, ARM VPSes, Raspberry Pi-style hosts, and Docker-capable QNAP models on those architectures.
+
+For production deployments, prefer a pinned release tag such as `4.0.0-beta.3` over `latest`. `latest` follows the most recent default-branch image and may change underneath a running deployment.
+
+The container runs as the non-root user from the distroless base (UID/GID `65532`). Its writable state lives under `/home/nonroot/data` by default:
+
+| Container path | Purpose |
+|---|---|
+| `/home/nonroot/data/serenebach.db` | Main SQLite database |
+| `/home/nonroot/data/img` | Uploaded images and OG cards |
+| `/home/nonroot/data/templates` | Per-template assets |
+| `/home/nonroot/data/public` | Static rebuild output |
+
+Back up the mounted volume or bind-mounted directory as a unit. SQLite, uploads, template assets, and static rebuild output are all intentionally colocated there.
+
 ### docker-compose
 
 ```bash
@@ -37,6 +62,152 @@ docker compose up -d
 Edit `docker-compose.yml` to set environment variables. `SB_AI_SECRET` is commented out by default; uncomment and set it to a long random string only if you plan to use the AI writing assists. Leaving it undefined or empty disables AI features entirely.
 
 Data is persisted in a Docker volume named `serenebach-data`.
+
+For deployments that should use the published image instead of building from a local checkout, use this compose file shape:
+
+```yaml
+services:
+  serenebach:
+    image: ghcr.io/serendipitynz/serenebach:4.0.0-beta.3
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - serenebach-data:/home/nonroot/data
+    # environment:
+    #   Set only when you use AI writing assists.
+    #   SB_AI_SECRET: "replace-with-a-long-random-secret"
+    #   Set when Serene Bach is behind a reverse proxy and you want
+    #   analytics to honour X-Forwarded-For from that proxy.
+    #   SB_TRUSTED_PROXIES: "127.0.0.1/32"
+    restart: unless-stopped
+
+volumes:
+  serenebach-data:
+```
+
+On first boot, open `/setup` and create the administrator account. You can seed from the CLI instead, but the browser setup flow is usually safer for public deployments because it avoids temporary default credentials:
+
+```bash
+docker compose up -d
+docker compose logs -f serenebach
+# Then open http://<host>:8080/setup or https://<domain>/setup.
+```
+
+### QNAP Container Station
+
+QNAP's exact labels vary between QTS / QuTS hero and Container Station versions, but the deployment model is the same: run the published image, persist `/home/nonroot/data`, and put a NAS reverse proxy or router in front of the exposed port only if the blog should be reachable from the internet.
+
+Recommended layout:
+
+- Image: `ghcr.io/serendipitynz/serenebach:4.0.0-beta.3`
+- Container port: `8080`
+- Host port: `8080` for LAN-only testing, or another unused high port if QNAP already uses `8080`
+- Persistent storage: named volume mapped to `/home/nonroot/data`, or a bind mount such as `/share/Container/serenebach/data:/home/nonroot/data`
+- Restart policy: `unless-stopped` or QNAP's equivalent "always restart unless manually stopped"
+
+If you use a bind mount, make sure the container's non-root user can write to it. Over SSH on the NAS, one common setup is:
+
+```bash
+mkdir -p /share/Container/serenebach/data
+chown -R 65532:65532 /share/Container/serenebach/data
+```
+
+If your QNAP model or policy does not allow changing ownership on the shared folder, use a Docker named volume from Container Station instead.
+
+Container Station's "Application" / compose mode can use:
+
+```yaml
+services:
+  serenebach:
+    image: ghcr.io/serendipitynz/serenebach:4.0.0-beta.3
+    ports:
+      - "8080:8080"
+    volumes:
+      - /share/Container/serenebach/data:/home/nonroot/data
+    restart: unless-stopped
+```
+
+After the container starts:
+
+1. Open `http://<qnap-lan-ip>:8080/setup`.
+2. Create the administrator account and site title.
+3. In **admin settings**, set the site base URL to the final public URL, for example `https://blog.example.com/`.
+4. If the site is public, terminate HTTPS at QNAP's reverse proxy, a router / tunnel, or another front-end service, then forward to the container's HTTP port.
+5. Back up `/share/Container/serenebach/data` or the named volume regularly.
+
+Avoid exposing the QNAP management UI and the blog admin UI on the same public port. A reverse proxy with HTTPS and a dedicated hostname is the cleanest arrangement.
+
+### VPS with Docker
+
+On a VPS, run Serene Bach behind an existing reverse proxy or load balancer. Bind the container to localhost so the app itself is not directly exposed to the internet:
+
+```bash
+sudo mkdir -p /opt/serenebach
+sudo chown "$USER":"$USER" /opt/serenebach
+cd /opt/serenebach
+```
+
+Create `compose.yaml`:
+
+```yaml
+services:
+  serenebach:
+    image: ghcr.io/serendipitynz/serenebach:4.0.0-beta.3
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./data:/home/nonroot/data
+    environment:
+      SB_TRUSTED_PROXIES: "127.0.0.1/32"
+      # SB_AI_SECRET: "replace-with-a-long-random-secret"
+      # SB_UPLOAD_MAX_MB: "10"
+    restart: unless-stopped
+```
+
+Prepare the bind mount and start the container:
+
+```bash
+mkdir -p data
+sudo chown -R 65532:65532 data
+docker compose pull
+docker compose up -d
+docker compose logs -f serenebach
+```
+
+Point your reverse proxy at `http://127.0.0.1:8080`, enable HTTPS, then open `https://<domain>/setup`.
+
+Minimal Caddy example:
+
+```caddyfile
+blog.example.com {
+	reverse_proxy 127.0.0.1:8080
+}
+```
+
+Minimal nginx example:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name blog.example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Operational checklist:
+
+- Pin the image tag in `compose.yaml`.
+- Run `docker compose pull && docker compose up -d` when upgrading to a new tag.
+- Back up `/opt/serenebach/data` before upgrades.
+- Set the site base URL in the admin UI to the HTTPS URL.
+- Keep `SB_TRUSTED_PROXIES` limited to the proxy addresses that actually sit in front of the container.
+- Leave `SB_AI_SECRET` unset unless AI writing assists are needed; setting it later enables the AI UI without changing the image.
 
 ## CGI
 
