@@ -14,7 +14,7 @@ RUN go mod download
 # Copy the rest of the source tree and build a static binary.
 # CGO_ENABLED=0 is a hard project constraint (pure-Go SQLite).
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /bin/serenebach ./cmd/serenebach
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /bin/serenebach ./cmd/serenebach
 
 # ----------------------------------------
 # Helper stage: create empty data directories with correct ownership.
