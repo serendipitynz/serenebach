@@ -49,6 +49,21 @@ docker run --rm -v serenebach-data:/home/nonroot/data -e SB_ADMIN_PASSWORD=<secr
 docker compose up -d
 ```
 
+### 公式イメージ (GHCR)
+
+GitHub Container Registry (`ghcr.io/serendipitynz/serenebach`) に公式コンテナイメージを公開しています。
+
+```bash
+docker pull ghcr.io/serendipitynz/serenebach:latest
+
+docker run -d -p 8080:8080 -v serenebach-data:/home/nonroot/data ghcr.io/serendipitynz/serenebach:latest
+```
+
+タグの種類:
+- `latest` — デフォルトブランチの最新ビルド
+- `4.0.0-beta.3`, `4.0.0`, … — リリースバージョンに対応するセマンティックバージョンタグ
+- `main` — `main` ブランチの先端
+
 詳細は [docs/deployment.md](docs/deployment.md) を参照してください。
 
 ## 付属ツール
