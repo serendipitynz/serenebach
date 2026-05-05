@@ -49,6 +49,21 @@ Or use the bundled `docker-compose.yml`:
 docker compose up -d
 ```
 
+### Pre-built images (GHCR)
+
+Official container images are published to GitHub Container Registry (`ghcr.io/serendipitynz/serenebach`).
+
+```bash
+docker pull ghcr.io/serendipitynz/serenebach:latest
+
+docker run -d -p 8080:8080 -v serenebach-data:/home/nonroot/data ghcr.io/serendipitynz/serenebach:latest
+```
+
+Available tags:
+- `latest` — most recent build on the default branch
+- `4.0.0-beta.3`, `4.0.0`, … — semver tags matching released versions
+- `main` — tip of the `main` branch
+
 See [docs/deployment.md](docs/deployment.md) for details.
 
 ## Companion tools
