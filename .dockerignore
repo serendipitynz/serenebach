@@ -37,6 +37,8 @@ docs/*
 
 # OS
 .DS_Store
+._*
+Thumbs.db
 
 # Owner-local directories (unpublished SB3 source, sandboxes)
 _base/

@@ -12,8 +12,9 @@
 .env
 
 .DS_Store
+Thumbs.db
 .idea/
-*.swp
+`*.swp
 _base/
 _sandbox/
 
