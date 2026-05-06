@@ -44,6 +44,50 @@ func TestProfileRouteRendersProfileArea(t *testing.T) {
 	}
 }
 
+// TestProfileRouteUsesProfileTemplatePin confirms that when
+// weblogs.profile_template_id is set the profile page renders with
+// that template instead of the active one.
+func TestProfileRouteUsesProfileTemplatePin(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+
+	profileMain := "<!doctype html><html><body>\n" +
+		"<!-- BEGIN profile_area -->\n" +
+		"<h1>PROFILE-PIN</h1>\n" +
+		"<p>{profile_name}</p>\n" +
+		"<!-- END profile_area -->\n" +
+		"</body></html>\n"
+	res, err := a.DB.Exec(`
+		INSERT INTO templates (wid, name, main_body, css, is_active, created_at, updated_at)
+		VALUES (1, 'profile-pin', ?, '', 0, 1700000000, 1700000000)`, profileMain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tid, err := res.LastInsertId()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.DB.Exec(`UPDATE weblogs SET profile_template_id = ? WHERE id = 1`, tid); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.DB.Exec(`UPDATE users SET display_name = 'Jane' WHERE id = 1`); err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	a.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/profile/1/", nil))
+	if w.Code != 200 {
+		t.Fatalf("status = %d", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "<h1>PROFILE-PIN</h1>") {
+		t.Errorf("profile pin template not used; body:\n%s", body)
+	}
+	if !strings.Contains(body, "<p>Jane</p>") {
+		t.Errorf("profile name not rendered in pinned template; body:\n%s", body)
+	}
+}
+
 // TestProfileRouteHiddenWhenListVisibleFalse: a user with
 // list_visible=0 should 404 on /profile/{id}/.
 func TestProfileRouteHiddenWhenListVisibleFalse(t *testing.T) {

@@ -419,7 +419,7 @@ func (h *Handler) renderList(w http.ResponseWriter, r *http.Request, entries []d
 		}
 	}
 	if tmpl == nil {
-			var pinID int64
+		var pinID int64
 		if useArchiveTemplate {
 			pinID = weblog.ArchiveTemplateID
 		}
