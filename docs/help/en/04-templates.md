@@ -52,7 +52,7 @@ A block is the region between `<!-- BEGIN block_name -->` and `<!-- END block_na
 Anything inside `{...}` is replaced at render time with the actual value.
 
 ```html
-<h1>{blog_title}</h1>
+<h1>{blog_name_only}</h1>
 <article>
   <h2>{entry_title}</h2>
   {entry_description}

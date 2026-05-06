@@ -52,7 +52,7 @@ HTML テンプレートは基本的に HTML の要素で構成されます。内
 `{tag_name}` と記述された部分が、実際の内容に置き換わります。
 
 ```html
-<h1>{blog_title}</h1>
+<h1>{blog_name_only}</h1>
 <article>
   <h2>{entry_title}</h2>
   {entry_description}

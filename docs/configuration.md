@@ -7,6 +7,7 @@ Every knob the running binary respects, plus the `task` shortcuts the dev workfl
 | Variable | Purpose |
 |---|---|
 | `SB_DB` | Path to the SQLite database (default `./data/dev.db`) |
+| `SB_BASE_PATH` | Deployment sub-path used as the URL prefix for all site links when the weblog Base URL is not configured (e.g. `/sb/`). Auto-detected from `SCRIPT_NAME` in CGI mode when not set |
 | `SB_ADMIN_NAME` | Seed / default admin user name |
 | `SB_ADMIN_PASSWORD` | Seed / default admin password |
 | `SB_ADMIN_EMAIL` | Seed / default admin email |
