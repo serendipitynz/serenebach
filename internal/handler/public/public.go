@@ -419,7 +419,11 @@ func (h *Handler) renderList(w http.ResponseWriter, r *http.Request, entries []d
 		}
 	}
 	if tmpl == nil {
-		tmpl, err = h.pickTemplate(ctx, weblog, useArchiveTemplate)
+			var pinID int64
+		if useArchiveTemplate {
+			pinID = weblog.ArchiveTemplateID
+		}
+		tmpl, err = h.pickTemplate(ctx, weblog, pinID)
 		if err != nil {
 			log.Printf("%s: load template: %v", logTag, err)
 			http.Error(w, "no active template", http.StatusInternalServerError)
@@ -470,17 +474,16 @@ func (h *Handler) renderList(w http.ResponseWriter, r *http.Request, entries []d
 	writeHTML(w, body, logTag)
 }
 
-// pickTemplate resolves the template to render with. Archive routes
-// honour weblog.ArchiveTemplateID when set; everything else falls
-// through to the currently-active template. Tolerant of a stale pin:
-// if the referenced row is gone we log and fall back to active rather
-// than erroring out the page.
-func (h *Handler) pickTemplate(ctx context.Context, weblog *domain.Weblog, useArchive bool) (*domain.Template, error) {
-	if useArchive && weblog.ArchiveTemplateID != 0 {
-		if t, err := h.Store.TemplateByID(ctx, h.WID, weblog.ArchiveTemplateID); err == nil {
+// pickTemplate resolves the template to render with. When pinID is non-zero
+// it tries that template first; otherwise it falls through to the
+// currently-active template. Tolerant of a stale pin: if the referenced row
+// is gone we log and fall back to active rather than erroring out the page.
+func (h *Handler) pickTemplate(ctx context.Context, weblog *domain.Weblog, pinID int64) (*domain.Template, error) {
+	if pinID != 0 {
+		if t, err := h.Store.TemplateByID(ctx, h.WID, pinID); err == nil {
 			return t, nil
 		} else {
-			log.Printf("public.pickTemplate: archive pin %d missing, falling back: %v", weblog.ArchiveTemplateID, err)
+			log.Printf("public.pickTemplate: pin %d missing, falling back: %v", pinID, err)
 		}
 	}
 	return h.Store.ActiveTemplate(ctx, h.WID)
