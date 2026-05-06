@@ -640,7 +640,16 @@
         if (!v) { input.focus(); return; }
         if (nameField) nameField.value = v;
         form.action = '/admin/templates/' + tplID + '/save-as';
-        form.submit();
+        if (form.requestSubmit) {
+          form.requestSubmit();
+        } else {
+          var btn = document.createElement('button');
+          btn.type = 'submit';
+          btn.style.display = 'none';
+          form.appendChild(btn);
+          btn.click();
+          form.removeChild(btn);
+        }
       });
       footer.appendChild(cancel);
       footer.appendChild(ok);
