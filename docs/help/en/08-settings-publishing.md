@@ -77,7 +77,7 @@ The **Design Settings** screen carries cross-template rendering knobs:
 - Sort order for comments
 - Date format
 
-The date format follows SB3-style tokens like `%y/%m/%d`.
+Date formats use SB3-style tokens such as `%Year%`, `%Mon%`, `%Day%`, `%Week%`, `%Hour%`, `%Min%`. Example: `%Year%-%Mon%-%Day% (%Week%)`
 
 ## Related pages
 

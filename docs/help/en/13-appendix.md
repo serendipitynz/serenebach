@@ -31,6 +31,8 @@ The image and template directories can be backed up with a regular file copy or 
 | Variable | Description |
 |---|---|
 | `SB_DB` | Path to the SQLite database |
+| `SB_BASE_PATH` | Deployment sub-path (e.g. `/sb/`) |
+| `SB_DEV` | Set to `1` for development mode (disables template caching, etc.) |
 | `SB_ADMIN_NAME` | Admin user name created during seed |
 | `SB_ADMIN_PASSWORD` | Admin password created during seed |
 | `SB_ADMIN_EMAIL` | Admin email created during seed |
