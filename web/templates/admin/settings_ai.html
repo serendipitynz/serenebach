@@ -37,7 +37,7 @@
 
       <p class="hint">{{T "profile.ai.hint"}}</p>
 
-      <form method="post" action="{{Root}}/admin/settings/ai" class="form-stack" data-ai-config-form>
+      <form method="post" action="{{Root}}/admin/settings/ai" class="form-stack" data-ai-config-form data-unsaved-warn>
         <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 
         <div class="form-row">
