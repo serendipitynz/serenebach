@@ -571,7 +571,7 @@
   "templates.settings.error.displayCountSaveFailed": "Could not save the display count.",
   "templates.settings.activeOption": "(Active template)",
   "templates.settings.archiveHint": "Used for year / month / category archive pages. Picking the active template renders them with the same skin as regular pages.",
-  "templates.settings.profileHint": "Used on user profile pages. The profile page itself isn't implemented yet, but the picker is here now.",
+  "templates.settings.profileHint": "Used on user profile pages.",
   "templates.settings.hint": "Pick a template for these pages. When unset, the active template is used.",
   "templates.settings.dateHeading": "Date & time formats",
   "templates.settings.dateHint": "Available tokens: <code>%Year%</code> / <code>%Mon%</code> / <code>%Day%</code> / <code>%Hour%</code> / <code>%Min%</code> / <code>%Week%</code> / <code>%WeekLong%</code> / <code>%MonLong%</code> / <code>%MonShort%</code> / <code>%DayOrd%</code> / <code>%Hour12%</code> / <code>%HourAP%</code> / <code>%Sec%</code> / <code>%Zone%</code>. Leave blank to use the default.",

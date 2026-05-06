@@ -571,7 +571,7 @@
   "templates.settings.error.displayCountSaveFailed": "表示件数の保存に失敗しました。",
   "templates.settings.activeOption": "（利用中のテンプレート）",
   "templates.settings.archiveHint": "月別・カテゴリー別アーカイブページで使われます。「利用中のテンプレート」を選ぶと通常ページと同じテンプレートが使われます。",
-  "templates.settings.profileHint": "ユーザープロフィールページで使われます。プロフィールページ自体は今後対応予定ですが、先に選択肢は用意しておきます。",
+  "templates.settings.profileHint": "ユーザープロフィールページで使われます。",
   "templates.settings.hint": "該当ページで使うテンプレートを指定します。未指定の場合は利用中のテンプレートが使われます。",
   "templates.settings.dateHeading": "時刻表記設定",
   "templates.settings.dateHint": "利用できるトークン: <code>%Year%</code> / <code>%Mon%</code> / <code>%Day%</code> / <code>%Hour%</code> / <code>%Min%</code> / <code>%Week%</code> / <code>%WeekLong%</code> / <code>%MonLong%</code> / <code>%MonShort%</code> / <code>%DayOrd%</code> / <code>%Hour12%</code> / <code>%HourAP%</code> / <code>%Sec%</code> / <code>%Zone%</code> など。空欄にすると既定値が使われます。",
