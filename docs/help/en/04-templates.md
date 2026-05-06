@@ -8,20 +8,48 @@ order: 40
 
 The look of the public site is controlled by templates. The Go port of Serene Bach uses the same template philosophy as SB3 — most existing SB3 templates can be imported as-is, though a few legacy features aren't supported.
 
-## What you can edit
+## Template structure
 
-The template editor covers:
+A template set consists of:
 
-- The full page HTML
-- The HTML for individual entry pages
-- The stylesheet
-- Template assets like logos and background images
+- Base HTML template (full-page HTML)
+- Individual-entry HTML template (used only in single-entry mode)
+- CSS template
 
-Preview before saving so you can confirm a new look without immediately replacing what's published.
+The individual-entry HTML template is optional; when absent, the base HTML template is used for single-entry pages too.
 
-## Basic syntax
+You can save multiple template sets and switch between them in **Design Settings**. Archive / category listings and profile pages can each use a different template. Per-category templates are also supported.
 
-Insert dynamic values with tags:
+Template assets such as images can be uploaded and referenced with `{site_parts}`:
+
+```html
+<img src="{site_parts}logo.png" alt="">
+```
+
+## HTML template syntax
+
+HTML templates are ordinary HTML with two special constructs: **blocks** and **tags**.
+
+### Blocks
+
+```html
+<!-- BEGIN block_name -->
+<p>{tag_name}</p>
+<!-- END block_name -->
+```
+
+A block is the region between `<!-- BEGIN block_name -->` and `<!-- END block_name -->`. Its repetition count changes depending on the page state.
+
+**Important:** `BEGIN` and `END` must each appear on a line of their own. The following will not work:
+
+```html
+<!-- Wrong: other tags on the same line -->
+<div><!-- BEGIN entry --><p>{entry_title}</p><!-- END entry --></div>
+```
+
+### Tags
+
+Anything inside `{...}` is replaced at render time with the actual value.
 
 ```html
 <h1>{blog_title}</h1>
@@ -31,53 +59,282 @@ Insert dynamic values with tags:
 </article>
 ```
 
-Anything inside `{...}` is replaced at render time with the actual value.
+## Block reference
 
-For repeated content (entry lists, category lists, recent comments) use blocks:
+| Category | Block | Description |
+|---|---|---|
+| Title | `title` | Page header. Always rendered once. |
+| Entry | `entry` | Entry loop. Repeats per entry on list pages; once on single-entry pages. |
+| Entry | `option` | Shown only on single-entry pages. |
+| Entry | `sequel` | Shown only on single-entry pages. Contains prev/next entry navigation. |
+| Comments | `comment_area` | Shown on single-entry pages when comments are accepted. Contains the comment form. |
+| Comments | `comment` | Individual approved comments. Repeats per comment. |
+| Pagination | `page` | Page navigation. Shown when total pages > 1. |
+| Profile | `profile` | User directory list (sidebar). |
+| Profile | `profile_area` | Profile detail block. Only on `/profile/{id}/` pages. |
+| Category | `category_area` | Category heading block. Only on category-scoped list pages. |
+| Lists | `archives` | Monthly archive list. |
+| Lists | `category` | Category list. |
+| Lists | `latest_entry` | Recent entries list. |
+| Lists | `link` | Blogroll / link list. |
+| Lists | `recent_comment` | Recent comments list. |
+| Lists | `selected_entry` | Selected/recommended entries list. **Always 0 in the Go port.** |
 
-```html
-<!-- BEGIN entry -->
-<article>
-  <h2>{entry_title}</h2>
-  {entry_description}
-</article>
-<!-- END entry -->
-```
+## Tag reference
 
-`BEGIN` and `END` must each appear on a line of their own.
-
-## Common tags
+### Global tags (available anywhere)
 
 | Tag | Value |
 |---|---|
-| `{blog_title}` | Blog title |
-| `{blog_description}` | Blog description |
-| `{blog_url}` | Blog URL |
+| `{site_encoding}` | Character encoding (`utf-8`) |
+| `{site_lang}` | Weblog language code |
+| `{site_title}` | Page title ( `"Blog \| Suffix"` when a suffix is set ) |
+| `{site_top}` | Blog top-page URL |
+| `{site_cgi}` | `/sb.cgi` (SB3 compatibility) |
 | `{site_css}` | URL of the template's CSS |
+| `{site_rss}` | `/rss.xml` |
+| `{site_atom}` | `/atom.xml` |
 | `{site_parts}` | URL prefix for template assets |
+| `{site_mobile}` | Mobile access URL. **Always empty in the Go port.** |
+| `{site_rsd}` | `/rsd.xml` (SB3 compatibility; XML-RPC is not implemented) |
+| `{selected_archive}` | Current page suffix (archive label, category name, etc.) |
+| `{script_name}` | `Serene Bach` |
+| `{script_version}` | Version string |
+| `{script_webpage}` | Official project URL |
+| `{mode_name}` | Long mode name (`entry`, `category`, `archive`, `tag`, `profile`, `search`, `page`) |
+| `{mode_id}` | Short mode identifier (`ent`, `cat`, `arc`, `tag`, `user`, `srch`, etc.) |
+| `{blog_name_only}` | Blog title (plain text) |
+| `{blog_name}` | Blog title wrapped in a link to the top page |
+| `{blog_description}` | Blog description |
+| `{csrf_token}` | CSRF token for public POST forms |
+
+### Pagination tags
+
+Usable inside and outside the `page` block.
+
+| Tag | Value |
+|---|---|
+| `{page_num}` | Total number of pages |
+| `{page_now}` | Current page number (1-indexed) |
+| `{prev_page_url}` | Previous page URL (empty on first page) |
+| `{prev_page_link}` | Previous-page HTML anchor (`<<`) |
+| `{next_page_url}` | Next page URL (empty on last page) |
+| `{next_page_link}` | Next-page HTML anchor (`>>`) |
+
+### Tags inside the `entry` block
+
+| Tag | Value |
+|---|---|
+| `{entry_id}` | Entry ID |
+| `{entry_permalink}` | Entry permalink URL |
 | `{entry_title}` | Entry title |
-| `{entry_description}` | Entry body |
-| `{entry_sequel}` | "More" content |
-| `{entry_posted}` | Posted timestamp |
-| `{entry_permalink}` | Entry URL |
-| `{entry_category_name}` | Category name |
-| `{entry_comments_count}` | Number of comments |
+| `{entry_date}` | Entry date (format differs between list and single-entry views) |
+| `{entry_time}` | Posting time wrapped in a permalink anchor |
+| `{entry_disp_time}` | Posting time (plain string) |
+| `{entry_description}` | Entry body (format-rendered HTML) |
+| `{entry_sequel}` | "Read more" link on list pages; "More" body on single-entry pages |
+| `{entry_mode}` | `list` or `entry` |
 | `{entry_likes_count}` | Number of likes |
-| `{entry_stamps_count}` | Number of stamps |
+| `{entry_like_url}` | Like POST URL |
+| `{entry_stamps_count}` | Total stamp count |
+| `{entry_stamp_url}` | Stamp POST URL |
+| `{entry_keywords}` | Keywords (comma-separated) |
+| `{entry_keyword}` | SB3 spelling alias for `{entry_keywords}` |
+| `{entry_tags}` | Tag list HTML fragment |
+| `{permalink}` | SB3 short alias for `{entry_permalink}` |
+| `{comment_num}` | Comments anchor HTML (`-` when comments are closed) |
+| `{comment_count}` | Raw comment count (empty when comments are closed) |
+| `{sb_entry_marking}` | Scroll anchor on list pages; empty on single-entry pages |
+| `{category_name}` | Category name link (`-` when uncategorised) |
+| `{category_id}` | Category ID (empty when uncategorised) |
+| `{category_disp_name}` | Category display name (`-` when uncategorised) |
+| `{user_name}` | Author **login name** (SB3-compatible) |
+| `{user_disp_name}` | Author display name |
+| `{user_login}` | Alias for `{user_name}` (login name) |
+| `{user_id}` | Author user ID |
 
-Some SB3-compatible aliases are also supported. After importing an older template, check the editor's status panel to see what was flagged.
+On single-entry pages (`entry` block count = 1) the following extra tags are available:
 
-## Template assets
+| Tag | Value |
+|---|---|
+| `{entry_og_image}` | OG image URL |
+| `{entry_og_image_width}` | `1200` |
+| `{entry_og_image_height}` | `630` |
 
-Logos, background images, and supplementary CSS files can be uploaded as template assets. Reference them with `{site_parts}`:
+Per-kind stamp counts are available as `{entry_stamps_heart}`, `{entry_stamps_laugh}`, `{entry_stamps_wow}`, and `{entry_stamps_party}`.
 
-```html
-<img src="{site_parts}logo.png" alt="">
-```
+### Tags inside the `sequel` block
+
+| Tag | Value |
+|---|---|
+| `{prev_permalink}` | Previous entry permalink (empty at edge) |
+| `{prev_title}` | Previous entry title |
+| `{next_permalink}` | Next entry permalink (empty at edge) |
+| `{next_title}` | Next entry title |
+| `{prev_entry}` | Ready-made anchor `« Title` (empty at edge) |
+| `{next_entry}` | Ready-made anchor `Title »` (empty at edge) |
+
+> The "previous / next" chronological relationship depends on the weblog's configured entry sort order.
+
+### Tags inside the `comment_area` block
+
+| Tag | Value |
+|---|---|
+| `{comment_post_url}` | Comment POST URL |
+| `{form_ts}` | Anti-spam Unix timestamp |
+| `{comment_error}` | Form error message (HTML-escaped) |
+| `{cookie_name}` | Prefilled commenter name from cookie |
+| `{cookie_email}` | Prefilled commenter email from cookie |
+| `{cookie_url}` | Prefilled commenter URL from cookie |
+| `{turnstile_widget}` | Cloudflare Turnstile widget HTML (empty when not configured) |
+| `{sb_comment_js}` | **Always empty in the Go port.** |
+
+### Tags inside the `comment` block
+
+| Tag | Value |
+|---|---|
+| `{comment_name}` | Comment author name (HTML-escaped) |
+| `{comment_time}` | Comment timestamp |
+| `{comment_description}` | Comment body (HTML-escaped, newlines → `<br>`) |
+| `{comment_url}` | Comment author URL (scheme-allow-listed) |
+| `{comment_icon}` | **Always empty in the Go port.** (reserved for a future avatar feature) |
+
+### Tags inside the `profile` block (sidebar)
+
+| Tag | Value |
+|---|---|
+| `{user_list}` | Pre-rendered `<ul><li><a href="...">Name</a></li>...</ul>` fragment of all list-visible users |
+
+### Tags inside the `profile_area` block (profile page)
+
+| Tag | Value |
+|---|---|
+| `{profile_id}` | User numeric ID |
+| `{profile_name}` | User display name |
+| `{profile_login}` | User login name |
+| `{profile_description}` | Profile description (format-rendered HTML) |
+| `{profile_email}` | **Always empty in the Go port.** (admin email is not public) |
+| `{user_id}` | Alias for `{profile_id}` |
+| `{user_name}` | Alias for `{profile_login}` (login name, SB3-compatible) |
+| `{user_disp_name}` | Alias for `{profile_name}` |
+| `{user_login}` | Alias for `{profile_login}` |
+
+### Tags inside the `category_area` block (category page)
+
+| Tag | Value |
+|---|---|
+| `{category_pagename}` | The category's own name |
+| `{category_fullname}` | Full name with parent chain (`Parent > Child`) |
+| `{category_description}` | Category description (format-rendered HTML) |
+
+### Tags inside the `archives` block
+
+| Tag | Value |
+|---|---|
+| `{archives_list}` | Monthly archive `<ul><li><a href="...">YYYY-MM (N)</a></li>...</ul>` HTML fragment |
+
+### Tags inside the `category` block
+
+| Tag | Value |
+|---|---|
+| `{category_list}` | Top-level categories only, as a `<ul>` HTML fragment |
+| `{subcategory_list}` | Nested categories including sub-categories, as a `<ul>` HTML fragment |
+
+### Tags inside the `recent_comment` block
+
+| Tag | Value |
+|---|---|
+| `{recent_comment_list}` | Recent comments `<ul><li><a href="...">EntryTitle</a> — Name</li>...</ul>` HTML fragment |
+
+### Tags inside the `latest_entry` block
+
+| Tag | Value |
+|---|---|
+| `{latest_entry_list}` | Recent entries `<ul><li><a href="...">Title</a></li>...</ul>` HTML fragment |
+
+### Tags inside the `link` block
+
+| Tag | Value |
+|---|---|
+| `{link_list}` | Blogroll HTML fragment (group nesting supported) |
+
+## SB3-compatible aliases
+
+The Go port provides the following aliases for compatibility with SB3 templates.
+
+| Tag | Alias of | Note |
+|---|---|---|
+| `{permalink}` | `{entry_permalink}` | SB3 short form |
+| `{entry_keyword}` | `{entry_keywords}` | SB3 singular spelling |
+| `{user_login}` | `{user_name}` | Go-port alias for login name |
+
+## Unsupported / behaviourally different tags and blocks
+
+These tags and blocks are either not implemented or behave differently from SB3. When you import an SB3 template, the template editor shows warnings for any that are present.
+
+### Unsupported tags (always empty)
+
+| Tag | Reason |
+|---|---|
+| `{trackback_url}` | Trackback is out of scope (spam vector) |
+| `{trackback_count}` | Same as above |
+| `{recent_trackback_list}` | Same as above |
+| `{comment_iconform}` | Comment icons are not supported |
+| `{related_category}` | Secondary category assignment is not modelled |
+| `{related_category_disp}` | Same as above |
+| `{entry_excerpt}` | Summary / excerpt field is not modelled |
+| `{calendar}` | Calendar sidebar widget is not implemented |
+| `{calendar2}` | Same as above |
+| `{calendar_horizontal}` | Same as above |
+| `{calendar_vertical}` | Same as above |
+| Any `{trackback_...}` | Trackback feature is out of scope |
+| Any `{amazon_...}` | Amazon affiliate integration is out of scope |
+| Any `{asin_...}` | Same as above |
+
+### Unsupported blocks
+
+| Block | Reason |
+|---|---|
+| `trackback_area` | Trackback is out of scope |
+| `recent_trackback` | Same as above |
+| `trackback` | Same as above |
+| `amazon_area` | Amazon affiliate is out of scope |
+| `amazon` | Same as above |
+| `comment_iconform` | Comment icons are not supported |
+| `calendar` | Calendar sidebar widget is not implemented |
+| `mobile_top` | Mobile mode was dropped |
+| `mobile_entry` | Same as above |
+| `mobile_comment_area` | Same as above |
+| `mobile_comment_form` | Same as above |
+| `mobile_trackback_area` | Same as above |
+
+### Tags with different semantics
+
+| Tag | SB3 semantics | Go-port semantics |
+|---|---|---|
+| `{site_mobile}` | Mobile URL | Always empty |
+| `{comment_icon}` | Icon image | Always empty |
+| `{profile_email}` | User email address | Always empty (kept private) |
+| `{sb_comment_js}` | SB3 comment script | Always empty |
+
+### Blocks with different semantics
+
+| Block | SB3 semantics | Go-port semantics |
+|---|---|---|
+| `selected_entry` | Shown when recommended-posts flag is set | Always 0 |
+
+## CSS template
+
+The CSS template can also use tags:
+
+| Tag | Value |
+|---|---|
+| `{site_parts}` | URL prefix for template assets |
+| `{site_encoding}` | Character encoding |
 
 ## Design settings
 
-The **Design Settings** screen (the サイドバー entry that opens `/admin/templates`) covers site-wide rendering knobs:
+The **Design Settings** screen covers site-wide rendering knobs:
 
 - Switching the active template
 - Templates used for archive / category listings
@@ -86,19 +343,16 @@ The **Design Settings** screen (the サイドバー entry that opens `/admin/tem
 - Sort order for entries and comments
 - Date format
 
+Date formats use the same SB3-style tokens such as `%Year%`, `%Mon%`, `%Day%`. See [Publishing settings and OG cards](settings-publishing) for details.
+
 ## Import and export
 
 You can import an SB3-style `template.txt`. Older character encodings (Shift_JIS, EUC-JP, ISO-2022-JP) are auto-converted to UTF-8 during import.
 
 Export uses the same `template.txt` format — useful for backups or moving a template to another instance.
 
-## Unsupported legacy features
-
-The Go port does not support trackbacks, Amazon affiliate tags, or mobile-only views. Imports succeed, but you'll need to remove or rewrite those bits in the template editor.
-
-See [Migrating from SB2 / SB3 and feature differences](sb3-migration) for the full list.
-
 ## Related pages
 
 - [Preview mode](preview)
 - [Migrating from SB2 / SB3 and feature differences](sb3-migration)
+- [Publishing settings and OG cards](settings-publishing)
