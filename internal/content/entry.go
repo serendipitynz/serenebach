@@ -74,6 +74,8 @@ func (v EntryView) Render() (string, error) {
 		WithPageSuffix(v.Entry.Title).
 		Apply(c)
 	c.Block("title", 1)
+	// toppage block is stripped on entry pages (top-page-only gate).
+	c.Block("toppage", 0)
 	// `option` block is SB3's "show this part only on entry pages"
 	// gate — populated with count=1 on entry permalink pages so
 	// entry-only markup (comment forms, stamp buttons in the layout

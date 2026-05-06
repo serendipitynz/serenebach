@@ -342,6 +342,7 @@ func writeHome(ctx context.Context, store *repo.Store, outDir string, site conte
 		Tags:         tagsForEntries(ctx, store, head),
 		ProfileUsers: profileUsers,
 		Sidebar:      sidebar,
+		Mode:         "page",
 	}).Render()
 	if err != nil {
 		return fmt.Errorf("rebuild: render home: %w", err)
@@ -510,6 +511,8 @@ func writeCategories(ctx context.Context, store *repo.Store, opts Options, site 
 			ProfileUsers: profileUsers,
 			Sidebar:      sidebar,
 			PageTitle:    "Category: " + cat.Name,
+			Mode:         "cat",
+			ModeContext:  strconv.FormatInt(cat.ID, 10),
 		}).Render()
 		if err != nil {
 			return fmt.Errorf("rebuild: render category %d: %w", cat.ID, err)
@@ -542,6 +545,8 @@ func writeTags(ctx context.Context, store *repo.Store, opts Options, site conten
 			ProfileUsers: profileUsers,
 			Sidebar:      sidebar,
 			PageTitle:    "Tag: " + t.Name,
+			Mode:         "tag",
+			ModeContext:  t.Slug,
 		}).Render()
 		if err != nil {
 			return fmt.Errorf("rebuild: render tag %d: %w", t.ID, err)
@@ -581,6 +586,8 @@ func writeArchives(ctx context.Context, store *repo.Store, opts Options, site co
 				ProfileUsers: profileUsers,
 				Sidebar:      sidebar,
 				PageTitle:    "Archive: " + strconv.Itoa(p.Year),
+				Mode:         "arc",
+				ModeContext:  strconv.Itoa(p.Year),
 			}).Render()
 			if err != nil {
 				return fmt.Errorf("rebuild: render archive %d: %w", p.Year, err)
@@ -608,6 +615,8 @@ func writeArchives(ctx context.Context, store *repo.Store, opts Options, site co
 			ProfileUsers: profileUsers,
 			Sidebar:      sidebar,
 			PageTitle:    "Archive: " + strconv.Itoa(p.Year) + "/" + padMonth(p.Month),
+			Mode:         "arc",
+			ModeContext:  fmt.Sprintf("%04d%s", p.Year, padMonth(p.Month)),
 		}).Render()
 		if err != nil {
 			return fmt.Errorf("rebuild: render archive %d/%02d: %w", p.Year, p.Month, err)

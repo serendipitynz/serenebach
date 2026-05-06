@@ -100,6 +100,14 @@ func (v ListView) Render() (string, error) {
 	// Show the header "title" block once for list pages.
 	c.Block("title", 1)
 
+	// toppage block: 1 on home / default list, 0 on every other page kind.
+	isTop := v.Mode == "" || v.Mode == "page"
+	if isTop {
+		c.Block("toppage", 1)
+	} else {
+		c.Block("toppage", 0)
+	}
+
 	for i, e := range v.Entries {
 		c.Num(i)
 		c.Tag("entry_id", strconv.FormatInt(e.ID, 10))
