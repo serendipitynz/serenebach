@@ -31,6 +31,8 @@ sqlite3 /var/lib/serenebach/blog.db ".backup /backup/blog.db"
 | 変数 | 内容 |
 |---|---|
 | `SB_DB` | SQLite データベースのパス |
+| `SB_BASE_PATH` | デプロイ時のサブパス（例: `/sb/`） |
+| `SB_DEV` | `1` にすると開発モード（テンプレートのキャッシュ無効化など） |
 | `SB_ADMIN_NAME` | seed 時に作成する管理ユーザー名 |
 | `SB_ADMIN_PASSWORD` | seed 時に作成する管理ユーザーのパスワード |
 | `SB_ADMIN_EMAIL` | seed 時に作成する管理ユーザーのメールアドレス |

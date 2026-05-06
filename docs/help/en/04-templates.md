@@ -40,7 +40,7 @@ HTML templates are ordinary HTML with two special constructs: **blocks** and **t
 
 A block is the region between `<!-- BEGIN block_name -->` and `<!-- END block_name -->`. Its repetition count changes depending on the page state.
 
-**Important:** `BEGIN` and `END` must each appear on a line of their own. The following will not work:
+**Important:** `BEGIN` and `END` must each appear on a line of their own. The following will **NOT** work:
 
 ```html
 <!-- Wrong: other tags on the same line -->
