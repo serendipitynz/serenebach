@@ -64,6 +64,7 @@ Anything inside `{...}` is replaced at render time with the actual value.
 | Category | Block | Description |
 |---|---|---|
 | Title | `title` | Page header. Always rendered once. |
+| Title | `toppage` | Shown only on the top (home) page. Hidden on category, archive, tag, single-entry, and profile pages. |
 | Entry | `entry` | Entry loop. Repeats per entry on list pages; once on single-entry pages. |
 | Entry | `option` | Shown only on single-entry pages. |
 | Entry | `sequel` | Shown only on single-entry pages. Contains prev/next entry navigation. |
