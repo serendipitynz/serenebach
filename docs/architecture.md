@@ -70,7 +70,7 @@ Commenters can opt into a prefill cookie via the `次回のために…記憶す
 Templates are edited in the browser at `/admin/templates`. The sidebar entry is labelled **デザイン設定** (the URL stayed `templates` for compatibility — it's now an umbrella for template-related design settings rather than just a template list). The page has multiple tabs:
 
 - **List** — every template row with activate / delete / export / reorder (drag the ≡ handle). Deleting the currently-active template is refused so the public site always has something to render.
-- **Settings** — pin a template per route family. Archive (year / month / category / tag) pages use the archive pin when set; everything else stays on the active template. Profile pin is stored but not yet used when rendering public profile pages.
+- **Settings** — pin a template per route family. Archive (year / month / category / tag) pages use the archive pin when set; profile pages use the profile pin when set; everything else stays on the active template.
 - **OG card** — the blog-wide default OG card background and text colour. Per-entry overrides on the entry editor take precedence.
 - **Import** — upload an SB3 `template.txt` (multipart/mixed bundle with base.html / style.css / optional entry.html / binary assets). Each imported asset lands under `SB_TEMPLATE_DIR/<new_id>/`.
 

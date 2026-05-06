@@ -46,7 +46,7 @@ func (h *Handler) profile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "site not configured", http.StatusInternalServerError)
 		return
 	}
-	tmpl, err := h.Store.ActiveTemplate(ctx, h.WID)
+	tmpl, err := h.pickTemplate(ctx, weblog, weblog.ProfileTemplateID)
 	if err != nil {
 		log.Printf("public.profile: load template: %v", err)
 		http.Error(w, "no active template", http.StatusInternalServerError)
