@@ -158,7 +158,10 @@ services:
     volumes:
       - ./data:/home/nonroot/data
     environment:
-      SB_TRUSTED_PROXIES: "127.0.0.1/32"
+      # When running inside Docker, requests arrive through the bridge network.
+      # Use the default Docker private IP range (172.16.0.0/12).
+      # For non-container or host-network deployments, use 127.0.0.1/32 instead.
+      SB_TRUSTED_PROXIES: "172.16.0.0/12"
       # SB_AI_SECRET: "replace-with-a-long-random-secret"
       # SB_UPLOAD_MAX_MB: "10"
     restart: unless-stopped
@@ -207,6 +210,8 @@ Operational checklist:
 - Back up `/opt/serenebach/data` before upgrades.
 - Set the site base URL in the admin UI to the HTTPS URL.
 - Keep `SB_TRUSTED_PROXIES` limited to the proxy addresses that actually sit in front of the container.
+  - Inside Docker, this is usually the bridge network CIDR (e.g. `172.16.0.0/12`), not `127.0.0.1/32`.
+  - Use `127.0.0.1/32` only for host-network or non-container deployments.
 - Leave `SB_AI_SECRET` unset unless AI writing assists are needed; setting it later enables the AI UI without changing the image.
 
 ## CGI
