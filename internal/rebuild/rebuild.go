@@ -1011,7 +1011,10 @@ func promoteExtraDirs(staging, finalOut string, pruneSet, oldRoots map[string]st
 
 	// Prune stale page directories. Skip a stale root if any active
 	// descendant is still present — removing the parent would delete
-	// the active child as well.
+	// the active child as well.  When a stale parent has active
+	// children, remove only the parent's own index.html so the stale
+	// flat page stops being served while the child directories and
+	// any operator-managed sibling files survive.
 	for root := range oldRoots {
 		if _, stillActive := pruneSet[root]; stillActive {
 			continue
@@ -1023,11 +1026,15 @@ func promoteExtraDirs(staging, finalOut string, pruneSet, oldRoots map[string]st
 				break
 			}
 		}
-		if hasActiveDescendant {
-			continue
-		}
 		stalePath := filepath.Join(finalOut, filepath.FromSlash(root))
 		if !dirExists(stalePath) {
+			continue
+		}
+		if hasActiveDescendant {
+			staleIndex := filepath.Join(stalePath, "index.html")
+			if err := os.Remove(staleIndex); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("rebuild: prune stale index %s: %w", staleIndex, err)
+			}
 			continue
 		}
 		if err := os.RemoveAll(stalePath); err != nil {
