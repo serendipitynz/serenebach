@@ -153,7 +153,11 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 		return nil, fmt.Errorf("rebuild: load sidebar: %w", err)
 	}
 
-	site := content.NewSite(*weblog).WithBasePath(opts.BasePath)
+	customTags, err := store.ListCustomTags(ctx, opts.WID)
+	if err != nil {
+		return nil, fmt.Errorf("rebuild: load custom tags: %w", err)
+	}
+	site := content.NewSite(*weblog).WithBasePath(opts.BasePath).WithCustomTags(customTags)
 	finalOut := opts.OutDir
 	rep := &Report{OutDir: finalOut}
 

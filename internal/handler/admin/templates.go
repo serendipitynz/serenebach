@@ -80,6 +80,9 @@ var tmplFuncs = template.FuncMap{
 	"iconEye": func() template.HTML {
 		return template.HTML(`<svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M1.5 10S4.5 4.5 10 4.5 18.5 10 18.5 10 15.5 15.5 10 15.5 1.5 10 1.5 10z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`)
 	},
+	"iconEdit": func() template.HTML {
+		return template.HTML(`<svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M13.5 2.5l4 4-10 10H3.5v-4l10-10z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`)
+	},
 	// T / Tf / THTML / Locale — stubs registered at parse time so
 	// templates can reference {{ T "key" }} without tripping the
 	// strict parse check. Real implementations are bound per-render
@@ -230,6 +233,7 @@ const (
 	pageTemplateImport   = "template_import"
 	pageTemplateSettings = "template_settings"
 	pageTemplateOG       = "template_og"
+	pageCustomTags       = "custom_tags"
 	pageHelp             = "help"
 )
 
@@ -292,7 +296,7 @@ func loadI18nBundle() *i18n.Bundle {
 
 func loadMainTemplates() map[string]*template.Template {
 	out := map[string]*template.Template{}
-	for _, p := range []string{pageHome, pageEntriesList, pageEntryForm, pagePagesList, pagePageForm, pageImages, pageCategoriesList, pageCategoryForm, pageLinksList, pageLinkForm, pageTagsList, pageUsersList, pageUserForm, pageProfileForm, pageCommentsList, pageCommentSettings, pageAnalytics, pageRebuild, pageSettings, pageSettingsBasic, pageSettingsAI, pageTemplatesList, pageTemplateForm, pageTemplateImport, pageTemplateSettings, pageTemplateOG, pageHelp} {
+	for _, p := range []string{pageHome, pageEntriesList, pageEntryForm, pagePagesList, pagePageForm, pageImages, pageCategoriesList, pageCategoryForm, pageLinksList, pageLinkForm, pageTagsList, pageUsersList, pageUserForm, pageProfileForm, pageCommentsList, pageCommentSettings, pageAnalytics, pageRebuild, pageSettings, pageSettingsBasic, pageSettingsAI, pageTemplatesList, pageTemplateForm, pageTemplateImport, pageTemplateSettings, pageTemplateOG, pageCustomTags, pageHelp} {
 		t, err := template.New("").Funcs(tmplFuncs).ParseFS(admintpl.FS(), "layout.html", p+".html")
 		if err != nil {
 			panic("admin: parse " + p + ": " + err.Error())

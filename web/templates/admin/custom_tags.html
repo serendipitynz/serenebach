@@ -1,0 +1,111 @@
+{{define "content"}}
+<h1>{{T "templates.title"}}</h1>
+
+<nav class="tabbar">
+  <a href="{{Root}}/admin/templates">{{T "templates.tab.list"}}</a>
+  <a href="{{Root}}/admin/templates/settings">{{T "templates.tab.settings"}}</a>
+  <a href="{{Root}}/admin/templates/import">{{T "templates.tab.import"}}</a>
+  <a href="{{Root}}/admin/templates/og">{{T "templates.tab.og"}}</a>
+  <a href="{{Root}}/admin/templates/custom-tags" class="active">{{T "templates.tab.customTags"}}</a>
+</nav>
+
+{{if eq .Flash "created"}}<p class="alert success">{{T "flash.saved"}}</p>{{end}}
+{{if eq .Flash "updated"}}<p class="alert success">{{T "flash.saved"}}</p>{{end}}
+{{if eq .Flash "deleted"}}<p class="alert success">{{T "flash.deleted"}}</p>{{end}}
+{{if .Error}}<p class="alert error">{{T .Error}}</p>{{end}}
+
+<div class="panel">
+  <div class="panel-head"><h2>{{T "customTags.heading"}}</h2></div>
+  <div class="panel-body">
+    {{if .Tags}}
+    <table class="listing">
+      <thead><tr>
+        <th class="col-flex-wide">{{T "customTags.col.name"}}</th>
+        <th class="col-flex-wide">{{T "customTags.col.preview"}}</th>
+        <th class="col-actions">{{T "common.col.action"}}</th>
+      </tr></thead>
+      <tbody>
+      {{range .Tags}}
+        <tr>
+          <td class="col-flex-wide"><code>{{printf "{%s}" .Name}}</code></td>
+          <td class="col-flex-wide"><pre class="tag-preview">{{.Preview}}</pre></td>
+          <td class="col-actions">
+            <a href="{{Root}}/admin/templates/custom-tags?edit={{.ID}}" class="btn-icon" aria-label="{{T `action.edit`}}" title="{{T `action.edit`}}">{{iconEdit}}</a>
+            <form method="post" action="{{Root}}/admin/templates/custom-tags/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `customTags.delete.confirm`}}')">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{T `action.delete`}}">{{iconTrash}}</button>
+            </form>
+          </td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+      <p class="hint">{{T "customTags.list.empty"}}</p>
+    {{end}}
+  </div>
+</div>
+
+{{if .EditID}}
+<div class="panel">
+  <div class="panel-head"><h2>{{T "customTags.edit.heading"}}</h2></div>
+  <div class="panel-body">
+    <form method="post" action="{{Root}}/admin/templates/custom-tags/{{.EditID}}/update" class="form-stack">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="form-row">
+        <label>{{T "customTags.form.name"}}</label>
+        <div>
+          <div class="input-prefix">
+            <span class="prefix">custom_</span>
+            <input type="text" name="name" value="{{trimPrefix "custom_" .EditName}}" pattern="[a-z][a-z0-9_]{0,49}" required>
+          </div>
+          {{if .NameError}}<p class="field-error">{{T .NameError}}</p>{{end}}
+        </div>
+      </div>
+      <div class="form-row">
+        <label>{{T "customTags.form.value"}}</label>
+        <div>
+          <textarea name="value" rows="8" spellcheck="false">{{.EditValue}}</textarea>
+          {{if .ValueError}}<p class="field-error">{{T .ValueError}}</p>{{end}}
+          <p class="hint">{{T "customTags.form.valueHint"}}</p>
+        </div>
+      </div>
+      <div class="form-actions">
+        <a href="{{Root}}/admin/templates/custom-tags">{{T "action.cancel"}}</a>
+        <button type="submit" class="primary">{{T "action.save"}}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{else}}
+<div class="panel">
+  <div class="panel-head"><h2>{{T "customTags.new.heading"}}</h2></div>
+  <div class="panel-body">
+    <form method="post" action="{{Root}}/admin/templates/custom-tags" class="form-stack">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="form-row">
+        <label>{{T "customTags.form.name"}}</label>
+        <div>
+          <div class="input-prefix">
+            <span class="prefix">custom_</span>
+            <input type="text" name="name" value="" pattern="[a-z][a-z0-9_]{0,49}" placeholder="ga_code" required>
+          </div>
+          {{if .NameError}}<p class="field-error">{{T .NameError}}</p>{{end}}
+        </div>
+      </div>
+      <div class="form-row">
+        <label>{{T "customTags.form.value"}}</label>
+        <div>
+          <textarea name="value" rows="8" spellcheck="false"></textarea>
+          {{if .ValueError}}<p class="field-error">{{T .ValueError}}</p>{{end}}
+          <p class="hint">{{T "customTags.form.valueHint"}}</p>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="primary">{{T "action.save"}}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{end}}
+{{end}}

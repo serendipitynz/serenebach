@@ -380,5 +380,37 @@ func TestBuildPreservesExistingOutputOnFailure(t *testing.T) {
 	}
 }
 
+func TestBuildExpandsCustomTags(t *testing.T) {
+	a := newSeededApp(t)
+	ctx := context.Background()
+
+	// Add a custom tag to the DB.
+	if _, err := a.DB.ExecContext(ctx,
+		`INSERT INTO site_custom_tags (wid, name, value) VALUES (?, ?, ?)`,
+		1, "custom_test", "<span class=\"custom\">hello</span>"); err != nil {
+		t.Fatalf("insert custom tag: %v", err)
+	}
+
+	// Inject the placeholder into the active template so the builder
+	// has something to expand.
+	if _, err := a.DB.ExecContext(ctx,
+		`UPDATE templates SET main_body = main_body || '\n<div>{custom_test}</div>' WHERE is_active = 1`); err != nil {
+		t.Fatalf("update template: %v", err)
+	}
+
+	out := filepath.Join(t.TempDir(), "public")
+	if _, err := rebuild.Build(ctx, a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(out, "index.html"))
+	if err != nil {
+		t.Fatalf("read index.html: %v", err)
+	}
+	if !strings.Contains(string(body), `<span class="custom">hello</span>`) {
+		t.Errorf("custom tag not expanded in static output; body:\n%s", string(body))
+	}
+}
+
 // silence unused import lint when test-only helpers drift
 var _ = sql.Open

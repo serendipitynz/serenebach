@@ -112,6 +112,20 @@
   </div>
 </div>
 
+{{if .CustomTags}}
+<div class="panel" id="custom-tags-reference">
+  <div class="panel-head"><h2>{{T "templates.form.customTags.heading"}}</h2></div>
+  <div class="panel-body">
+    <p class="hint">{{T "templates.form.customTags.hint"}}</p>
+    <div class="tag-badges">
+      {{range .CustomTags}}
+      <button type="button" class="badge" data-copy-text="{{printf "{%s}" .Name}}">{{printf "{%s}" .Name}}</button>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
+
 {{/* Template status. The recheck button is associated with the edit
      form via the `form="template-edit-form"` attribute so it still
      submits the live editor textarea contents — even though the

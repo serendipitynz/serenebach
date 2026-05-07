@@ -109,6 +109,7 @@ Anything inside `{...}` is replaced at render time with the actual value.
 | `{blog_name}` | Blog title wrapped in a link to the top page |
 | `{blog_description}` | Blog description |
 | `{csrf_token}` | CSRF token for public POST forms |
+| `{custom_xxx}` | User-defined custom tags. The name and value registered in the admin panel are expanded here. |
 
 ### Pagination tags
 
@@ -333,6 +334,27 @@ The CSS template can also use tags:
 |---|---|
 | `{site_parts}` | URL prefix for template assets |
 | `{site_encoding}` | Character encoding |
+
+## Custom tags
+
+The **Custom Tags** tab in Design Settings lets you register your own `{custom_xxx}` placeholders for use in templates. Values are inserted as raw HTML / text — they are **not escaped** when rendered.
+
+```html
+<!-- In a template -->
+<div class="analytics">{custom_google_analytics}</div>
+```
+
+Rules for registered tags:
+
+| Field | Rule |
+|---|---|
+| Tag name | `custom_` prefix followed by lowercase letters, digits, and underscores only (max 50 chars after the prefix) |
+| Value | HTML or plain text (max 64 KB) |
+| Limit | Up to 50 tags per weblog |
+
+Registered tags are injected automatically on **every page type** — entry lists, single entries, categories, archives, and profiles. Changes take effect immediately on the dynamic site; a static rebuild is required if you use `task build-site`.
+
+> **Security note:** values are emitted as raw HTML. Because only admin-level operators can edit them, the XSS surface is limited to trusted users.
 
 ## Design settings
 
