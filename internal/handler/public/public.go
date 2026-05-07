@@ -156,6 +156,9 @@ func (h *Handler) Mount(r chi.Router) {
 	// (registered at the app level for on-disk assets), so this wins
 	// when the path shape matches.
 	r.Get("/template/{id}/style.css", h.templateStyleCSS)
+	// Catch-all for flat pages. Placed after every specific route so
+	// that /entry/, /category/, etc. win first.
+	r.Get("/*", h.servePage)
 }
 
 // MountMutations registers the reader-facing POST endpoints (comment
@@ -1402,4 +1405,80 @@ func writeHTML(w http.ResponseWriter, body, tag string) {
 	if _, err := w.Write([]byte(body)); err != nil {
 		log.Printf("%s: write: %v", tag, err)
 	}
+}
+
+// servePage is the catch-all handler for flat pages (/about, /privacy, …).
+// It looks up the request path in the pages table and renders via PageView.
+// If no page matches, it emits a 404.
+func (h *Handler) servePage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	slug := r.URL.Path
+	if slug == "" || slug == "/" {
+		http.NotFound(w, r)
+		return
+	}
+	// Ensure leading slash.
+	if slug[0] != '/' {
+		slug = "/" + slug
+	}
+
+	page, err := h.Store.PageBySlug(ctx, h.WID, slug)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		log.Printf("public.servePage: lookup %q: %v", slug, err)
+		http.Error(w, "failed to load page", http.StatusInternalServerError)
+		return
+	}
+	if page.Status != domain.PagePublished {
+		http.NotFound(w, r)
+		return
+	}
+
+	weblog, err := h.Store.WeblogByID(ctx, h.WID)
+	if err != nil {
+		log.Printf("public.servePage: load weblog: %v", err)
+		http.Error(w, "site not configured", http.StatusInternalServerError)
+		return
+	}
+
+	var tmpl *domain.Template
+	if page.TemplateID != 0 {
+		if t, err := h.Store.TemplateByID(ctx, h.WID, page.TemplateID); err == nil {
+			tmpl = t
+		} else {
+			log.Printf("public.servePage: page template %d missing, falling back: %v", page.TemplateID, err)
+		}
+	}
+	if tmpl == nil {
+		tmpl, err = h.Store.ActiveTemplate(ctx, h.WID)
+		if err != nil {
+			log.Printf("public.servePage: load template: %v", err)
+			http.Error(w, "no active template", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	profileUsers, err := h.Store.VisibleProfileUsers(ctx, h.WID)
+	if err != nil {
+		log.Printf("public.servePage: profile users: %v", err)
+	}
+	sidebar := h.loadSidebarData(ctx, "public.servePage")
+
+	view := content.PageView{
+		Site:         siteWithLabel(*weblog, weblog.Lang).WithBasePath(root(r)),
+		Template:     tmpl,
+		Page:         *page,
+		ProfileUsers: profileUsers,
+		Sidebar:      sidebar,
+	}
+	body, err := view.Render()
+	if err != nil {
+		log.Printf("public.servePage: render: %v", err)
+		http.Error(w, "render error", http.StatusInternalServerError)
+		return
+	}
+	writeHTML(w, body, "public.servePage")
 }
