@@ -29,9 +29,10 @@
           <td class="col-datetime" data-label="{{T `common.col.updated`}}">{{fmtDate .UpdatedAt}}</td>
           <td class="col-actions">
             <a href="{{Root}}{{.Slug}}" target="_blank" rel="noopener" aria-label="{{T `common.viewPublic`}}" class="btn-icon" title="{{T `common.viewPublic`}}">↗</a>
+            {{- $canDeletePage := $.User.CanDeleteEntry .AuthorID -}}
             <form method="post" action="{{Root}}/admin/pages/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `common.confirmDelete`}}')">
               <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
-              <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{T `action.delete`}}">{{iconTrash}}</button>
+              <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{if $canDeletePage}}{{T `action.delete`}}{{else}}{{T `action.delete.forbiddenOwner`}}{{end}}"{{if not $canDeletePage}} disabled{{end}}>{{iconTrash}}</button>
             </form>
           </td>
         </tr>

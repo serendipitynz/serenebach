@@ -47,6 +47,16 @@ func (h *Handler) pageList(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to list pages", http.StatusInternalServerError)
 		return
 	}
+	u := session.UserFrom(r.Context())
+	if u != nil {
+		filtered := make([]domain.Page, 0, len(pages))
+		for _, p := range pages {
+			if u.CanEditEntry(p.AuthorID) {
+				filtered = append(filtered, p)
+			}
+		}
+		pages = filtered
+	}
 	templates, err := h.Store.ListTemplatesForAdmin(r.Context(), h.wid())
 	if err != nil {
 		log.Printf("admin.pageList: templates: %v", err)
@@ -104,6 +114,11 @@ func (h *Handler) pageEditForm(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	u := session.UserFrom(r.Context())
+	if u == nil {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
 	p, err := h.Store.PageByID(r.Context(), h.wid(), id)
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
@@ -112,6 +127,10 @@ func (h *Handler) pageEditForm(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("admin.pageEditForm: %v", err)
 		http.Error(w, "failed to load page", http.StatusInternalServerError)
+		return
+	}
+	if !u.CanEditEntry(p.AuthorID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 	h.renderPageForm(w, r, fmt.Sprintf("/admin/pages/%d/edit", id), *p, "", tr(r, "pages.form.titleEditPlain"), "pages")
@@ -215,10 +234,12 @@ func parsePageForm(r *http.Request, base domain.Page) (domain.Page, string) {
 }
 
 func (h *Handler) pageCreate(w http.ResponseWriter, r *http.Request) {
+	u := session.UserFrom(r.Context())
 	base := domain.Page{
-		WID:    h.wid(),
-		Status: domain.PageDraft,
-		Slug:   "/",
+		WID:      h.wid(),
+		AuthorID: u.ID,
+		Status:   domain.PageDraft,
+		Slug:     "/",
 	}
 	page, errMsg := parsePageForm(r, base)
 	if errMsg != "" {
@@ -245,6 +266,11 @@ func (h *Handler) pageUpdate(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	u := session.UserFrom(r.Context())
+	if u == nil {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
 	existing, err := h.Store.PageByID(r.Context(), h.wid(), id)
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
@@ -253,6 +279,10 @@ func (h *Handler) pageUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("admin.pageUpdate: load: %v", err)
 		http.Error(w, "failed to load page", http.StatusInternalServerError)
+		return
+	}
+	if !u.CanEditEntry(existing.AuthorID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 	page, errMsg := parsePageForm(r, *existing)
@@ -277,6 +307,25 @@ func (h *Handler) pageDelete(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil || id <= 0 {
 		http.NotFound(w, r)
+		return
+	}
+	u := session.UserFrom(r.Context())
+	if u == nil {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	existing, err := h.Store.PageByID(r.Context(), h.wid(), id)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		log.Printf("admin.pageDelete: load: %v", err)
+		http.Error(w, "failed to load page", http.StatusInternalServerError)
+		return
+	}
+	if !u.CanDeleteEntry(existing.AuthorID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 	if err := h.Store.DeletePage(r.Context(), h.wid(), id); err != nil {

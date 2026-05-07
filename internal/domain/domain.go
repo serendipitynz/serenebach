@@ -520,6 +520,7 @@ type Image struct {
 type Page struct {
 	ID         int64
 	WID        int64
+	AuthorID   int64
 	Title      string
 	Body       string
 	Format     string // "html" or "markdown"

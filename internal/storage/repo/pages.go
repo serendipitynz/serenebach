@@ -13,7 +13,7 @@ import (
 // PageBySlug returns one page by its slug (including the leading "/").
 func (s *Store) PageBySlug(ctx context.Context, wid int64, slug string) (*domain.Page, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, title, body, format, slug, template_id, sort_order, status, created_at, updated_at
+		SELECT id, wid, author_id, title, body, format, slug, template_id, sort_order, status, created_at, updated_at
 		FROM pages WHERE wid = ? AND slug = ?`, wid, slug)
 	return scanPage(row)
 }
@@ -21,7 +21,7 @@ func (s *Store) PageBySlug(ctx context.Context, wid int64, slug string) (*domain
 // PageByID returns one page by id.
 func (s *Store) PageByID(ctx context.Context, wid, id int64) (*domain.Page, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, title, body, format, slug, template_id, sort_order, status, created_at, updated_at
+		SELECT id, wid, author_id, title, body, format, slug, template_id, sort_order, status, created_at, updated_at
 		FROM pages WHERE wid = ? AND id = ?`, wid, id)
 	return scanPage(row)
 }
@@ -29,7 +29,7 @@ func (s *Store) PageByID(ctx context.Context, wid, id int64) (*domain.Page, erro
 // ListPagesForAdmin returns every page for the weblog ordered by sort_order then id.
 func (s *Store) ListPagesForAdmin(ctx context.Context, wid int64) ([]domain.Page, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, title, body, format, slug, template_id, sort_order, status, created_at, updated_at
+		SELECT id, wid, author_id, title, body, format, slug, template_id, sort_order, status, created_at, updated_at
 		FROM pages WHERE wid = ? ORDER BY sort_order, id`, wid)
 	if err != nil {
 		return nil, fmt.Errorf("repo: ListPagesForAdmin: %w", err)
@@ -41,7 +41,7 @@ func (s *Store) ListPagesForAdmin(ctx context.Context, wid int64) ([]domain.Page
 // PublishedPages returns only published pages, ordered by sort_order then id.
 func (s *Store) PublishedPages(ctx context.Context, wid int64) ([]domain.Page, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, title, body, format, slug, template_id, sort_order, status, created_at, updated_at
+		SELECT id, wid, author_id, title, body, format, slug, template_id, sort_order, status, created_at, updated_at
 		FROM pages WHERE wid = ? AND status = ? ORDER BY sort_order, id`, wid, domain.PagePublished)
 	if err != nil {
 		return nil, fmt.Errorf("repo: PublishedPages: %w", err)
@@ -54,9 +54,9 @@ func (s *Store) PublishedPages(ctx context.Context, wid int64) ([]domain.Page, e
 func (s *Store) CreatePage(ctx context.Context, p domain.Page) (int64, error) {
 	now := time.Now().Unix()
 	res, err := s.db.ExecContext(ctx, `
-		INSERT INTO pages (wid, title, body, format, slug, template_id, sort_order, status, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.WID, p.Title, p.Body, p.Format, p.Slug, p.TemplateID, p.SortOrder, p.Status, now, now)
+		INSERT INTO pages (wid, author_id, title, body, format, slug, template_id, sort_order, status, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.WID, p.AuthorID, p.Title, p.Body, p.Format, p.Slug, p.TemplateID, p.SortOrder, p.Status, now, now)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return 0, ErrSlugInUse
@@ -108,7 +108,7 @@ func (s *Store) DeletePage(ctx context.Context, wid, id int64) error {
 func scanPage(row *sql.Row) (*domain.Page, error) {
 	var p domain.Page
 	var createdAt, updatedAt int64
-	if err := row.Scan(&p.ID, &p.WID, &p.Title, &p.Body, &p.Format, &p.Slug, &p.TemplateID, &p.SortOrder, &p.Status, &createdAt, &updatedAt); err != nil {
+	if err := row.Scan(&p.ID, &p.WID, &p.AuthorID, &p.Title, &p.Body, &p.Format, &p.Slug, &p.TemplateID, &p.SortOrder, &p.Status, &createdAt, &updatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -124,7 +124,7 @@ func scanPages(rows *sql.Rows) ([]domain.Page, error) {
 	for rows.Next() {
 		var p domain.Page
 		var createdAt, updatedAt int64
-		if err := rows.Scan(&p.ID, &p.WID, &p.Title, &p.Body, &p.Format, &p.Slug, &p.TemplateID, &p.SortOrder, &p.Status, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.WID, &p.AuthorID, &p.Title, &p.Body, &p.Format, &p.Slug, &p.TemplateID, &p.SortOrder, &p.Status, &createdAt, &updatedAt); err != nil {
 			return nil, fmt.Errorf("repo: scan page: %w", err)
 		}
 		p.CreatedAt = time.Unix(createdAt, 0)
