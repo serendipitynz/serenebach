@@ -518,18 +518,19 @@ type Image struct {
 // slug path such as /about or /privacy. It does not appear in feeds,
 // archives, or entry lists.
 type Page struct {
-	ID         int64
-	WID        int64
-	AuthorID   int64
-	Title      string
-	Body       string
-	Format     string // "html" or "markdown"
-	Slug       string // leading "/" included, e.g. "/about"
-	TemplateID int64  // 0 = active template
-	SortOrder  int
-	Status     PageStatus
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID            int64
+	WID           int64
+	AuthorID      int64
+	Title         string
+	Body          string
+	Format        string // "html" or "markdown"
+	Slug          string // leading "/" included, e.g. "/about"
+	TemplateID    int64  // 0 = active template
+	SortOrder     int
+	Status        PageStatus
+	OGBGImagePath string // per-page OG background override; empty = inherit weblog default
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 // Message is a visitor-submitted comment attached to one Entry. Name is

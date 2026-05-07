@@ -1186,14 +1186,12 @@
   });
 
   // ---- OG card manual generation ---------------------------------------
-  var ogGenerateBtn = document.querySelector('[data-og-card-generate]');
-  if (ogGenerateBtn) {
+  document.querySelectorAll('[data-og-card-generate]').forEach(function (ogGenerateBtn) {
     ogGenerateBtn.addEventListener('click', function () {
-      var match = window.location.pathname.match(/\/admin\/entries\/(\d+)\/edit$/);
+      var match = window.location.pathname.match(/\/admin\/(entries|pages)\/(\d+)\/edit$/);
       if (!match) return;
-      var entryID = match[1];
-      var statusEl = document.querySelector('[data-og-card-status]');
-      var preview = document.querySelector('[data-og-card-preview]');
+      var statusEl = ogGenerateBtn.closest('[data-og-card-row]')?.querySelector('[data-og-card-status]');
+      var preview = ogGenerateBtn.closest('[data-og-card-row]')?.querySelector('[data-og-card-preview]');
       ogGenerateBtn.disabled = true;
       if (statusEl) {
         statusEl.hidden = false;
@@ -1221,7 +1219,7 @@
           ogGenerateBtn.disabled = false;
         });
     });
-  }
+  });
 
   // OG text-color controls — checkbox toggles picker enable state,
   // Clear wipes both and flips the unset marker so the server stores

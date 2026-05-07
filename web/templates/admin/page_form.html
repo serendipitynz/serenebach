@@ -60,6 +60,35 @@
     </label>
   </div>
 
+  <div class="form-row" data-og-bg-field>
+    <div class="label">{{T "entries.form.ogBg"}}</div>
+    <div>
+      <input type="hidden" name="og_bg_image_path" value="{{.Page.OGBGImagePath}}" data-og-bg-input>
+      <div class="og-bg-row">
+        <img class="og-bg-preview" data-og-bg-preview
+             {{if .Page.OGBGImagePath}}src="{{Root}}/img/{{.Page.OGBGImagePath}}"{{else}}hidden{{end}}
+             alt="">
+        <button type="button" class="link" data-og-bg-picker>{{T "entries.form.ogBg.pick"}}</button>
+        <button type="button" class="link" data-og-bg-clear>{{T "entries.form.ogBg.clear"}}</button>
+      </div>
+      <p class="hint">{{T "entries.form.ogBgHint"}}</p>
+
+      {{if .Page.ID}}
+      <div class="og-card-row" data-og-card-row>
+        <img class="og-card-preview" data-og-card-preview
+             src="{{Root}}/img/og/page_{{.Page.ID}}.png?ts={{.OGCardTS}}"
+             alt="" loading="lazy"
+             onerror="this.hidden = true">
+        <button type="button" class="btn-secondary" data-og-card-generate>
+          {{T "entries.form.ogCard.generate"}}
+        </button>
+        <span class="og-card-status" data-og-card-status hidden></span>
+      </div>
+      <p class="hint">{{T "entries.form.ogCardHint"}}</p>
+      {{end}}
+    </div>
+  </div>
+
   <div class="form-actions">
     <a href="{{Root}}/admin/pages">{{T "action.back"}}</a>
     <button type="submit" class="primary">{{T "action.save"}}</button>

@@ -80,6 +80,7 @@ Anything inside `{...}` is replaced at render time with the actual value.
 | Lists | `link` | Blogroll / link list. |
 | Lists | `recent_comment` | Recent comments list. |
 | Lists | `selected_entry` | Selected/recommended entries list. **Always 0 in the Go port.** |
+| Flat pages | `dedicated_page` | Shown only on flat pages. Hidden on regular entry pages and listings. |
 
 ## Tag reference
 
@@ -134,7 +135,7 @@ Usable inside and outside the `page` block.
 | `{entry_disp_time}` | Posting time (plain string) |
 | `{entry_description}` | Entry body (format-rendered HTML) |
 | `{entry_sequel}` | "Read more" link on list pages; "More" body on single-entry pages |
-| `{entry_mode}` | `list` or `entry` |
+| `{entry_mode}` | `list`, `entry`, or `page` (flat pages) |
 | `{entry_likes_count}` | Number of likes |
 | `{entry_like_url}` | Like POST URL |
 | `{entry_stamps_count}` | Total stamp count |

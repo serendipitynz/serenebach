@@ -320,6 +320,13 @@ func (s Site) OGImageURL(entryID int64) string {
 	return s.baseURL() + "img/og/" + strconv.FormatInt(entryID, 10) + ".png"
 }
 
+// PageOGImageURL returns the absolute URL of the Open Graph card image
+// for a flat page. Matches the file layout the admin OG renderer writes to
+// <SB_IMAGE_DIR>/og/page_<page_id>.png.
+func (s Site) PageOGImageURL(pageID int64) string {
+	return s.baseURL() + "img/og/page_" + strconv.FormatInt(pageID, 10) + ".png"
+}
+
 // formatWith expands an SB3 format string against t using the weblog's
 // lang, substituting pkgDefault when the weblog has nothing configured
 // for that context. Centralised so every {*_date}/{*_time} tag goes

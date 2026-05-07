@@ -1,10 +1,13 @@
 package admin
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -13,6 +16,7 @@ import (
 	"github.com/serendipitynz/serenebach/internal/csrf"
 	"github.com/serendipitynz/serenebach/internal/domain"
 	"github.com/serendipitynz/serenebach/internal/format"
+	"github.com/serendipitynz/serenebach/internal/og"
 	"github.com/serendipitynz/serenebach/internal/session"
 	"github.com/serendipitynz/serenebach/internal/storage/repo"
 )
@@ -25,6 +29,7 @@ func (h *Handler) mountPages(r chi.Router) {
 	r.Get("/pages/{id}/edit", h.pageEditForm)
 	r.Post("/pages/{id}/edit", h.pageUpdate)
 	r.Post("/pages/{id}/delete", h.pageDelete)
+	r.Post("/pages/{id}/og", h.pageOGRegenerate)
 }
 
 // ---- list ---------------------------------------------------------------
@@ -97,6 +102,10 @@ type pageFormPageData struct {
 	CurrentFormat string
 	Error         string
 	Flash         string
+	// OGCardTS is the mtime (unix seconds) of the page's OG card
+	// file, used as a cache-busting query param on the preview img.
+	// Zero means the file doesn't exist yet.
+	OGCardTS int64
 }
 
 func (h *Handler) pageNewForm(w http.ResponseWriter, r *http.Request) {
@@ -105,7 +114,7 @@ func (h *Handler) pageNewForm(w http.ResponseWriter, r *http.Request) {
 		Status: domain.PageDraft,
 		Slug:   "/",
 	}
-	h.renderPageForm(w, r, "/admin/pages/new", page, "", tr(r, "pages.form.titleNew"), "page-new")
+	h.renderPageForm(w, r, "/admin/pages/new", page, "", tr(r, "pages.form.titleNew"), "page-new", 0)
 }
 
 func (h *Handler) pageEditForm(w http.ResponseWriter, r *http.Request) {
@@ -133,10 +142,17 @@ func (h *Handler) pageEditForm(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
-	h.renderPageForm(w, r, fmt.Sprintf("/admin/pages/%d/edit", id), *p, "", tr(r, "pages.form.titleEditPlain"), "pages")
+	var ogCardTS int64
+	if h.ImageDir != "" && p.ID > 0 {
+		_, absFile, _ := h.pageOGCardPath(p.ID)
+		if info, err := os.Stat(absFile); err == nil {
+			ogCardTS = info.ModTime().Unix()
+		}
+	}
+	h.renderPageForm(w, r, fmt.Sprintf("/admin/pages/%d/edit", id), *p, "", tr(r, "pages.form.titleEditPlain"), "pages", ogCardTS)
 }
 
-func (h *Handler) renderPageForm(w http.ResponseWriter, r *http.Request, action string, page domain.Page, errMsg, title, activeMenu string) {
+func (h *Handler) renderPageForm(w http.ResponseWriter, r *http.Request, action string, page domain.Page, errMsg, title, activeMenu string, ogCardTS int64) {
 	templates, err := h.Store.ListTemplatesForAdmin(r.Context(), h.wid())
 	if err != nil {
 		log.Printf("admin.renderPageForm: templates: %v", err)
@@ -156,6 +172,7 @@ func (h *Handler) renderPageForm(w http.ResponseWriter, r *http.Request, action 
 		CurrentFormat: string(format.Normalize(page.Format)),
 		Error:         errMsg,
 		Flash:         r.URL.Query().Get("ok"),
+		OGCardTS:      ogCardTS,
 	})
 }
 
@@ -220,6 +237,10 @@ func parsePageForm(r *http.Request, base domain.Page) (domain.Page, string) {
 		}
 	}
 
+	// Per-page OG background override. Same stored_path convention as
+	// the weblog-level field; empty = inherit the site default.
+	base.OGBGImagePath = strings.TrimSpace(r.PostFormValue("og_bg_image_path"))
+
 	statusRaw := r.PostFormValue("status")
 	switch statusRaw {
 	case "0":
@@ -243,19 +264,21 @@ func (h *Handler) pageCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	page, errMsg := parsePageForm(r, base)
 	if errMsg != "" {
-		h.renderPageForm(w, r, "/admin/pages/new", page, errMsg, tr(r, "pages.form.titleNew"), "page-new")
+		h.renderPageForm(w, r, "/admin/pages/new", page, errMsg, tr(r, "pages.form.titleNew"), "page-new", 0)
 		return
 	}
 	id, err := h.Store.CreatePage(r.Context(), page)
 	if err != nil {
 		if errors.Is(err, repo.ErrSlugInUse) {
-			h.renderPageForm(w, r, "/admin/pages/new", page, tr(r, "pages.form.error.slugInUse"), tr(r, "pages.form.titleNew"), "page-new")
+			h.renderPageForm(w, r, "/admin/pages/new", page, tr(r, "pages.form.error.slugInUse"), tr(r, "pages.form.titleNew"), "page-new", 0)
 			return
 		}
 		log.Printf("admin.pageCreate: %v", err)
 		http.Error(w, "failed to create page", http.StatusInternalServerError)
 		return
 	}
+	page.ID = id
+	h.regeneratePageOGCard(r.Context(), page)
 	h.maybeAutoRebuild(r.Context())
 	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/pages/%d/edit?ok=saved", id), http.StatusFound)
 }
@@ -287,18 +310,19 @@ func (h *Handler) pageUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	page, errMsg := parsePageForm(r, *existing)
 	if errMsg != "" {
-		h.renderPageForm(w, r, fmt.Sprintf("/admin/pages/%d/edit", id), page, errMsg, tr(r, "pages.form.titleEditPlain"), "pages")
+		h.renderPageForm(w, r, fmt.Sprintf("/admin/pages/%d/edit", id), page, errMsg, tr(r, "pages.form.titleEditPlain"), "pages", 0)
 		return
 	}
 	if err := h.Store.UpdatePage(r.Context(), page); err != nil {
 		if errors.Is(err, repo.ErrSlugInUse) {
-			h.renderPageForm(w, r, fmt.Sprintf("/admin/pages/%d/edit", id), page, tr(r, "pages.form.error.slugInUse"), tr(r, "pages.form.titleEditPlain"), "pages")
+			h.renderPageForm(w, r, fmt.Sprintf("/admin/pages/%d/edit", id), page, tr(r, "pages.form.error.slugInUse"), tr(r, "pages.form.titleEditPlain"), "pages", 0)
 			return
 		}
 		log.Printf("admin.pageUpdate: save: %v", err)
 		http.Error(w, "failed to save page", http.StatusInternalServerError)
 		return
 	}
+	h.regeneratePageOGCard(r.Context(), page)
 	h.maybeAutoRebuild(r.Context())
 	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/pages/%d/edit?ok=saved", id), http.StatusFound)
 }
@@ -337,6 +361,120 @@ func (h *Handler) pageDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to delete page", http.StatusInternalServerError)
 		return
 	}
+	h.removePageOGCard(id)
 	h.maybeAutoRebuild(r.Context())
 	http.Redirect(w, r, root(r)+"/admin/pages?ok=deleted", http.StatusFound)
+}
+
+// ---- OG card generation for pages ---------------------------------------
+
+// pageOGCardPath returns the on-disk path + public URL for the OG card
+// belonging to the given page id. Lives under <ImageDir>/og/ so the
+// existing /img/* route + static rebuild mirror automatically cover
+// serving and copying the file.
+func (h *Handler) pageOGCardPath(pageID int64) (absDir, absFile, urlPath string) {
+	absDir = filepath.Join(h.ImageDir, "og")
+	name := "page_" + strconv.FormatInt(pageID, 10) + ".png"
+	absFile = filepath.Join(absDir, name)
+	urlPath = "/img/og/" + name
+	return
+}
+
+// regeneratePageOGCard writes the card for one page. Failures are logged
+// but never surface to the HTTP layer.
+func (h *Handler) regeneratePageOGCard(ctx context.Context, page domain.Page) {
+	if h.OG == nil || h.ImageDir == "" || !h.AutoOG {
+		return
+	}
+	weblog, err := h.Store.WeblogByID(ctx, h.wid())
+	if err != nil {
+		log.Printf("admin.regeneratePageOGCard: load weblog: %v", err)
+		return
+	}
+	absDir, absFile, _ := h.pageOGCardPath(page.ID)
+	if err := os.MkdirAll(absDir, 0o755); err != nil {
+		log.Printf("admin.regeneratePageOGCard: mkdir: %v", err)
+		return
+	}
+	f, err := os.Create(absFile)
+	if err != nil {
+		log.Printf("admin.regeneratePageOGCard: create: %v", err)
+		return
+	}
+	defer f.Close()
+	bgPath := h.resolveOGBG(page.OGBGImagePath, weblog.OGBGImagePath)
+	if err := h.OG.RenderCard(f, page.Title, weblog.Title, og.Options{
+		BGPath:    bgPath,
+		TextColor: weblog.OGTextColor,
+	}); err != nil {
+		log.Printf("admin.regeneratePageOGCard: render: %v", err)
+	}
+}
+
+// removePageOGCard best-effort unlinks the card on page delete.
+func (h *Handler) removePageOGCard(pageID int64) {
+	if h.ImageDir == "" {
+		return
+	}
+	_, absFile, _ := h.pageOGCardPath(pageID)
+	_ = os.Remove(absFile)
+}
+
+// pageOGRegenerate is the manual "build OG card now" endpoint for pages.
+func (h *Handler) pageOGRegenerate(w http.ResponseWriter, r *http.Request) {
+	if h.OG == nil || h.ImageDir == "" {
+		http.Error(w, "og disabled", http.StatusServiceUnavailable)
+		return
+	}
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || id <= 0 {
+		http.Error(w, "bad id", http.StatusBadRequest)
+		return
+	}
+	page, err := h.Store.PageByID(r.Context(), h.wid(), id)
+	if err != nil {
+		log.Printf("admin.pageOGRegenerate: load: %v", err)
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	u := session.UserFrom(r.Context())
+	if u == nil || !u.CanEditEntry(page.AuthorID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	weblog, err := h.Store.WeblogByID(r.Context(), h.wid())
+	if err != nil {
+		log.Printf("admin.pageOGRegenerate: load weblog: %v", err)
+		http.Error(w, "internal", http.StatusInternalServerError)
+		return
+	}
+	absDir, absFile, urlPath := h.pageOGCardPath(page.ID)
+	if err := os.MkdirAll(absDir, 0o755); err != nil {
+		log.Printf("admin.pageOGRegenerate: mkdir: %v", err)
+		http.Error(w, "fs", http.StatusInternalServerError)
+		return
+	}
+	f, err := os.Create(absFile)
+	if err != nil {
+		log.Printf("admin.pageOGRegenerate: create: %v", err)
+		http.Error(w, "fs", http.StatusInternalServerError)
+		return
+	}
+	defer f.Close()
+	bgPath := h.resolveOGBG(page.OGBGImagePath, weblog.OGBGImagePath)
+	if err := h.OG.RenderCard(f, page.Title, weblog.Title, og.Options{
+		BGPath:    bgPath,
+		TextColor: weblog.OGTextColor,
+	}); err != nil {
+		log.Printf("admin.pageOGRegenerate: render: %v", err)
+		http.Error(w, "render", http.StatusInternalServerError)
+		return
+	}
+	info, _ := f.Stat()
+	var ts int64
+	if info != nil {
+		ts = info.ModTime().Unix()
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	fmt.Fprintf(w, `{"ok":true,"url":%q,"ts":%d}`, root(r)+urlPath, ts)
 }
