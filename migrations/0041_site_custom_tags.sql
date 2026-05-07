@@ -4,8 +4,8 @@ CREATE TABLE site_custom_tags (
     wid        INTEGER NOT NULL DEFAULT 1,
     name       TEXT    NOT NULL,  -- e.g. "custom_ga_code" (prefix included)
     value      TEXT    NOT NULL DEFAULT '',
-    created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-    updated_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
 );
 
 CREATE UNIQUE INDEX idx_site_custom_tags_wid_name ON site_custom_tags(wid, name);

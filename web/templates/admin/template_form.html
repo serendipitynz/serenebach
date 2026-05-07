@@ -119,7 +119,7 @@
     <p class="hint">{{T "templates.form.customTags.hint"}}</p>
     <div class="tag-badges">
       {{range .CustomTags}}
-      <button type="button" class="badge" data-copy-text="{{.Name}}">{{"{{"}}.Name}}</button>
+      <button type="button" class="badge" data-copy-text="{{printf "{%s}" .Name}}">{{printf "{%s}" .Name}}</button>
       {{end}}
     </div>
   </div>
