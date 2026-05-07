@@ -21,7 +21,7 @@ import (
 const maxCustomTags = 50
 const maxCustomTagValueBytes = 65535
 
-var customTagNamePattern = regexp.MustCompile(`^custom_[a-z][a-z0-9_]{0,48}$`)
+var customTagNamePattern = regexp.MustCompile(`^custom_[a-z][a-z0-9_]{0,49}$`)
 
 // mountCustomTags registers /admin/templates/custom-tags routes under
 // the design-settings group (already gated by requireDesign).

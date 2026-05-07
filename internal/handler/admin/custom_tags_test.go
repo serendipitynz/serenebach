@@ -35,6 +35,11 @@ func TestValidateCustomTagRejectsInvalidName(t *testing.T) {
 	ctx := context.Background()
 	store := repo.New(nil) // nil is fine; validateCustomTag does not touch store for name checks
 
+	// Boundary cases: exactly 49, 50, and 51 characters after "custom_"
+	name49 := "custom_" + strings.Repeat("a", 49)
+	name50 := "custom_" + strings.Repeat("a", 50)
+	name51 := "custom_" + strings.Repeat("a", 51)
+
 	cases := []struct {
 		name string
 		want bool
@@ -42,6 +47,9 @@ func TestValidateCustomTagRejectsInvalidName(t *testing.T) {
 		{"custom_hello", true},
 		{"custom_hello_world", true},
 		{"custom_a1", true},
+		{name49, true},  // 49 chars after custom_ → valid
+		{name50, true},  // 50 chars after custom_ → valid (boundary)
+		{name51, false}, // 51 chars after custom_ → invalid
 		{"custom_", false},
 		{"custom_1start", false},
 		{"custom-hello", false},
