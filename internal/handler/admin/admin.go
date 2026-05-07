@@ -120,6 +120,7 @@ func (h *Handler) MountProtected(r chi.Router) {
 	r.Get("/", h.home)
 	r.Post("/logout", h.logout)
 	h.mountEntries(r)
+	h.mountPages(r)
 	h.mountImages(r)
 	h.mountCategories(r)
 	h.mountLinks(r)
