@@ -54,14 +54,14 @@ docker compose up -d
 GitHub Container Registry (`ghcr.io/serendipitynz/serenebach`) に公式コンテナイメージを公開しています。
 
 ```bash
-docker pull ghcr.io/serendipitynz/serenebach:4.0.0-beta.4
+docker pull ghcr.io/serendipitynz/serenebach:4.0.0-beta.5
 
-docker run -d -p 8080:8080 -v serenebach-data:/home/nonroot/data ghcr.io/serendipitynz/serenebach:4.0.0-beta.4
+docker run -d -p 8080:8080 -v serenebach-data:/home/nonroot/data ghcr.io/serendipitynz/serenebach:4.0.0-beta.5
 ```
 
 タグの種類:
 - `latest` — デフォルトブランチの最新ビルド
-- `4.0.0-beta.4`, `4.0.0`, … — リリースバージョンに対応するセマンティックバージョンタグ
+- `4.0.0-beta.5`, `4.0.0`, … — リリースバージョンに対応するセマンティックバージョンタグ
 - `main` — `main` ブランチの先端
 
 本番運用では `latest` よりもリリースタグ固定を推奨します。QNAP Container Station / VPS での構成例は [docs/deployment.md](docs/deployment.md) を参照してください。

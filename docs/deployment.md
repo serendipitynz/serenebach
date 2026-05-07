@@ -33,14 +33,14 @@ The runtime image is based on `gcr.io/distroless/static-debian12:nonroot` (~24 M
 Pre-built multi-arch images are published to GitHub Container Registry:
 
 ```bash
-docker pull ghcr.io/serendipitynz/serenebach:4.0.0-beta.4
+docker pull ghcr.io/serendipitynz/serenebach:4.0.0-beta.5
 ```
 
 If an anonymous pull returns `unauthorized`, the GHCR package exists but is not public. In GitHub, open the package settings for `serenebach` and change **Package visibility** to public before documenting the image as publicly installable.
 
 Supported platforms are `linux/amd64` and `linux/arm64`, so the same image works on typical Intel/AMD VPSes, ARM VPSes, Raspberry Pi-style hosts, and Docker-capable QNAP models on those architectures.
 
-For production deployments, prefer a pinned release tag such as `4.0.0-beta.4` over `latest`. `latest` follows the most recent default-branch image and may change underneath a running deployment.
+For production deployments, prefer a pinned release tag such as `4.0.0-beta.5` over `latest`. `latest` follows the most recent default-branch image and may change underneath a running deployment.
 
 The container runs as the non-root user from the distroless base (UID/GID `65532`). Its writable state lives under `/home/nonroot/data` by default:
 
@@ -68,7 +68,7 @@ For deployments that should use the published image instead of building from a l
 ```yaml
 services:
   serenebach:
-    image: ghcr.io/serendipitynz/serenebach:4.0.0-beta.4
+    image: ghcr.io/serendipitynz/serenebach:4.0.0-beta.5
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
@@ -99,7 +99,7 @@ QNAP's exact labels vary between QTS / QuTS hero and Container Station versions,
 
 Recommended layout:
 
-- Image: `ghcr.io/serendipitynz/serenebach:4.0.0-beta.4`
+- Image: `ghcr.io/serendipitynz/serenebach:4.0.0-beta.5`
 - Container port: `8080`
 - Host port: `8080` for LAN-only testing, or another unused high port if QNAP already uses `8080`
 - Persistent storage: named volume mapped to `/home/nonroot/data`, or a bind mount such as `/share/Container/serenebach/data:/home/nonroot/data`
@@ -119,7 +119,7 @@ Container Station's "Application" / compose mode can use:
 ```yaml
 services:
   serenebach:
-    image: ghcr.io/serendipitynz/serenebach:4.0.0-beta.4
+    image: ghcr.io/serendipitynz/serenebach:4.0.0-beta.5
     ports:
       - "8080:8080"
     volumes:
@@ -152,7 +152,7 @@ Create `compose.yaml`:
 ```yaml
 services:
   serenebach:
-    image: ghcr.io/serendipitynz/serenebach:4.0.0-beta.4
+    image: ghcr.io/serendipitynz/serenebach:4.0.0-beta.5
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
