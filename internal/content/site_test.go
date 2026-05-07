@@ -61,5 +61,3 @@ func TestSiteApplyCustomTagsDoNotEscapeHTML(t *testing.T) {
 		t.Errorf("custom tag value was escaped; got: %q", out)
 	}
 }
-
-
