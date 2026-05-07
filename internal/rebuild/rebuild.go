@@ -794,20 +794,20 @@ func writeLLMsTxt(outDir string, weblog domain.Weblog, all []domain.Entry, rep *
 // archive/):
 //
 //  1. If staging has it, rename the existing finalOut/<sub> aside
-//     to finalOut/<sub>.old (rename within the same dir is atomic
-//     and reversible), rename staging/<sub> into finalOut/<sub>,
-//     then remove .old.
+//     into a random-named backup directory under finalOut (same-FS
+//     rename is atomic and reversible), rename staging/<sub> into
+//     finalOut/<sub>, then remove the backup.
 //  2. If staging does NOT have it (e.g. the DB has zero entries
 //     this run), remove finalOut/<sub> so deleted-everything is
 //     tracked.
 //
-// On rename failure we restore the .old backup so the live snapshot
-// keeps the previous content. Once subtree promotion is done, the
-// top-level files (index.html, style.css, rss.xml, atom.xml,
-// llms*.txt) are renamed file-by-file — file rename overwrites are
-// atomic on POSIX, so each file flips in place. Finally, when the
-// LLMS toggle is off any leftover llms*.txt are removed so flipping
-// the switch off cleans up after itself.
+// On rename failure we restore the backup so the live snapshot keeps
+// the previous content. Once subtree promotion is done, the top-level
+// files (index.html, style.css, rss.xml, atom.xml, llms*.txt) are
+// renamed file-by-file — file rename overwrites are atomic on POSIX,
+// so each file flips in place. Finally, when the LLMS toggle is off
+// any leftover llms*.txt are removed so flipping the switch off
+// cleans up after itself.
 func promoteStaging(finalOut, staging string, llmsEnabled bool, pruneSet map[string]struct{}) error {
 	// Load the previous build's page-root manifest so we can prune
 	// stale directories that were generated in an earlier run but no
@@ -820,10 +820,6 @@ func promoteStaging(finalOut, staging string, llmsEnabled bool, pruneSet map[str
 	for _, sub := range []string{"entry", "category", "tag", "archive"} {
 		stagedPath := filepath.Join(staging, sub)
 		finalPath := filepath.Join(finalOut, sub)
-		backupPath := finalPath + ".old"
-		// Drop any leftover backup from a prior interrupted run so
-		// the rename below has a clean target.
-		_ = os.RemoveAll(backupPath)
 
 		stagedExists := dirExists(stagedPath)
 		finalExists := dirExists(finalPath)
@@ -840,8 +836,16 @@ func promoteStaging(finalOut, staging string, llmsEnabled bool, pruneSet map[str
 			continue
 		}
 
+		var backupDir string
 		if finalExists {
+			bd, err := os.MkdirTemp(finalOut, ".sb-backup-")
+			if err != nil {
+				return fmt.Errorf("rebuild: create backup dir: %w", err)
+			}
+			backupDir = bd
+			backupPath := filepath.Join(bd, "dir")
 			if err := os.Rename(finalPath, backupPath); err != nil {
+				_ = os.RemoveAll(bd)
 				return fmt.Errorf("rebuild: backup %s: %w", finalPath, err)
 			}
 		}
@@ -849,12 +853,12 @@ func promoteStaging(finalOut, staging string, llmsEnabled bool, pruneSet map[str
 			// Restore previous output so the live snapshot is
 			// not left partially overwritten.
 			if finalExists {
-				_ = os.Rename(backupPath, finalPath)
+				_ = os.Rename(filepath.Join(backupDir, "dir"), finalPath)
 			}
 			return fmt.Errorf("rebuild: promote %s: %w", finalPath, err)
 		}
 		if finalExists {
-			_ = os.RemoveAll(backupPath)
+			_ = os.RemoveAll(backupDir)
 		}
 	}
 
@@ -931,8 +935,6 @@ func promoteExtraDirs(staging, finalOut string, pruneSet, oldRoots map[string]st
 	for _, root := range rootsByDepth {
 		stagedPath := filepath.Join(staging, filepath.FromSlash(root))
 		finalPath := filepath.Join(finalOut, filepath.FromSlash(root))
-		backupPath := finalPath + ".old"
-		_ = os.RemoveAll(backupPath)
 
 		// Ensure the parent directory exists in finalOut so the
 		// rename below has a target.  MkdirAll is a no-op when the
@@ -957,15 +959,23 @@ func promoteExtraDirs(staging, finalOut string, pruneSet, oldRoots map[string]st
 			}
 		}
 
+		var backupDir string
 		finalExists := dirExists(finalPath)
 		if finalExists {
+			bd, err := os.MkdirTemp(finalOut, ".sb-backup-")
+			if err != nil {
+				return fmt.Errorf("rebuild: create backup dir: %w", err)
+			}
+			backupDir = bd
+			backupPath := filepath.Join(bd, "dir")
 			if err := os.Rename(finalPath, backupPath); err != nil {
+				_ = os.RemoveAll(bd)
 				return fmt.Errorf("rebuild: backup %s: %w", finalPath, err)
 			}
 		}
 		if err := os.Rename(stagedPath, finalPath); err != nil {
 			if finalExists {
-				_ = os.Rename(backupPath, finalPath)
+				_ = os.Rename(filepath.Join(backupDir, "dir"), finalPath)
 			}
 			return fmt.Errorf("rebuild: promote %s: %w", finalPath, err)
 		}
@@ -973,7 +983,7 @@ func promoteExtraDirs(staging, finalOut string, pruneSet, oldRoots map[string]st
 		// Restore preserved children from the backup.
 		for _, child := range childrenToPreserve {
 			childRel := child[len(root)+1:]
-			backupChild := filepath.Join(backupPath, filepath.FromSlash(childRel))
+			backupChild := filepath.Join(filepath.Join(backupDir, "dir"), filepath.FromSlash(childRel))
 			finalChild := filepath.Join(finalPath, filepath.FromSlash(childRel))
 			if dirExists(backupChild) {
 				// Ensure the intermediate directories exist in the
@@ -991,7 +1001,7 @@ func promoteExtraDirs(staging, finalOut string, pruneSet, oldRoots map[string]st
 		}
 
 		if finalExists {
-			_ = os.RemoveAll(backupPath)
+			_ = os.RemoveAll(backupDir)
 		}
 	}
 
