@@ -33,9 +33,13 @@ func (h *Handler) mountTemplatesDesign(r chi.Router) {
 		gr.Get("/templates/active/edit", h.templatesActiveShortcut)
 		gr.Get("/templates/settings", h.templatesSettingsForm)
 		gr.Post("/templates/settings", h.templatesSettingsSave)
-		gr.Get("/templates/og", h.templatesOGForm)
-		gr.Post("/templates/og", h.templatesOGSave)
-		gr.Get("/templates/{id}/edit", h.templatesEditForm)
+	gr.Get("/templates/og", h.templatesOGForm)
+	gr.Post("/templates/og", h.templatesOGSave)
+	gr.Get("/templates/custom-tags", h.customTagList)
+	gr.Post("/templates/custom-tags", h.customTagCreate)
+	gr.Post("/templates/custom-tags/{id}/update", h.customTagUpdate)
+	gr.Post("/templates/custom-tags/{id}/delete", h.customTagDelete)
+	gr.Get("/templates/{id}/edit", h.templatesEditForm)
 		gr.Post("/templates/{id}/edit", h.templatesSave)
 		gr.Post("/templates/{id}/recheck", h.templatesRecheck)
 		gr.Post("/templates/{id}/save-as", h.templatesSaveAs)
@@ -335,6 +339,10 @@ type templateFormPageData struct {
 	// tags surface a ⚠️ badge on the body section) but suppress the
 	// noisy "everything's fine" success card.
 	LintFromRecheck bool
+	// CustomTags are the registered user-defined tags surfaced as a
+	// quick-reference list so the template author can copy-paste
+	// {custom_xxx} placeholders into the editor.
+	CustomTags []domain.CustomTag
 }
 
 // templateLintSummary packages per-body lint output for the admin
@@ -394,6 +402,10 @@ func (h *Handler) renderTemplateForm(w http.ResponseWriter, r *http.Request, t d
 			log.Printf("admin.renderTemplateForm: list assets: %v", err)
 		}
 	}
+	customTags, err := h.Store.ListCustomTags(r.Context(), h.wid())
+	if err != nil {
+		log.Printf("admin.renderTemplateForm: list custom tags: %v", err)
+	}
 	renderMain(w, r, pageTemplateForm, templateFormPageData{
 		pageBase: pageBase{
 			Title:      trf(r, "templates.form.titleEditPlain", t.Name),
@@ -409,6 +421,7 @@ func (h *Handler) renderTemplateForm(w http.ResponseWriter, r *http.Request, t d
 		EntryLint:       newTemplateLintSummary(t.EntryBody),
 		LintRan:         true,
 		LintFromRecheck: flash == "rechecked",
+		CustomTags:      customTags,
 	})
 }
 
