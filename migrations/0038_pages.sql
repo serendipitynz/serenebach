@@ -3,7 +3,6 @@
 CREATE TABLE pages (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     wid         INTEGER NOT NULL DEFAULT 1,
-    author_id   INTEGER NOT NULL DEFAULT 1,
     title       TEXT    NOT NULL DEFAULT '',
     body        TEXT    NOT NULL DEFAULT '',
     format      TEXT    NOT NULL DEFAULT '',
