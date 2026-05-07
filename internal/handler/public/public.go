@@ -64,6 +64,20 @@ func siteWithLabel(w domain.Weblog, lang string) content.Site {
 	return s
 }
 
+// buildSite is the request-scoped variant of siteWithLabel: it also
+// fetches user-defined custom tags from the store so {custom_*}
+// placeholders resolve on the rendered page. Errors are logged and
+// swallowed so a broken custom-tag query doesn't 500 the public site.
+func (h *Handler) buildSite(ctx context.Context, w domain.Weblog) content.Site {
+	s := siteWithLabel(w, w.Lang)
+	tags, err := h.Store.ListCustomTags(ctx, h.WID)
+	if err != nil {
+		log.Printf("public.buildSite: load custom tags: %v", err)
+	}
+	s.CustomTags = tags
+	return s
+}
+
 // tr resolves a reader-facing key. Locale preference: the blog's
 // configured Lang (weblog.Lang) wins when supported, so visitors
 // consistently see errors in the blog's own language; otherwise the
@@ -453,7 +467,7 @@ func (h *Handler) renderList(w http.ResponseWriter, r *http.Request, entries []d
 	sidebar := h.loadSidebarData(ctx, logTag)
 
 	view := content.ListView{
-		Site:         siteWithLabel(*weblog, weblog.Lang).WithBasePath(root(r)),
+		Site:         h.buildSite(ctx, *weblog).WithBasePath(root(r)),
 		Template:     tmpl,
 		Entries:      entries,
 		Categories:   cats,
@@ -946,7 +960,7 @@ func (h *Handler) entry(w http.ResponseWriter, r *http.Request) {
 	sidebar := h.loadSidebarData(ctx, "public.entry")
 
 	view := content.EntryView{
-		Site:          siteWithLabel(*weblog, weblog.Lang).WithBasePath(root(r)),
+		Site:          h.buildSite(ctx, *weblog).WithBasePath(root(r)),
 		Template:      tmpl,
 		Entry:         *entry,
 		Category:      catPtr,
@@ -1468,7 +1482,7 @@ func (h *Handler) servePage(w http.ResponseWriter, r *http.Request) {
 	sidebar := h.loadSidebarData(ctx, "public.servePage")
 
 	view := content.PageView{
-		Site:         siteWithLabel(*weblog, weblog.Lang).WithBasePath(root(r)),
+		Site:         h.buildSite(ctx, *weblog).WithBasePath(root(r)),
 		Template:     tmpl,
 		Page:         *page,
 		ProfileUsers: profileUsers,

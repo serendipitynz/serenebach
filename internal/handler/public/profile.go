@@ -59,7 +59,7 @@ func (h *Handler) profile(w http.ResponseWriter, r *http.Request) {
 	sidebar := h.loadSidebarData(ctx, "public.profile")
 
 	view := content.ProfileView{
-		Site:         siteWithLabel(*weblog, weblog.Lang).WithBasePath(root(r)),
+		Site:         h.buildSite(ctx, *weblog).WithBasePath(root(r)),
 		Template:     tmpl,
 		User:         *user,
 		ProfileUsers: profileUsers,

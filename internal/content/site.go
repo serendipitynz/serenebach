@@ -206,6 +206,9 @@ type Site struct {
 	// "続きを読む …"). Resolved from the public i18n bundle via the
 	// "entry.readMore" key. Empty falls back to "read more ...".
 	ReadMoreLabel string
+	// CustomTags are user-defined {custom_*} sbtemplate placeholders.
+	// Injected by Apply so every page type receives them automatically.
+	CustomTags []domain.CustomTag
 }
 
 func NewSite(w domain.Weblog) Site {
@@ -272,6 +275,13 @@ func (s Site) WithMode(mode, ctx string) Site {
 // rendered HTML <title> matches what the browser tab shows in SB3.
 func (s Site) WithPageSuffix(suffix string) Site {
 	s.PageSuffix = suffix
+	return s
+}
+
+// WithCustomTags returns a copy of the site bound to the given custom
+// tags so {custom_*} placeholders resolve on the rendered page.
+func (s Site) WithCustomTags(tags []domain.CustomTag) Site {
+	s.CustomTags = tags
 	return s
 }
 
@@ -443,6 +453,11 @@ func (s Site) Apply(c *sbtemplate.Context) {
 	c.Tag("prev_page_link", "")
 	c.Tag("next_page_url", "")
 	c.Tag("next_page_link", "")
+	// User-defined custom tags — raw HTML, injected after every built-in
+	// tag so they can reference (or shadow) standard names if desired.
+	for _, ct := range s.CustomTags {
+		c.Tag(ct.Name, ct.Value)
+	}
 }
 
 // modeNameFor returns the SB3 long-form mode label for the short mode
