@@ -176,6 +176,29 @@ func (h *Handler) renderPageForm(w http.ResponseWriter, r *http.Request, action 
 	})
 }
 
+// validatePageSlug checks that the proposed slug does not collide with
+// any existing page slug, either exactly or as a prefix/child.  The
+// excludeID argument lets updates skip the page being edited.
+func validatePageSlug(ctx context.Context, store *repo.Store, wid int64, slug string, excludeID int64) error {
+	pages, err := store.ListPagesForAdmin(ctx, wid)
+	if err != nil {
+		return err
+	}
+	for _, p := range pages {
+		if p.ID == excludeID {
+			continue
+		}
+		existing := p.Slug
+		if existing == slug {
+			return repo.ErrSlugInUse
+		}
+		if strings.HasPrefix(existing, slug+"/") || strings.HasPrefix(slug, existing+"/") {
+			return repo.ErrSlugPrefixConflict
+		}
+	}
+	return nil
+}
+
 // ---- create / update ---------------------------------------------------
 
 func parsePageForm(r *http.Request, base domain.Page) (domain.Page, string) {
@@ -267,6 +290,21 @@ func (h *Handler) pageCreate(w http.ResponseWriter, r *http.Request) {
 		h.renderPageForm(w, r, "/admin/pages/new", page, errMsg, tr(r, "pages.form.titleNew"), "page-new", 0)
 		return
 	}
+	if err := validatePageSlug(r.Context(), h.Store, h.wid(), page.Slug, 0); err != nil {
+		var msg string
+		switch {
+		case errors.Is(err, repo.ErrSlugPrefixConflict):
+			msg = tr(r, "pages.form.error.slugPrefixConflict")
+		case errors.Is(err, repo.ErrSlugInUse):
+			msg = tr(r, "pages.form.error.slugInUse")
+		default:
+			log.Printf("admin.pageCreate: validate: %v", err)
+			http.Error(w, "failed to validate page", http.StatusInternalServerError)
+			return
+		}
+		h.renderPageForm(w, r, "/admin/pages/new", page, msg, tr(r, "pages.form.titleNew"), "page-new", 0)
+		return
+	}
 	id, err := h.Store.CreatePage(r.Context(), page)
 	if err != nil {
 		if errors.Is(err, repo.ErrSlugInUse) {
@@ -311,6 +349,21 @@ func (h *Handler) pageUpdate(w http.ResponseWriter, r *http.Request) {
 	page, errMsg := parsePageForm(r, *existing)
 	if errMsg != "" {
 		h.renderPageForm(w, r, fmt.Sprintf("/admin/pages/%d/edit", id), page, errMsg, tr(r, "pages.form.titleEditPlain"), "pages", 0)
+		return
+	}
+	if err := validatePageSlug(r.Context(), h.Store, h.wid(), page.Slug, id); err != nil {
+		var msg string
+		switch {
+		case errors.Is(err, repo.ErrSlugPrefixConflict):
+			msg = tr(r, "pages.form.error.slugPrefixConflict")
+		case errors.Is(err, repo.ErrSlugInUse):
+			msg = tr(r, "pages.form.error.slugInUse")
+		default:
+			log.Printf("admin.pageUpdate: validate: %v", err)
+			http.Error(w, "failed to validate page", http.StatusInternalServerError)
+			return
+		}
+		h.renderPageForm(w, r, fmt.Sprintf("/admin/pages/%d/edit", id), page, msg, tr(r, "pages.form.titleEditPlain"), "pages", 0)
 		return
 	}
 	if err := h.Store.UpdatePage(r.Context(), page); err != nil {

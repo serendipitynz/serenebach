@@ -301,6 +301,7 @@
   "pages.form.error.slugInvalid": "パスは英小文字・数字・ハイフンのみ使用できます (スラッシュ区切りで複数階層可)。",
   "pages.form.error.slugReserved": "そのパスはシステムで予約されています。",
   "pages.form.error.slugInUse": "そのパスは既に使われています。",
+  "pages.form.error.slugPrefixConflict": "そのパスは既存のページの親または子になっています。",
   "pages.form.error.statusInvalid": "状態の値が不正です。",
 
   "categories.title": "カテゴリー",

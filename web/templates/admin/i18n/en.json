@@ -301,6 +301,7 @@
   "pages.form.error.slugInvalid": "Path must use lowercase letters, digits and hyphens only (multiple segments allowed with slashes).",
   "pages.form.error.slugReserved": "That path is reserved by the system.",
   "pages.form.error.slugInUse": "That path is already in use.",
+  "pages.form.error.slugPrefixConflict": "That path is a parent or child of an existing page.",
   "pages.form.error.statusInvalid": "Invalid status value.",
 
   "categories.title": "Categories",

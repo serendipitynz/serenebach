@@ -907,12 +907,28 @@ func promoteStaging(finalOut, staging string, llmsEnabled bool, pruneSet map[str
 // finalOut/service/pricing, leaving sibling directories such as
 // service/downloads untouched.
 //
+// Nested roots (e.g. /service and /service/pricing) are handled safely
+// by promoting deepest roots first and preserving active children that
+// already exist in finalOut across the parent rename.
+//
 // After promotion, directories that were tracked in oldRoots but are
 // no longer in pruneSet are removed so deleted / unpublished / renamed
-// flat pages are cleaned up.  Operator-managed directories that were
-// never tracked in oldRoots are left untouched.
+// flat pages are cleaned up.  A stale parent is skipped when an active
+// descendant still lives inside it, preventing accidental deletion of
+// active children.  Operator-managed directories that were never
+// tracked in oldRoots are left untouched.
 func promoteExtraDirs(staging, finalOut string, pruneSet, oldRoots map[string]struct{}) error {
-	for root := range pruneSet {
+	// Promote deepest roots first so child directories are moved out of
+	// their parents in staging before the parent is promoted.
+	rootsByDepth := make([]string, 0, len(pruneSet))
+	for r := range pruneSet {
+		rootsByDepth = append(rootsByDepth, r)
+	}
+	sort.Slice(rootsByDepth, func(i, j int) bool {
+		return depth(rootsByDepth[i]) > depth(rootsByDepth[j])
+	})
+
+	for _, root := range rootsByDepth {
 		stagedPath := filepath.Join(staging, filepath.FromSlash(root))
 		finalPath := filepath.Join(finalOut, filepath.FromSlash(root))
 		backupPath := finalPath + ".old"
@@ -923,6 +939,22 @@ func promoteExtraDirs(staging, finalOut string, pruneSet, oldRoots map[string]st
 		// directory already exists (e.g. operator-managed dirs).
 		if err := os.MkdirAll(filepath.Dir(finalPath), 0o755); err != nil {
 			return fmt.Errorf("rebuild: mkdir parent %s: %w", finalPath, err)
+		}
+
+		// Identify active children that already live in finalPath (they
+		// were promoted in earlier iterations because we sort deepest
+		// first). We must preserve them across the parent rename.
+		var childrenToPreserve []string
+		for child := range pruneSet {
+			if child == root {
+				continue
+			}
+			if strings.HasPrefix(child, root+"/") {
+				childRel := child[len(root)+1:]
+				if dirExists(filepath.Join(finalPath, filepath.FromSlash(childRel))) {
+					childrenToPreserve = append(childrenToPreserve, child)
+				}
+			}
 		}
 
 		finalExists := dirExists(finalPath)
@@ -937,16 +969,47 @@ func promoteExtraDirs(staging, finalOut string, pruneSet, oldRoots map[string]st
 			}
 			return fmt.Errorf("rebuild: promote %s: %w", finalPath, err)
 		}
+
+		// Restore preserved children from the backup.
+		for _, child := range childrenToPreserve {
+			childRel := child[len(root)+1:]
+			backupChild := filepath.Join(backupPath, filepath.FromSlash(childRel))
+			finalChild := filepath.Join(finalPath, filepath.FromSlash(childRel))
+			if dirExists(backupChild) {
+				// Ensure the intermediate directories exist in the
+				// freshly-promoted parent.
+				if err := os.MkdirAll(filepath.Dir(finalChild), 0o755); err != nil {
+					return fmt.Errorf("rebuild: mkdir child parent %s: %w", finalChild, err)
+				}
+				// Remove any empty placeholder that the parent staging
+				// dir may have left behind.
+				_ = os.RemoveAll(finalChild)
+				if err := os.Rename(backupChild, finalChild); err != nil {
+					return fmt.Errorf("rebuild: restore child %s: %w", finalChild, err)
+				}
+			}
+		}
+
 		if finalExists {
 			_ = os.RemoveAll(backupPath)
 		}
 	}
 
-	// Prune stale page directories using the full root path recorded in
-	// the manifest. This correctly handles multi-segment slugs such as
-	// /service/pricing where the manifest key is "service/pricing".
+	// Prune stale page directories. Skip a stale root if any active
+	// descendant is still present — removing the parent would delete
+	// the active child as well.
 	for root := range oldRoots {
 		if _, stillActive := pruneSet[root]; stillActive {
+			continue
+		}
+		hasActiveDescendant := false
+		for active := range pruneSet {
+			if strings.HasPrefix(active, root+"/") {
+				hasActiveDescendant = true
+				break
+			}
+		}
+		if hasActiveDescendant {
 			continue
 		}
 		stalePath := filepath.Join(finalOut, filepath.FromSlash(root))
@@ -958,6 +1021,14 @@ func promoteExtraDirs(staging, finalOut string, pruneSet, oldRoots map[string]st
 		}
 	}
 	return nil
+}
+
+// depth counts path segments.
+func depth(p string) int {
+	if p == "" {
+		return 0
+	}
+	return strings.Count(p, "/") + 1
 }
 
 func dirExists(p string) bool {
