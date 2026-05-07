@@ -958,29 +958,19 @@ func promoteExtraDirs(staging, finalOut string, pruneSet, oldRoots map[string]st
 		}
 	}
 
-	finalEntries, err := os.ReadDir(finalOut)
-	if err != nil {
-		return fmt.Errorf("rebuild: read final dir: %w", err)
-	}
-	for _, ent := range finalEntries {
-		if !ent.IsDir() {
+	// Prune stale page directories using the full root path recorded in
+	// the manifest. This correctly handles multi-segment slugs such as
+	// /service/pricing where the manifest key is "service/pricing".
+	for root := range oldRoots {
+		if _, stillActive := pruneSet[root]; stillActive {
 			continue
 		}
-		name := ent.Name()
-		if _, skip := excluded[name]; skip {
+		stalePath := filepath.Join(finalOut, filepath.FromSlash(root))
+		if !dirExists(stalePath) {
 			continue
 		}
-		if _, wasStaged := stagedDirs[name]; wasStaged {
-			continue
-		}
-		if _, isManaged := oldRoots[name]; !isManaged {
-			continue
-		}
-		if _, stillActive := pruneSet[name]; stillActive {
-			continue
-		}
-		if err := os.RemoveAll(filepath.Join(finalOut, name)); err != nil {
-			return fmt.Errorf("rebuild: prune %s: %w", name, err)
+		if err := os.RemoveAll(stalePath); err != nil {
+			return fmt.Errorf("rebuild: prune %s: %w", stalePath, err)
 		}
 	}
 	return nil
