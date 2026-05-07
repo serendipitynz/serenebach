@@ -215,7 +215,7 @@ func (v EntryView) Render() (string, error) {
 
 	// Blocks deliberately left empty on permalink. profile_area fires
 	// only on /profile/{id}/; trackback_* are permanently unsupported.
-	for _, blk := range []string{"trackback_area", "profile_area", "page", "recent_trackback"} {
+	for _, blk := range []string{"trackback_area", "profile_area", "page", "recent_trackback", "dedicated_page"} {
 		if tmpl.HasBlock(blk) {
 			c.Block(blk, 0)
 		}
