@@ -473,6 +473,16 @@ type TemplateAsset struct {
 	UpdatedAt  time.Time
 }
 
+// CustomTag is a user-defined {custom_*} sbtemplate placeholder.
+type CustomTag struct {
+	ID        int64
+	WID       int64
+	Name      string
+	Value     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 // PageStatus mirrors EntryStatus semantics but only has two states.
 type PageStatus int
 
