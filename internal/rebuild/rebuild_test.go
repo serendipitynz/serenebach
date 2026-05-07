@@ -412,5 +412,232 @@ func TestBuildExpandsCustomTags(t *testing.T) {
 	}
 }
 
+func TestBuildWritesPublishedFlatPages(t *testing.T) {
+	a := newSeededApp(t)
+	ctx := context.Background()
+	now := time.Now().Unix()
+
+	if _, err := a.DB.ExecContext(ctx,
+		`INSERT INTO pages (wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		1, 1, "About", "<p>about us</p>", "html", "/about", 0, 0, 1, "", now, now); err != nil {
+		t.Fatalf("insert page: %v", err)
+	}
+
+	out := filepath.Join(t.TempDir(), "public")
+	rep, err := rebuild.Build(ctx, a.Store, rebuild.Options{OutDir: out, WID: 1})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if rep.Pages != 1 {
+		t.Errorf("rep.Pages = %d, want 1", rep.Pages)
+	}
+
+	path := filepath.Join(out, "about", "index.html")
+	if _, err := os.Stat(path); err != nil {
+		t.Errorf("expected %s: %v", path, err)
+	}
+}
+
+func TestBuildSkipsDraftFlatPages(t *testing.T) {
+	a := newSeededApp(t)
+	ctx := context.Background()
+	now := time.Now().Unix()
+
+	if _, err := a.DB.ExecContext(ctx,
+		`INSERT INTO pages (wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		1, 1, "Draft", "<p>draft</p>", "html", "/draft", 0, 0, 0, "", now, now); err != nil {
+		t.Fatalf("insert page: %v", err)
+	}
+
+	out := filepath.Join(t.TempDir(), "public")
+	if _, err := rebuild.Build(ctx, a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(out, "draft", "index.html")); !os.IsNotExist(err) {
+		t.Errorf("draft page should not be written")
+	}
+}
+
+func TestBuildFlatPageContainsPageMode(t *testing.T) {
+	a := newSeededApp(t)
+	ctx := context.Background()
+	now := time.Now().Unix()
+
+	if _, err := a.DB.ExecContext(ctx,
+		`INSERT INTO pages (wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		1, 1, "About", "<p>about us</p>", "html", "/about", 0, 0, 1, "", now, now); err != nil {
+		t.Fatalf("insert page: %v", err)
+	}
+
+	// Override the active template with a body that uniquely proves
+	// {entry_mode} was expanded by PageView.
+	if _, err := a.DB.ExecContext(ctx,
+		`UPDATE templates SET main_body = 'MODE:{entry_mode}' WHERE is_active = 1`); err != nil {
+		t.Fatalf("update template: %v", err)
+	}
+
+	out := filepath.Join(t.TempDir(), "public")
+	if _, err := rebuild.Build(ctx, a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(out, "about", "index.html"))
+	if err != nil {
+		t.Fatalf("read about/index.html: %v", err)
+	}
+	s := string(body)
+	if !strings.Contains(s, "MODE:page") {
+		t.Errorf("expected MODE:page in output, got:\n%s", s)
+	}
+}
+
+func TestBuildPrunesStaleFlatPages(t *testing.T) {
+	a := newSeededApp(t)
+	ctx := context.Background()
+	now := time.Now().Unix()
+
+	if _, err := a.DB.ExecContext(ctx,
+		`INSERT INTO pages (wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		1, 1, "About", "<p>about</p>", "html", "/about", 0, 0, 1, "", now, now); err != nil {
+		t.Fatalf("insert page: %v", err)
+	}
+
+	out := filepath.Join(t.TempDir(), "public")
+	if _, err := rebuild.Build(ctx, a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("first Build: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(out, "about", "index.html")); err != nil {
+		t.Fatalf("about page missing after first build: %v", err)
+	}
+
+	// Delete the page and rebuild.
+	if _, err := a.DB.ExecContext(ctx, `DELETE FROM pages WHERE slug = '/about'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rebuild.Build(ctx, a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("second Build: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(out, "about", "index.html")); !os.IsNotExist(err) {
+		t.Errorf("stale about page should have been pruned")
+	}
+}
+
+func TestBuildPreservesOperatorManagedSiblings(t *testing.T) {
+	a := newSeededApp(t)
+	ctx := context.Background()
+	now := time.Now().Unix()
+
+	if _, err := a.DB.ExecContext(ctx,
+		`INSERT INTO pages (wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		1, 1, "Pricing", "<p>pricing</p>", "html", "/service/pricing", 0, 0, 1, "", now, now); err != nil {
+		t.Fatalf("insert page: %v", err)
+	}
+
+	out := filepath.Join(t.TempDir(), "public")
+	// Pre-create an operator-managed file that lives under the same parent.
+	manual := filepath.Join(out, "service", "downloads", "manual.pdf")
+	if err := os.MkdirAll(filepath.Dir(manual), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(manual, []byte("pdf"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := rebuild.Build(ctx, a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(out, "service", "pricing", "index.html")); err != nil {
+		t.Errorf("pricing page missing: %v", err)
+	}
+	if data, err := os.ReadFile(manual); err != nil {
+		t.Errorf("operator-managed file was removed: %v", err)
+	} else if string(data) != "pdf" {
+		t.Errorf("operator-managed file was mutated")
+	}
+}
+
+func TestBuildParentChildSlugsAreSafe(t *testing.T) {
+	a := newSeededApp(t)
+	ctx := context.Background()
+	now := time.Now().Unix()
+
+	// Bypass admin validation and insert both a parent and child slug.
+	if _, err := a.DB.ExecContext(ctx,
+		`INSERT INTO pages (wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		1, 1, "Service", "<p>service</p>", "html", "/service", 0, 0, 1, "", now, now); err != nil {
+		t.Fatalf("insert parent page: %v", err)
+	}
+	if _, err := a.DB.ExecContext(ctx,
+		`INSERT INTO pages (wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		1, 1, "Pricing", "<p>pricing</p>", "html", "/service/pricing", 0, 0, 1, "", now, now); err != nil {
+		t.Fatalf("insert child page: %v", err)
+	}
+
+	out := filepath.Join(t.TempDir(), "public")
+	if _, err := rebuild.Build(ctx, a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	// Both pages must exist.
+	for _, p := range []string{"service/index.html", "service/pricing/index.html"} {
+		if _, err := os.Stat(filepath.Join(out, p)); err != nil {
+			t.Errorf("missing %s: %v", p, err)
+		}
+	}
+}
+
+func TestBuildPrunesStaleParentWithActiveChild(t *testing.T) {
+	a := newSeededApp(t)
+	ctx := context.Background()
+	now := time.Now().Unix()
+
+	if _, err := a.DB.ExecContext(ctx,
+		`INSERT INTO pages (wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		1, 1, "Service", "<p>service</p>", "html", "/service", 0, 0, 1, "", now, now); err != nil {
+		t.Fatalf("insert parent page: %v", err)
+	}
+	if _, err := a.DB.ExecContext(ctx,
+		`INSERT INTO pages (wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		1, 1, "Pricing", "<p>pricing</p>", "html", "/service/pricing", 0, 0, 1, "", now, now); err != nil {
+		t.Fatalf("insert child page: %v", err)
+	}
+
+	out := filepath.Join(t.TempDir(), "public")
+	if _, err := rebuild.Build(ctx, a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("first Build: %v", err)
+	}
+	for _, p := range []string{"service/index.html", "service/pricing/index.html"} {
+		if _, err := os.Stat(filepath.Join(out, p)); err != nil {
+			t.Fatalf("missing %s after first build: %v", p, err)
+		}
+	}
+
+	// Remove only the parent page; child remains published.
+	if _, err := a.DB.ExecContext(ctx, `DELETE FROM pages WHERE slug = '/service'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rebuild.Build(ctx, a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("second Build: %v", err)
+	}
+
+	// Stale parent directory should be pruned, but active child must survive.
+	if _, err := os.Stat(filepath.Join(out, "service", "index.html")); !os.IsNotExist(err) {
+		t.Errorf("stale service/index.html should have been pruned")
+	}
+	if _, err := os.Stat(filepath.Join(out, "service", "pricing", "index.html")); err != nil {
+		t.Errorf("active child service/pricing/index.html should remain: %v", err)
+	}
+}
+
 // silence unused import lint when test-only helpers drift
 var _ = sql.Open
