@@ -34,6 +34,7 @@ const DefaultEntryListSize = 10
 type Report struct {
 	Home                 bool
 	Entries              int
+	Pages                int
 	Categories           int
 	Tags                 int
 	ArchiveYear          int
@@ -180,6 +181,10 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 	rep.Home = true
 
 	if err := writeEntries(ctx, store, stagedOpts, site, tmpl, weblog, all, cats, users, profileUsers, sidebar, rep); err != nil {
+		return nil, err
+	}
+
+	if err := writePages(ctx, store, stagedOpts, site, profileUsers, sidebar, rep); err != nil {
 		return nil, err
 	}
 
@@ -656,6 +661,44 @@ func writeTemplateCSS(ctx context.Context, store *repo.Store, site content.Site,
 // feed write failure is fatal for the same reason a home-page failure is
 // — partial snapshots are worse than no rebuild. Feed content is capped
 // inside the builder, so handing it the full entry list is safe.
+func writePages(ctx context.Context, store *repo.Store, opts Options, site content.Site, profileUsers []domain.User, sidebar content.SidebarData, rep *Report) error {
+	pages, err := store.PublishedPages(ctx, opts.WID)
+	if err != nil {
+		return fmt.Errorf("rebuild: list pages: %w", err)
+	}
+	for _, p := range pages {
+		var tmpl *domain.Template
+		if p.TemplateID != 0 {
+			if t, err := store.TemplateByID(ctx, opts.WID, p.TemplateID); err == nil {
+				tmpl = t
+			}
+		}
+		if tmpl == nil {
+			tmpl, err = store.ActiveTemplate(ctx, opts.WID)
+			if err != nil {
+				return fmt.Errorf("rebuild: load active template for page %d: %w", p.ID, err)
+			}
+		}
+		body, err := (content.PageView{
+			Site:         site,
+			Template:     tmpl,
+			Page:         p,
+			ProfileUsers: profileUsers,
+			Sidebar:      sidebar,
+		}).Render()
+		if err != nil {
+			return fmt.Errorf("rebuild: render page %d: %w", p.ID, err)
+		}
+		// slug is "/about" → "about/index.html"
+		path := filepath.Join(opts.OutDir, filepath.FromSlash(p.Slug[1:]), "index.html")
+		if err := writeFile(path, []byte(body)); err != nil {
+			return err
+		}
+		rep.Pages++
+	}
+	return nil
+}
+
 func writeFeeds(outDir string, site content.Site, all []domain.Entry, cats map[int64]domain.Category, users map[int64]domain.User, rep *Report) error {
 	opts := feed.Options{
 		Site: site, Entries: all, Users: users, Categories: cats,
@@ -771,11 +814,89 @@ func promoteStaging(finalOut, staging string, llmsEnabled bool) error {
 		}
 	}
 
+	// Flat pages land as top-level directories (e.g. "about/"). Promote
+	// every directory that isn't one of the known managed subtrees or
+	// the asset mirrors.
+	if err := promoteExtraDirs(staging, finalOut); err != nil {
+		return err
+	}
+
 	if !llmsEnabled {
 		for _, name := range []string{"llms.txt", "llms-full.txt"} {
 			if err := os.Remove(filepath.Join(finalOut, name)); err != nil && !os.IsNotExist(err) {
 				return fmt.Errorf("rebuild: remove %s: %w", name, err)
 			}
+		}
+	}
+	return nil
+}
+
+// promoteExtraDirs moves any top-level directory under staging into
+// finalOut that isn't part of the known managed subtrees (entry,
+// category, tag, archive) or the asset mirrors (img, template).
+// Directories that exist in finalOut but not in staging are removed
+// so deleted flat pages are cleaned up.
+func promoteExtraDirs(staging, finalOut string) error {
+	excluded := map[string]struct{}{
+		"entry":    {},
+		"category": {},
+		"tag":      {},
+		"archive":  {},
+		"img":      {},
+		"template": {},
+	}
+
+	stagedEntries, err := os.ReadDir(staging)
+	if err != nil {
+		return fmt.Errorf("rebuild: read staging dir: %w", err)
+	}
+	for _, ent := range stagedEntries {
+		if !ent.IsDir() {
+			continue
+		}
+		name := ent.Name()
+		if _, skip := excluded[name]; skip {
+			continue
+		}
+		stagedPath := filepath.Join(staging, name)
+		finalPath := filepath.Join(finalOut, name)
+		backupPath := finalPath + ".old"
+		_ = os.RemoveAll(backupPath)
+		finalExists := dirExists(finalPath)
+		if finalExists {
+			if err := os.Rename(finalPath, backupPath); err != nil {
+				return fmt.Errorf("rebuild: backup %s: %w", finalPath, err)
+			}
+		}
+		if err := os.Rename(stagedPath, finalPath); err != nil {
+			if finalExists {
+				_ = os.Rename(backupPath, finalPath)
+			}
+			return fmt.Errorf("rebuild: promote %s: %w", finalPath, err)
+		}
+		if finalExists {
+			_ = os.RemoveAll(backupPath)
+		}
+	}
+
+	finalEntries, err := os.ReadDir(finalOut)
+	if err != nil {
+		return fmt.Errorf("rebuild: read final dir: %w", err)
+	}
+	for _, ent := range finalEntries {
+		if !ent.IsDir() {
+			continue
+		}
+		name := ent.Name()
+		if _, skip := excluded[name]; skip {
+			continue
+		}
+		stagedPath := filepath.Join(staging, name)
+		if dirExists(stagedPath) {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(finalOut, name)); err != nil {
+			return fmt.Errorf("rebuild: prune %s: %w", name, err)
 		}
 	}
 	return nil
