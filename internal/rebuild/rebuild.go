@@ -901,46 +901,30 @@ func promoteStaging(finalOut, staging string, llmsEnabled bool, pruneSet map[str
 	return nil
 }
 
-// promoteExtraDirs moves any top-level directory under staging into
-// finalOut that isn't part of the known managed subtrees (entry,
-// category, tag, archive) or the asset mirrors (img, template).
+// promoteExtraDirs promotes each flat-page root from staging into
+// finalOut at the full-root granularity recorded in pruneSet.  This
+// means a page at /service/pricing replaces *only*
+// finalOut/service/pricing, leaving sibling directories such as
+// service/downloads untouched.
 //
-// Directories in finalOut that were present in oldRoots (managed by a
-// previous rebuild) but no longer exist in staging and are not in the
-// current pruneSet are removed so deleted / unpublished / renamed flat
-// pages are cleaned up. Operator-managed directories that were never
-// tracked in oldRoots are left untouched.
+// After promotion, directories that were tracked in oldRoots but are
+// no longer in pruneSet are removed so deleted / unpublished / renamed
+// flat pages are cleaned up.  Operator-managed directories that were
+// never tracked in oldRoots are left untouched.
 func promoteExtraDirs(staging, finalOut string, pruneSet, oldRoots map[string]struct{}) error {
-	excluded := map[string]struct{}{
-		"entry":    {},
-		"category": {},
-		"tag":      {},
-		"archive":  {},
-		"img":      {},
-		"template": {},
-	}
-
-	stagedEntries, err := os.ReadDir(staging)
-	if err != nil {
-		return fmt.Errorf("rebuild: read staging dir: %w", err)
-	}
-	stagedDirs := make(map[string]struct{})
-	for _, ent := range stagedEntries {
-		if !ent.IsDir() {
-			continue
-		}
-		name := ent.Name()
-		if _, skip := excluded[name]; skip {
-			continue
-		}
-		stagedDirs[name] = struct{}{}
-	}
-
-	for name := range stagedDirs {
-		stagedPath := filepath.Join(staging, name)
-		finalPath := filepath.Join(finalOut, name)
+	for root := range pruneSet {
+		stagedPath := filepath.Join(staging, filepath.FromSlash(root))
+		finalPath := filepath.Join(finalOut, filepath.FromSlash(root))
 		backupPath := finalPath + ".old"
 		_ = os.RemoveAll(backupPath)
+
+		// Ensure the parent directory exists in finalOut so the
+		// rename below has a target.  MkdirAll is a no-op when the
+		// directory already exists (e.g. operator-managed dirs).
+		if err := os.MkdirAll(filepath.Dir(finalPath), 0o755); err != nil {
+			return fmt.Errorf("rebuild: mkdir parent %s: %w", finalPath, err)
+		}
+
 		finalExists := dirExists(finalPath)
 		if finalExists {
 			if err := os.Rename(finalPath, backupPath); err != nil {
