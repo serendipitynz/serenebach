@@ -61,6 +61,20 @@ Use **Insert image** in the editor toolbar to drop in an image you've already up
 
 HTML entries get an `<img>` tag; Markdown entries get the Markdown image syntax.
 
+## Flat pages
+
+**Flat pages** are standalone content pages independent of entries. Use them for `/about`, `/privacy`, or any page that should not appear in listings, archives, or feeds.
+
+Flat page characteristics:
+
+- Not shown on the home page, category pages, archives, or feeds
+- No categories, tags, comments, or "more" section
+- Custom URL path (e.g. `/about`, `/service/pricing`)
+- Per-page template selection (falls back to the active template)
+- OG cards can be generated just like entries
+
+Paths may contain lowercase letters, digits, hyphens, and slashes. System-reserved paths such as `/entry` and `/admin` are rejected.
+
 ## Entry list
 
 The **Entries** list supports title search and status filtering. Click a title to open the editor. The arrow opens the public page in a new tab for published entries.

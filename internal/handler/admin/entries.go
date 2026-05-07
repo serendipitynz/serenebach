@@ -58,6 +58,16 @@ func (h *Handler) entryList(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to list entries", http.StatusInternalServerError)
 		return
 	}
+	u := session.UserFrom(r.Context())
+	if u != nil {
+		filtered := make([]domain.Entry, 0, len(entries))
+		for _, e := range entries {
+			if u.CanEditEntry(e.AuthorID) {
+				filtered = append(filtered, e)
+			}
+		}
+		entries = filtered
+	}
 	catIDs := make([]int64, 0, len(entries))
 	for _, e := range entries {
 		catIDs = append(catIDs, e.CategoryID)

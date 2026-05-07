@@ -34,6 +34,11 @@ var ErrNotFound = errors.New("repo: not found")
 // handler) catch this and re-render the form with a validation message.
 var ErrSlugInUse = errors.New("repo: slug already in use")
 
+// ErrSlugPrefixConflict is returned when a page slug would nest inside
+// or envelop an existing slug (e.g. /service and /service/pricing).
+// Unlike ErrSlugInUse this is checked in Go, not the DB layer.
+var ErrSlugPrefixConflict = errors.New("repo: slug prefix conflict")
+
 // defaultDescFormat applies the "empty → html" fallback for
 // description_format columns. Keeps every call site consistent so
 // a missing value never lands in the DB as raw "".

@@ -186,7 +186,7 @@ func (v ListView) Render() (string, error) {
 	// as empty rather than leaking the raw `{-name}` placeholder.
 	// profile_area / sequel / comment_area are entry-mode blocks; the
 	// trackback + recent_trackback blocks wait on the trackback feature.
-	for _, blk := range []string{"sequel", "comment_area", "trackback_area", "profile_area", "recent_trackback"} {
+	for _, blk := range []string{"sequel", "comment_area", "trackback_area", "profile_area", "recent_trackback", "dedicated_page"} {
 		if tmpl.HasBlock(blk) {
 			c.Block(blk, 0)
 		}

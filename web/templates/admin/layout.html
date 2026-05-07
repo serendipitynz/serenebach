@@ -71,6 +71,10 @@
             <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></span>
             <span class="nav-label">{{T "nav.entries.list"}}</span>
           </a></li>
+          <li><a class="nav-item{{if eq .ActiveMenu `pages`}} is-active{{end}}" href="{{Root}}/admin/pages"{{if eq .ActiveMenu `pages`}} aria-current="page"{{end}}>
+            <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg></span>
+            <span class="nav-label">{{T "nav.pages"}}</span>
+          </a></li>
           <li><a class="nav-item{{if eq .ActiveMenu `images`}} is-active{{end}}" href="{{Root}}/admin/images"{{if eq .ActiveMenu `images`}} aria-current="page"{{end}}>
             <span class="nav-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg></span>
             <span class="nav-label">{{T "nav.images"}}</span>

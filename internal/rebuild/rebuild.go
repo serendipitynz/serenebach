@@ -16,7 +16,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/serendipitynz/serenebach/internal/content"
@@ -34,6 +36,7 @@ const DefaultEntryListSize = 10
 type Report struct {
 	Home                 bool
 	Entries              int
+	Pages                int
 	Categories           int
 	Tags                 int
 	ArchiveYear          int
@@ -183,6 +186,11 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 		return nil, err
 	}
 
+	pageRoots, err := writePages(ctx, store, stagedOpts, site, profileUsers, sidebar, rep)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := writeCategories(ctx, store, stagedOpts, site, archiveTmpl, cats, users, profileUsers, sidebar, rep); err != nil {
 		return nil, err
 	}
@@ -222,7 +230,7 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 	// Every render + write succeeded. Swap the staged tree into
 	// place; failures inside promoteStaging leave the previous
 	// snapshot intact thanks to the rename-via-backup pattern.
-	if err := promoteStaging(finalOut, staging, weblog.LLMSEnabled); err != nil {
+	if err := promoteStaging(finalOut, staging, weblog.LLMSEnabled, pageRoots); err != nil {
 		return nil, err
 	}
 
@@ -652,10 +660,95 @@ func writeTemplateCSS(ctx context.Context, store *repo.Store, site content.Site,
 	return nil
 }
 
+// pagesManifestName is the hidden file that records the set of flat-page
+// root directories managed by the previous rebuild. It lives in both
+// staging and finalOut so promoteExtraDirs can prune stale directories
+// without touching operator-managed top-level directories.
+const pagesManifestName = ".sb-pages-manifest"
+
+// writePagesManifest writes one root directory per line, sorted, so the
+// file is deterministic across rebuilds.
+func writePagesManifest(outDir string, roots map[string]struct{}) error {
+	if len(roots) == 0 {
+		// Write an empty file so a previous manifest is overwritten.
+		return writeFile(filepath.Join(outDir, pagesManifestName), []byte{})
+	}
+	lines := make([]string, 0, len(roots))
+	for r := range roots {
+		lines = append(lines, r)
+	}
+	sort.Strings(lines)
+	return writeFile(filepath.Join(outDir, pagesManifestName), []byte(strings.Join(lines, "\n")+"\n"))
+}
+
+// readPagesManifest reads the manifest at path and returns the set of
+// roots it contains. If the file does not exist, an empty set is returned.
+func readPagesManifest(path string) (map[string]struct{}, error) {
+	set := make(map[string]struct{})
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return set, nil
+		}
+		return nil, err
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			set[line] = struct{}{}
+		}
+	}
+	return set, nil
+}
+
 // writeFeeds emits rss.xml + atom.xml alongside the HTML snapshot. A
 // feed write failure is fatal for the same reason a home-page failure is
 // — partial snapshots are worse than no rebuild. Feed content is capped
 // inside the builder, so handing it the full entry list is safe.
+func writePages(ctx context.Context, store *repo.Store, opts Options, site content.Site, profileUsers []domain.User, sidebar content.SidebarData, rep *Report) (map[string]struct{}, error) {
+	pages, err := store.PublishedPages(ctx, opts.WID)
+	if err != nil {
+		return nil, fmt.Errorf("rebuild: list pages: %w", err)
+	}
+	roots := make(map[string]struct{}, len(pages))
+	for _, p := range pages {
+		var tmpl *domain.Template
+		if p.TemplateID != 0 {
+			if t, err := store.TemplateByID(ctx, opts.WID, p.TemplateID); err == nil {
+				tmpl = t
+			}
+		}
+		if tmpl == nil {
+			tmpl, err = store.ActiveTemplate(ctx, opts.WID)
+			if err != nil {
+				return nil, fmt.Errorf("rebuild: load active template for page %d: %w", p.ID, err)
+			}
+		}
+		body, err := (content.PageView{
+			Site:         site,
+			Template:     tmpl,
+			Page:         p,
+			ProfileUsers: profileUsers,
+			Sidebar:      sidebar,
+		}).Render()
+		if err != nil {
+			return nil, fmt.Errorf("rebuild: render page %d: %w", p.ID, err)
+		}
+		// slug is "/about" → "about/index.html"
+		root := filepath.FromSlash(p.Slug[1:])
+		path := filepath.Join(opts.OutDir, root, "index.html")
+		if err := writeFile(path, []byte(body)); err != nil {
+			return nil, err
+		}
+		rep.Pages++
+		roots[root] = struct{}{}
+	}
+	if err := writePagesManifest(opts.OutDir, roots); err != nil {
+		return nil, fmt.Errorf("rebuild: write pages manifest: %w", err)
+	}
+	return roots, nil
+}
+
 func writeFeeds(outDir string, site content.Site, all []domain.Entry, cats map[int64]domain.Category, users map[int64]domain.User, rep *Report) error {
 	opts := feed.Options{
 		Site: site, Entries: all, Users: users, Categories: cats,
@@ -701,28 +794,32 @@ func writeLLMsTxt(outDir string, weblog domain.Weblog, all []domain.Entry, rep *
 // archive/):
 //
 //  1. If staging has it, rename the existing finalOut/<sub> aside
-//     to finalOut/<sub>.old (rename within the same dir is atomic
-//     and reversible), rename staging/<sub> into finalOut/<sub>,
-//     then remove .old.
+//     into a random-named backup directory under finalOut (same-FS
+//     rename is atomic and reversible), rename staging/<sub> into
+//     finalOut/<sub>, then remove the backup.
 //  2. If staging does NOT have it (e.g. the DB has zero entries
 //     this run), remove finalOut/<sub> so deleted-everything is
 //     tracked.
 //
-// On rename failure we restore the .old backup so the live snapshot
-// keeps the previous content. Once subtree promotion is done, the
-// top-level files (index.html, style.css, rss.xml, atom.xml,
-// llms*.txt) are renamed file-by-file — file rename overwrites are
-// atomic on POSIX, so each file flips in place. Finally, when the
-// LLMS toggle is off any leftover llms*.txt are removed so flipping
-// the switch off cleans up after itself.
-func promoteStaging(finalOut, staging string, llmsEnabled bool) error {
+// On rename failure we restore the backup so the live snapshot keeps
+// the previous content. Once subtree promotion is done, the top-level
+// files (index.html, style.css, rss.xml, atom.xml, llms*.txt) are
+// renamed file-by-file — file rename overwrites are atomic on POSIX,
+// so each file flips in place. Finally, when the LLMS toggle is off
+// any leftover llms*.txt are removed so flipping the switch off
+// cleans up after itself.
+func promoteStaging(finalOut, staging string, llmsEnabled bool, pruneSet map[string]struct{}) error {
+	// Load the previous build's page-root manifest so we can prune
+	// stale directories that were generated in an earlier run but no
+	// longer exist (deleted, unpublished, or renamed pages).
+	oldRoots, err := readPagesManifest(filepath.Join(finalOut, pagesManifestName))
+	if err != nil {
+		return fmt.Errorf("rebuild: read old pages manifest: %w", err)
+	}
+
 	for _, sub := range []string{"entry", "category", "tag", "archive"} {
 		stagedPath := filepath.Join(staging, sub)
 		finalPath := filepath.Join(finalOut, sub)
-		backupPath := finalPath + ".old"
-		// Drop any leftover backup from a prior interrupted run so
-		// the rename below has a clean target.
-		_ = os.RemoveAll(backupPath)
 
 		stagedExists := dirExists(stagedPath)
 		finalExists := dirExists(finalPath)
@@ -739,8 +836,16 @@ func promoteStaging(finalOut, staging string, llmsEnabled bool) error {
 			continue
 		}
 
+		var backupDir string
 		if finalExists {
+			bd, err := os.MkdirTemp(finalOut, ".sb-backup-")
+			if err != nil {
+				return fmt.Errorf("rebuild: create backup dir: %w", err)
+			}
+			backupDir = bd
+			backupPath := filepath.Join(bd, "dir")
 			if err := os.Rename(finalPath, backupPath); err != nil {
+				_ = os.RemoveAll(bd)
 				return fmt.Errorf("rebuild: backup %s: %w", finalPath, err)
 			}
 		}
@@ -748,12 +853,12 @@ func promoteStaging(finalOut, staging string, llmsEnabled bool) error {
 			// Restore previous output so the live snapshot is
 			// not left partially overwritten.
 			if finalExists {
-				_ = os.Rename(backupPath, finalPath)
+				_ = os.Rename(filepath.Join(backupDir, "dir"), finalPath)
 			}
 			return fmt.Errorf("rebuild: promote %s: %w", finalPath, err)
 		}
 		if finalExists {
-			_ = os.RemoveAll(backupPath)
+			_ = os.RemoveAll(backupDir)
 		}
 	}
 
@@ -771,6 +876,25 @@ func promoteStaging(finalOut, staging string, llmsEnabled bool) error {
 		}
 	}
 
+	// Flat pages land as top-level directories (e.g. "about/"). Promote
+	// every directory that isn't one of the known managed subtrees or
+	// the asset mirrors.
+	if err := promoteExtraDirs(staging, finalOut, pruneSet, oldRoots); err != nil {
+		return err
+	}
+
+	// Carry the new manifest forward so the next rebuild knows which
+	// directories it managed.
+	stagedManifest := filepath.Join(staging, pagesManifestName)
+	finalManifest := filepath.Join(finalOut, pagesManifestName)
+	if _, err := os.Stat(stagedManifest); err == nil {
+		if err := os.Rename(stagedManifest, finalManifest); err != nil {
+			return fmt.Errorf("rebuild: promote pages manifest: %w", err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("rebuild: stat pages manifest: %w", err)
+	}
+
 	if !llmsEnabled {
 		for _, name := range []string{"llms.txt", "llms-full.txt"} {
 			if err := os.Remove(filepath.Join(finalOut, name)); err != nil && !os.IsNotExist(err) {
@@ -779,6 +903,142 @@ func promoteStaging(finalOut, staging string, llmsEnabled bool) error {
 		}
 	}
 	return nil
+}
+
+// promoteExtraDirs promotes each flat-page root from staging into
+// finalOut at the full-root granularity recorded in pruneSet.  This
+// means a page at /service/pricing replaces *only*
+// finalOut/service/pricing, leaving sibling directories such as
+// service/downloads untouched.
+//
+// Nested roots (e.g. /service and /service/pricing) are handled safely
+// by promoting deepest roots first and preserving active children that
+// already exist in finalOut across the parent rename.
+//
+// After promotion, directories that were tracked in oldRoots but are
+// no longer in pruneSet are removed so deleted / unpublished / renamed
+// flat pages are cleaned up.  A stale parent is skipped when an active
+// descendant still lives inside it, preventing accidental deletion of
+// active children.  Operator-managed directories that were never
+// tracked in oldRoots are left untouched.
+func promoteExtraDirs(staging, finalOut string, pruneSet, oldRoots map[string]struct{}) error {
+	// Promote deepest roots first so child directories are moved out of
+	// their parents in staging before the parent is promoted.
+	rootsByDepth := make([]string, 0, len(pruneSet))
+	for r := range pruneSet {
+		rootsByDepth = append(rootsByDepth, r)
+	}
+	sort.Slice(rootsByDepth, func(i, j int) bool {
+		return depth(rootsByDepth[i]) > depth(rootsByDepth[j])
+	})
+
+	for _, root := range rootsByDepth {
+		stagedPath := filepath.Join(staging, filepath.FromSlash(root))
+		finalPath := filepath.Join(finalOut, filepath.FromSlash(root))
+
+		// Ensure the parent directory exists in finalOut so the
+		// rename below has a target.  MkdirAll is a no-op when the
+		// directory already exists (e.g. operator-managed dirs).
+		if err := os.MkdirAll(filepath.Dir(finalPath), 0o755); err != nil {
+			return fmt.Errorf("rebuild: mkdir parent %s: %w", finalPath, err)
+		}
+
+		// Identify active children that already live in finalPath (they
+		// were promoted in earlier iterations because we sort deepest
+		// first). We must preserve them across the parent rename.
+		var childrenToPreserve []string
+		for child := range pruneSet {
+			if child == root {
+				continue
+			}
+			if strings.HasPrefix(child, root+"/") {
+				childRel := child[len(root)+1:]
+				if dirExists(filepath.Join(finalPath, filepath.FromSlash(childRel))) {
+					childrenToPreserve = append(childrenToPreserve, child)
+				}
+			}
+		}
+
+		var backupDir string
+		finalExists := dirExists(finalPath)
+		if finalExists {
+			bd, err := os.MkdirTemp(finalOut, ".sb-backup-")
+			if err != nil {
+				return fmt.Errorf("rebuild: create backup dir: %w", err)
+			}
+			backupDir = bd
+			backupPath := filepath.Join(bd, "dir")
+			if err := os.Rename(finalPath, backupPath); err != nil {
+				_ = os.RemoveAll(bd)
+				return fmt.Errorf("rebuild: backup %s: %w", finalPath, err)
+			}
+		}
+		if err := os.Rename(stagedPath, finalPath); err != nil {
+			if finalExists {
+				_ = os.Rename(filepath.Join(backupDir, "dir"), finalPath)
+			}
+			return fmt.Errorf("rebuild: promote %s: %w", finalPath, err)
+		}
+
+		// Restore preserved children from the backup.
+		for _, child := range childrenToPreserve {
+			childRel := child[len(root)+1:]
+			backupChild := filepath.Join(filepath.Join(backupDir, "dir"), filepath.FromSlash(childRel))
+			finalChild := filepath.Join(finalPath, filepath.FromSlash(childRel))
+			if dirExists(backupChild) {
+				// Ensure the intermediate directories exist in the
+				// freshly-promoted parent.
+				if err := os.MkdirAll(filepath.Dir(finalChild), 0o755); err != nil {
+					return fmt.Errorf("rebuild: mkdir child parent %s: %w", finalChild, err)
+				}
+				// Remove any empty placeholder that the parent staging
+				// dir may have left behind.
+				_ = os.RemoveAll(finalChild)
+				if err := os.Rename(backupChild, finalChild); err != nil {
+					return fmt.Errorf("rebuild: restore child %s: %w", finalChild, err)
+				}
+			}
+		}
+
+		if finalExists {
+			_ = os.RemoveAll(backupDir)
+		}
+	}
+
+	// Prune stale page directories. Skip a stale root if any active
+	// descendant is still present — removing the parent would delete
+	// the active child as well.
+	for root := range oldRoots {
+		if _, stillActive := pruneSet[root]; stillActive {
+			continue
+		}
+		hasActiveDescendant := false
+		for active := range pruneSet {
+			if strings.HasPrefix(active, root+"/") {
+				hasActiveDescendant = true
+				break
+			}
+		}
+		if hasActiveDescendant {
+			continue
+		}
+		stalePath := filepath.Join(finalOut, filepath.FromSlash(root))
+		if !dirExists(stalePath) {
+			continue
+		}
+		if err := os.RemoveAll(stalePath); err != nil {
+			return fmt.Errorf("rebuild: prune %s: %w", stalePath, err)
+		}
+	}
+	return nil
+}
+
+// depth counts path segments.
+func depth(p string) int {
+	if p == "" {
+		return 0
+	}
+	return strings.Count(p, "/") + 1
 }
 
 func dirExists(p string) bool {

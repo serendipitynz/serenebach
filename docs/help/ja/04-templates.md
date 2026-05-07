@@ -80,6 +80,7 @@ HTML テンプレートは基本的に HTML の要素で構成されます。内
 | リスト関連 | `link` | リンクリスト（ブログロール）表示に利用します。 |
 | リスト関連 | `recent_comment` | 最新コメントリスト表示に利用します。 |
 | リスト関連 | `selected_entry` | 選択記事リスト表示に利用します。**Go 版では常に 0（非表示）です。** |
+| 固定ページ | `dedicated_page` | 固定ページでのみ表示されるブロックです。通常の記事ページや一覧ページでは表示されません。 |
 
 ## 独自タグ一覧
 
@@ -136,7 +137,7 @@ HTML テンプレートは基本的に HTML の要素で構成されます。内
 | `{entry_disp_time}` | 投稿時刻（プレーン文字列） |
 | `{entry_description}` | 記事本文（フォーマット適用済み HTML） |
 | `{entry_sequel}` | リストページでは「続きを読む」リンク、個別記事ページでは追記本文 |
-| `{entry_mode}` | `list` または `entry` |
+| `{entry_mode}` | `list`、`entry`、または `page`（固定ページ） |
 | `{entry_likes_count}` | いいね数 |
 | `{entry_like_url}` | いいね POST 先 URL |
 | `{entry_stamps_count}` | スタンプ総数 |

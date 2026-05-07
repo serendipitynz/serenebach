@@ -148,6 +148,9 @@ var tmplFuncs = template.FuncMap{
 		}
 		return strings.Join(out, ", ")
 	},
+	"trimPrefix": func(prefix, s string) string {
+		return strings.TrimPrefix(s, prefix)
+	},
 }
 
 func entryStatusLabel(s domain.EntryStatus) string {
@@ -204,6 +207,8 @@ const (
 	pageHome             = "home"
 	pageEntriesList      = "entries_list"
 	pageEntryForm        = "entry_form"
+	pagePagesList        = "pages_list"
+	pagePageForm         = "page_form"
 	pageImages           = "images"
 	pageCategoriesList   = "categories_list"
 	pageCategoryForm     = "category_form"
@@ -287,7 +292,7 @@ func loadI18nBundle() *i18n.Bundle {
 
 func loadMainTemplates() map[string]*template.Template {
 	out := map[string]*template.Template{}
-	for _, p := range []string{pageHome, pageEntriesList, pageEntryForm, pageImages, pageCategoriesList, pageCategoryForm, pageLinksList, pageLinkForm, pageTagsList, pageUsersList, pageUserForm, pageProfileForm, pageCommentsList, pageCommentSettings, pageAnalytics, pageRebuild, pageSettings, pageSettingsBasic, pageSettingsAI, pageTemplatesList, pageTemplateForm, pageTemplateImport, pageTemplateSettings, pageTemplateOG, pageHelp} {
+	for _, p := range []string{pageHome, pageEntriesList, pageEntryForm, pagePagesList, pagePageForm, pageImages, pageCategoriesList, pageCategoryForm, pageLinksList, pageLinkForm, pageTagsList, pageUsersList, pageUserForm, pageProfileForm, pageCommentsList, pageCommentSettings, pageAnalytics, pageRebuild, pageSettings, pageSettingsBasic, pageSettingsAI, pageTemplatesList, pageTemplateForm, pageTemplateImport, pageTemplateSettings, pageTemplateOG, pageHelp} {
 		t, err := template.New("").Funcs(tmplFuncs).ParseFS(admintpl.FS(), "layout.html", p+".html")
 		if err != nil {
 			panic("admin: parse " + p + ": " + err.Error())

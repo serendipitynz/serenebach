@@ -1,0 +1,97 @@
+{{define "content"}}
+{{- $aceMode := "html" -}}
+{{- if eq .CurrentFormat "markdown" -}}{{- $aceMode = "markdown" -}}{{- end -}}
+{{- if eq .CurrentFormat "sbtext" -}}{{- $aceMode = "text" -}}{{- end -}}
+
+{{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
+{{if eq .Flash "saved"}}<p class="alert success">{{T "flash.saved"}}</p>{{end}}
+
+<form method="post" action="{{.Action}}" class="entry-form" data-entry-form data-unsaved-warn>
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+  <div class="entry-form-head">
+    <label class="entry-form-title-label" for="page-title">{{T "entries.form.titleLabel"}}</label>
+    <div class="entry-form-head-right">
+      {{if .Page.ID}}
+      <a href="{{Root}}{{.Page.Slug}}" target="_blank" rel="noopener">{{T "common.viewPublic"}}</a>
+      {{end}}
+    </div>
+  </div>
+  <div class="entry-title-row">
+    <input id="page-title" type="text" name="title" value="{{.Page.Title}}" class="entry-title-input" autofocus>
+  </div>
+
+  <div class="entry-form-subhead">
+    <label for="page-body" class="entry-form-body-label">{{T "entries.form.bodyLabel"}}</label>
+    <div class="entry-form-subhead-right">
+      <label class="inline-field">{{T "entries.form.formatLabel"}}
+        <select name="format" data-code-editor-format>
+          {{range .Formats}}<option value="{{.Value}}"{{if eq $.CurrentFormat .Value}} selected{{end}} title="{{.Hint}}">{{.Label}}</option>{{end}}
+        </select>
+      </label>
+      <button type="button" class="link" data-image-picker-open>{{T "entries.form.insertImage"}}</button>
+    </div>
+  </div>
+  <textarea id="page-body" name="body" rows="14" spellcheck="false"
+            data-code-editor="{{$aceMode}}" data-code-editor-dynamic data-image-target>{{.Page.Body}}</textarea>
+  <div class="image-picker" hidden data-image-picker>
+    <input type="search" class="image-picker-filter" placeholder="{{T `entries.form.imgFilter`}}" data-image-picker-filter aria-label="{{T `entries.form.imgFilterAria`}}">
+    <div data-image-picker-body></div>
+  </div>
+
+  <div class="entry-form-options">
+    <label>{{T "pages.form.path"}}
+      <span class="input-prefix">
+        <span class="input-prefix-label">/</span>
+        <input type="text" name="slug" value="{{if ne .Page.Slug `/`}}{{.Page.Slug | trimPrefix `/`}}{{end}}" placeholder="about" pattern="[a-z0-9]+(-[a-z0-9]+)*(/[a-z0-9]+(-[a-z0-9]+)*)*" maxlength="200">
+      </span>
+    </label>
+    <label>{{T "pages.form.template"}}
+      <select name="template_id">
+        <option value="0"{{if eq .Page.TemplateID 0}} selected{{end}}>{{T "pages.template.active"}}</option>
+        {{range .Templates}}<option value="{{.ID}}"{{if eq $.Page.TemplateID .ID}} selected{{end}}>{{.Name}}</option>{{end}}
+      </select>
+    </label>
+    <label>{{T "entries.form.status"}}
+      <select name="status">
+        <option value="0"{{if eq .StatusInt 0}} selected{{end}}>{{T "status.draft"}}</option>
+        <option value="1"{{if eq .StatusInt 1}} selected{{end}}>{{T "status.published"}}</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="form-row" data-og-bg-field>
+    <div class="label">{{T "entries.form.ogBg"}}</div>
+    <div>
+      <input type="hidden" name="og_bg_image_path" value="{{.Page.OGBGImagePath}}" data-og-bg-input>
+      <div class="og-bg-row">
+        <img class="og-bg-preview" data-og-bg-preview
+             {{if .Page.OGBGImagePath}}src="{{Root}}/img/{{.Page.OGBGImagePath}}"{{else}}hidden{{end}}
+             alt="">
+        <button type="button" class="link" data-og-bg-picker>{{T "entries.form.ogBg.pick"}}</button>
+        <button type="button" class="link" data-og-bg-clear>{{T "entries.form.ogBg.clear"}}</button>
+      </div>
+      <p class="hint">{{T "entries.form.ogBgHint"}}</p>
+
+      {{if .Page.ID}}
+      <div class="og-card-row" data-og-card-row>
+        <img class="og-card-preview" data-og-card-preview
+             src="{{Root}}/img/og/page_{{.Page.ID}}.png?ts={{.OGCardTS}}"
+             alt="" loading="lazy"
+             onerror="this.hidden = true">
+        <button type="button" class="btn-secondary" data-og-card-generate>
+          {{T "entries.form.ogCard.generate"}}
+        </button>
+        <span class="og-card-status" data-og-card-status hidden></span>
+      </div>
+      <p class="hint">{{T "entries.form.ogCardHint"}}</p>
+      {{end}}
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <a href="{{Root}}/admin/pages">{{T "action.back"}}</a>
+    <button type="submit" class="primary">{{T "action.save"}}</button>
+  </div>
+</form>
+{{end}}
