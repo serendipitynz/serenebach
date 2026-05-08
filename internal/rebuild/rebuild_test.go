@@ -639,5 +639,276 @@ func TestBuildPrunesStaleParentWithActiveChild(t *testing.T) {
 	}
 }
 
+// TestBuildMirrorsImageTreeWithoutPruningUnrelated verifies the
+// image-copy contract: copyImageTree adds files, but the rebuild
+// must not delete operator-managed files that already exist under
+// out/img (e.g. uploads created in a previous run or copied in by
+// hand). The assertion plants a sentinel under out/img and confirms
+// it survives a build that mirrors a separate ImageDir.
+func TestBuildMirrorsImageTreeWithoutPruningUnrelated(t *testing.T) {
+	a := newSeededApp(t)
+	out := filepath.Join(t.TempDir(), "public")
+	imgSrc := filepath.Join(t.TempDir(), "img-src")
+
+	// Source image directory carries one regular asset.
+	if err := os.MkdirAll(imgSrc, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	srcAsset := filepath.Join(imgSrc, "fresh.png")
+	if err := os.WriteFile(srcAsset, []byte("fresh-bytes"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Operator-managed file already under out/img — must survive the
+	// rebuild even though the source ImageDir does not contain it.
+	if err := os.MkdirAll(filepath.Join(out, "img"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manualPath := filepath.Join(out, "img", "manual.png")
+	if err := os.WriteFile(manualPath, []byte("manual-bytes"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	rep, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{
+		OutDir:   out,
+		WID:      1,
+		ImageDir: imgSrc,
+	})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if rep.ImagesCopied < 1 {
+		t.Errorf("ImagesCopied = %d, want >= 1", rep.ImagesCopied)
+	}
+
+	// The newly-mirrored asset is in place.
+	if data, err := os.ReadFile(filepath.Join(out, "img", "fresh.png")); err != nil {
+		t.Errorf("mirrored fresh.png missing: %v", err)
+	} else if string(data) != "fresh-bytes" {
+		t.Errorf("mirrored fresh.png mutated: %q", string(data))
+	}
+	// The operator-managed sentinel was not deleted or overwritten.
+	if data, err := os.ReadFile(manualPath); err != nil {
+		t.Errorf("operator-managed manual.png removed: %v", err)
+	} else if string(data) != "manual-bytes" {
+		t.Errorf("operator-managed manual.png mutated: %q", string(data))
+	}
+}
+
+// TestBuildMirrorsOGImagesWhenPresent ensures OG card PNGs that live
+// under <ImageDir>/og/ travel into <OutDir>/img/og/ as part of the
+// image-tree mirror. Static deployments depend on this so meta tags
+// like {og_image} resolve to a real file on the static host.
+func TestBuildMirrorsOGImagesWhenPresent(t *testing.T) {
+	a := newSeededApp(t)
+	out := filepath.Join(t.TempDir(), "public")
+	imgSrc := filepath.Join(t.TempDir(), "img-src")
+
+	ogDir := filepath.Join(imgSrc, "og")
+	if err := os.MkdirAll(ogDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Plant fake OG cards (single-pixel PNG bytes are fine — the
+	// rebuild copies whatever bytes it finds without inspecting them).
+	for _, name := range []string{"entry_1.png", "entry_2.png", "site_default.png"} {
+		if err := os.WriteFile(filepath.Join(ogDir, name), []byte("og-"+name), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{
+		OutDir:   out,
+		WID:      1,
+		ImageDir: imgSrc,
+	}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	for _, name := range []string{"entry_1.png", "entry_2.png", "site_default.png"} {
+		mirrored := filepath.Join(out, "img", "og", name)
+		data, err := os.ReadFile(mirrored)
+		if err != nil {
+			t.Errorf("og card %s missing at %s: %v", name, mirrored, err)
+			continue
+		}
+		if string(data) != "og-"+name {
+			t.Errorf("og card %s mutated: %q", name, string(data))
+		}
+	}
+}
+
+// TestBuildLeavesNoStagingOrBackupDirsOnSuccess covers the cleanup
+// contract: after a successful rebuild, no `.sb-rebuild-*` or
+// `.sb-backup-*` directory must remain under OutDir. Operators
+// frequently rsync OutDir straight to a static host; leftover
+// staging would either ship to production or trigger
+// "unexpected files" warnings.
+func TestBuildLeavesNoStagingOrBackupDirsOnSuccess(t *testing.T) {
+	a := newSeededApp(t)
+	out := filepath.Join(t.TempDir(), "public")
+
+	// Two builds in sequence so the second one exercises both the
+	// staging dir and the backup-rename path.
+	for i := 0; i < 2; i++ {
+		if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+			t.Fatalf("Build #%d: %v", i+1, err)
+		}
+	}
+
+	dirEntries, err := os.ReadDir(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, de := range dirEntries {
+		name := de.Name()
+		if strings.HasPrefix(name, ".sb-rebuild-") {
+			t.Errorf("staging dir leaked after success: %s", name)
+		}
+		if strings.HasPrefix(name, ".sb-backup-") {
+			t.Errorf("backup dir leaked after success: %s", name)
+		}
+	}
+}
+
+// TestBuildCleansStagingDirOnFailure verifies the "always
+// best-effort clean staging on exit" defer: when render or write
+// fails AFTER MkdirTemp creates the staging dir, the defer must
+// still tear it down. Operators frequently rsync OutDir straight
+// to a static host; leftover staging would either ship to
+// production or trigger noisy "unexpected files" warnings.
+//
+// To exercise the post-MkdirTemp failure path we drop entry_tags
+// after a successful first build. Pre-staging fetches in Build
+// (weblog / template / entries / sidebar / custom tags) do not
+// touch entry_tags, so MkdirTemp succeeds and writeHome's
+// tagsForEntries logs-and-continues; writeEntries then fails on
+// TagsByEntry, which returns an error — exactly the contract we
+// want the defer to clean up after.
+func TestBuildCleansStagingDirOnFailure(t *testing.T) {
+	a := newSeededApp(t)
+	out := filepath.Join(t.TempDir(), "public")
+
+	// First build succeeds and seeds the live snapshot.
+	if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("initial Build: %v", err)
+	}
+
+	// Drop entry_tags so writeEntries fails after staging is created.
+	if _, err := a.DB.ExecContext(context.Background(), `DROP TABLE entry_tags`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{OutDir: out, WID: 1}); err == nil {
+		t.Fatal("expected Build to fail with entry_tags dropped")
+	}
+
+	dirEntries, err := os.ReadDir(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, de := range dirEntries {
+		name := de.Name()
+		if strings.HasPrefix(name, ".sb-rebuild-") {
+			t.Errorf("staging dir leaked after failure: %s", name)
+		}
+		if strings.HasPrefix(name, ".sb-backup-") {
+			t.Errorf("backup dir leaked after failure: %s", name)
+		}
+	}
+}
+
+// TestBuildPicksUpCustomTagChangesOnNextRebuild verifies the rebuild
+// re-reads custom tags every run, not just once. The first rebuild
+// emits the original value; updating the row and building again
+// must change the static HTML accordingly.
+func TestBuildPicksUpCustomTagChangesOnNextRebuild(t *testing.T) {
+	a := newSeededApp(t)
+	ctx := context.Background()
+
+	if _, err := a.DB.ExecContext(ctx,
+		`INSERT INTO site_custom_tags (wid, name, value) VALUES (?, ?, ?)`,
+		1, "custom_swap", "<span>v1</span>"); err != nil {
+		t.Fatalf("insert custom tag: %v", err)
+	}
+	if _, err := a.DB.ExecContext(ctx,
+		`UPDATE templates SET main_body = main_body || '\n<div>{custom_swap}</div>' WHERE is_active = 1`); err != nil {
+		t.Fatalf("update template: %v", err)
+	}
+
+	out := filepath.Join(t.TempDir(), "public")
+	if _, err := rebuild.Build(ctx, a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("first Build: %v", err)
+	}
+	first, err := os.ReadFile(filepath.Join(out, "index.html"))
+	if err != nil {
+		t.Fatalf("read first index.html: %v", err)
+	}
+	if !strings.Contains(string(first), "<span>v1</span>") {
+		t.Fatalf("first build missing v1; body:\n%s", string(first))
+	}
+
+	// Mutate the tag value and rebuild — the static output must reflect it.
+	if _, err := a.DB.ExecContext(ctx,
+		`UPDATE site_custom_tags SET value = ? WHERE name = ?`,
+		"<span>v2</span>", "custom_swap"); err != nil {
+		t.Fatalf("update custom tag: %v", err)
+	}
+	if _, err := rebuild.Build(ctx, a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("second Build: %v", err)
+	}
+	second, err := os.ReadFile(filepath.Join(out, "index.html"))
+	if err != nil {
+		t.Fatalf("read second index.html: %v", err)
+	}
+	if strings.Contains(string(second), "<span>v1</span>") {
+		t.Errorf("second build still contains stale v1 value; body:\n%s", string(second))
+	}
+	if !strings.Contains(string(second), "<span>v2</span>") {
+		t.Errorf("second build missing v2; body:\n%s", string(second))
+	}
+}
+
+// TestBuildFlatPagesCoexistWithEntryRoutes plants a flat page,
+// entries, categories, tags, and archives all in the same OutDir
+// and asserts every output bucket lands under its expected path.
+// The promotion-order assumption is "deepest pages first, then
+// known managed subtrees, then asset top-level files" — a regression
+// would surface as a missing or overwritten directory.
+func TestBuildFlatPagesCoexistWithEntryRoutes(t *testing.T) {
+	a := newSeededApp(t)
+	ctx := context.Background()
+	now := time.Now().Unix()
+
+	if _, err := a.DB.ExecContext(ctx,
+		`INSERT INTO pages (wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		1, 1, "About", "<p>about</p>", "html", "/about", 0, 0, 1, "", now, now); err != nil {
+		t.Fatalf("insert page: %v", err)
+	}
+
+	out := filepath.Join(t.TempDir(), "public")
+	rep, err := rebuild.Build(ctx, a.Store, rebuild.Options{OutDir: out, WID: 1})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if rep.Pages != 1 {
+		t.Errorf("rep.Pages = %d, want 1", rep.Pages)
+	}
+	if rep.Entries == 0 || rep.Categories == 0 || rep.ArchiveYear == 0 {
+		t.Errorf("expected entries/categories/archives also rendered; rep=%+v", rep)
+	}
+	for _, p := range []string{
+		"index.html",
+		"about/index.html",
+		"entry/1/index.html",
+		"category/1/index.html",
+		"rss.xml",
+		"atom.xml",
+	} {
+		if _, err := os.Stat(filepath.Join(out, p)); err != nil {
+			t.Errorf("missing %s after coexist build: %v", p, err)
+		}
+	}
+}
+
 // silence unused import lint when test-only helpers drift
 var _ = sql.Open
