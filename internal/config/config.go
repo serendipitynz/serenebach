@@ -86,7 +86,10 @@ type Config struct {
 	// knob and is overridable via the corresponding SB_* env var
 	// (time.ParseDuration syntax, e.g. "10s", "1m"). Defaults are tuned
 	// to absorb OG-image generation while keeping Slowloris-class
-	// attacks from being practical.
+	// attacks from being practical. ReadTimeout defaults to 0 because
+	// http.Server.ReadTimeout covers the request body too; capping it
+	// would conflict with multi-megabyte image uploads on slow links.
+	// Body size is bounded by MaxBytesReader at the handler layer.
 	ReadHeaderTimeout time.Duration
 	ReadTimeout       time.Duration
 	WriteTimeout      time.Duration
@@ -200,10 +203,16 @@ const DefaultUploadMaxMB = 10
 
 // HTTP server timeout defaults. WriteTimeout is intentionally generous
 // because OG-image generation runs on the request goroutine on first
-// access. ShutdownTimeout caps the drain window after SIGINT/SIGTERM.
+// access. ReadTimeout defaults to 0 (no whole-request deadline) because
+// http.Server.ReadTimeout covers the body too — combining a short
+// deadline with the 10 MiB upload ceiling would cut off legitimate
+// uploads on slow links. Slowloris defence is carried by
+// ReadHeaderTimeout instead, and body size is bounded by
+// MaxBytesReader at the handler layer. ShutdownTimeout caps the drain
+// window after SIGINT/SIGTERM.
 const (
 	DefaultReadHeaderTimeout = 10 * time.Second
-	DefaultReadTimeout       = 30 * time.Second
+	DefaultReadTimeout       = 0
 	DefaultWriteTimeout      = 60 * time.Second
 	DefaultIdleTimeout       = 120 * time.Second
 	DefaultMaxHeaderBytes    = 1 << 20 // 1 MiB

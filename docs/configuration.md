@@ -27,7 +27,7 @@ Every knob the running binary respects, plus the `task` shortcuts the dev workfl
 | `SB_PUBLIC_ALLOWED_ORIGINS` | Additional origins permitted on reader-facing POSTs (comments, likes, stamps). Comma-separated, full `scheme://host[:port]` |
 | `SB_DEV` | Set to `1` to disable template and i18n caching so admin UI edits are reflected on the next request without restarting. `task dev` sets this automatically |
 | `SB_READ_HEADER_TIMEOUT` | `time.ParseDuration` value capping how long the server waits for the request line + headers (default `10s`, server mode only) |
-| `SB_READ_TIMEOUT` | `time.ParseDuration` value capping the total time to read the request including body (default `30s`, server mode only) |
+| `SB_READ_TIMEOUT` | `time.ParseDuration` value capping the total time to read the request including body. Default is `0` (no whole-request deadline) so multi-megabyte image uploads on slow links are not cut off; Slowloris defence is provided by `SB_READ_HEADER_TIMEOUT` and body size is bounded by `SB_UPLOAD_MAX_MB`. Server mode only |
 | `SB_WRITE_TIMEOUT` | `time.ParseDuration` value capping how long the server has to write the response (default `60s`; sized to absorb on-demand OG-image generation, server mode only) |
 | `SB_IDLE_TIMEOUT` | `time.ParseDuration` value for keep-alive idle timeout (default `120s`, server mode only) |
 | `SB_MAX_HEADER_BYTES` | Maximum size, in bytes, of the request line + headers (default `1048576`, i.e. 1 MiB; server mode only) |

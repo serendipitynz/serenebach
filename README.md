@@ -30,6 +30,8 @@ Prefer the CLI? `task seed` still works — it creates the dev DB and seeds an a
 
 A `.env` template ships at `.env.example`. Copy it to `.env` and fill in `SB_AI_SECRET` if you plan to enable the AI writing assists.
 
+Server-mode HTTP timeouts and graceful shutdown have sensible defaults out of the box and can be tuned via `SB_READ_HEADER_TIMEOUT`, `SB_WRITE_TIMEOUT`, `SB_IDLE_TIMEOUT`, `SB_MAX_HEADER_BYTES`, and `SB_SHUTDOWN_TIMEOUT`. See [docs/configuration.md](docs/configuration.md) for the full list.
+
 ## Docker
 
 ```bash
