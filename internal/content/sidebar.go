@@ -24,8 +24,17 @@ import (
 	"github.com/serendipitynz/serenebach/internal/template/sbtemplate"
 )
 
-func firstOfMonth(year, month int) time.Time {
-	return time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+// firstOfMonth fabricates "first of the month" for archive labels. The
+// instant must be built in the same timezone the formatter projects
+// into, otherwise FormatArchiveDate's t.In(s.TZ) shift across UTC can
+// roll the synthetic 1st-of-the-month back to the previous month for
+// negative-offset zones (e.g. America/New_York: 2026-01-01 00:00 UTC
+// → 2025-12-31 19:00 EST).
+func firstOfMonth(year, month int, loc *time.Location) time.Time {
+	if loc == nil {
+		loc = time.Local
+	}
+	return time.Date(year, time.Month(month), 1, 0, 0, 0, 0, loc)
 }
 
 // noNameLabel returns the reader-facing placeholder for an anonymous
@@ -122,7 +131,7 @@ func archiveLabelFor(s Site, year, month int) string {
 	// Fabricate a "first of the month" time so dateformat tokens
 	// render correctly. The specific day doesn't matter — archive
 	// patterns use Year / Mon only.
-	t := firstOfMonth(year, month)
+	t := firstOfMonth(year, month, s.resolveTZ())
 	return s.FormatArchiveDate(t)
 }
 

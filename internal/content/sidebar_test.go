@@ -3,10 +3,29 @@ package content
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/serendipitynz/serenebach/internal/domain"
 	"github.com/serendipitynz/serenebach/internal/template/sbtemplate"
 )
+
+// TestArchiveLabelHonoursSiteTZ guards against the regression where
+// the synthetic "first of the month" was built in UTC while the
+// formatter projected it into s.TZ — for negative-offset zones that
+// rolled the rendered label back to the previous month even though
+// the URL still said the requested month.
+func TestArchiveLabelHonoursSiteTZ(t *testing.T) {
+	t.Parallel()
+
+	ny, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Skipf("LoadLocation: %v", err)
+	}
+	site := NewSite(domain.Weblog{Lang: "ja"}).WithTZ(ny)
+	if got, want := archiveLabelFor(site, 2026, 1), "2026-01"; got != want {
+		t.Errorf("archiveLabelFor = %q, want %q", got, want)
+	}
+}
 
 func TestApplyCategorySidebarBlockEmitsNestedSubcategoryList(t *testing.T) {
 	t.Parallel()
