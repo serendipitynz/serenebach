@@ -771,31 +771,34 @@ func TestBuildLeavesNoStagingOrBackupDirsOnSuccess(t *testing.T) {
 }
 
 // TestBuildCleansStagingDirOnFailure verifies the "always
-// best-effort clean staging on exit" defer: a build that succeeds
-// once and then fails mid-flight must not leave a `.sb-rebuild-*`
-// dir under OutDir. Operators frequently rsync OutDir straight to
-// a static host; leftover staging would either ship to production
-// or trigger noisy "unexpected files" warnings.
+// best-effort clean staging on exit" defer: when render or write
+// fails AFTER MkdirTemp creates the staging dir, the defer must
+// still tear it down. Operators frequently rsync OutDir straight
+// to a static host; leftover staging would either ship to
+// production or trigger noisy "unexpected files" warnings.
+//
+// To exercise the post-MkdirTemp failure path we drop entry_tags
+// after a successful first build. Pre-staging fetches in Build
+// (weblog / template / entries / sidebar / custom tags) do not
+// touch entry_tags, so MkdirTemp succeeds and writeHome's
+// tagsForEntries logs-and-continues; writeEntries then fails on
+// TagsByEntry, which returns an error — exactly the contract we
+// want the defer to clean up after.
 func TestBuildCleansStagingDirOnFailure(t *testing.T) {
 	a := newSeededApp(t)
 	out := filepath.Join(t.TempDir(), "public")
 
-	// First build succeeds and seeds the live snapshot, ensuring out
-	// exists and contains the previous tree.
+	// First build succeeds and seeds the live snapshot.
 	if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
 		t.Fatalf("initial Build: %v", err)
 	}
 
-	// Force the next build to fail after staging is created. Removing
-	// the active template trips the loader before staging would be
-	// created in this path; the previous snapshot guarantees out exists,
-	// so the directory listing below is meaningful regardless.
-	if _, err := a.DB.ExecContext(context.Background(),
-		`DELETE FROM templates WHERE is_active = 1`); err != nil {
+	// Drop entry_tags so writeEntries fails after staging is created.
+	if _, err := a.DB.ExecContext(context.Background(), `DROP TABLE entry_tags`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{OutDir: out, WID: 1}); err == nil {
-		t.Fatal("expected Build to fail without an active template")
+		t.Fatal("expected Build to fail with entry_tags dropped")
 	}
 
 	dirEntries, err := os.ReadDir(out)

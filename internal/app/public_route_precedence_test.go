@@ -1,8 +1,11 @@
 package app_test
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -108,30 +111,47 @@ func TestPublicRouteTagBuiltInBeatsFlatPage(t *testing.T) {
 
 // TestPublicRouteImgFileServerWinsOverPage confirms the /img/* file
 // server registered at the root mux outranks the public catch-all
-// flat-page handler. /img/missing.png must 404 from the static
-// FileServer (or pass to the catch-all 404), never serve a flat page
-// even when the DB carries `/img/missing.png` as a page slug.
+// flat-page handler. A real PNG is dropped under a.Config.ImageDir
+// and a forged flat page is planted at the matching slug; the
+// request must come back 200 with the file bytes, not the page
+// body. Asserting the file content (and not just "non-page") is
+// what locks in "the named /img/* route really won" — accepting
+// only "anything but the page" would still pass if the FileServer
+// were removed and the catch-all returned 404.
 func TestPublicRouteImgFileServerWinsOverPage(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
 	now := time.Now().Unix()
 
-	if _, err := a.DB.Exec(`INSERT INTO pages (wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at)
-		VALUES (1, 1, 'forged', 'FORGED-IMG-PAGE', 'html', '/img/missing.png', 0, 0, 1, '', ?, ?)`, now, now); err != nil {
+	// Real PNG file under the test app's ImageDir.
+	pngBytes := []byte("\x89PNG\r\n\x1a\nFIXTURE")
+	imgPath := filepath.Join(a.Config.ImageDir, "fixture.png")
+	if err := os.MkdirAll(a.Config.ImageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(imgPath, pngBytes, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest("GET", "/img/missing.png", nil)
+	// Forged flat page at the same path so a regression that skips the
+	// /img/* FileServer would surface FORGED-IMG-PAGE in the response.
+	if _, err := a.DB.Exec(`INSERT INTO pages (wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at)
+		VALUES (1, 1, 'forged', 'FORGED-IMG-PAGE', 'html', '/img/fixture.png', 0, 0, 1, '', ?, ?)`, now, now); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("GET", "/img/fixture.png", nil)
 	w := httptest.NewRecorder()
 	a.Handler().ServeHTTP(w, req)
-	if strings.Contains(w.Body.String(), "FORGED-IMG-PAGE") {
-		t.Errorf("flat-page body leaked into /img/...")
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
 	}
-	// Status is whatever the FileServer chose for a missing asset
-	// (404). The point of the assertion is the body content, not the
-	// exact code.
-	if w.Code == http.StatusOK {
-		t.Errorf("/img/missing.png returned 200 unexpectedly")
+	if !bytes.Equal(w.Body.Bytes(), pngBytes) {
+		t.Errorf("body bytes do not match the seeded PNG; FileServer did not handle the request")
+	}
+	if strings.Contains(w.Body.String(), "FORGED-IMG-PAGE") {
+		t.Errorf("flat-page body leaked into /img/fixture.png")
 	}
 }
 
