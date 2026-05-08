@@ -228,6 +228,24 @@ func New(cfg *config.Config) (*App, error) {
 		return err
 	}
 
+	// Build the static asset handlers up front so any FS error
+	// (missing parent directory we cannot create, EACCES, etc.)
+	// fails the App constructor instead of being smuggled into a
+	// request handler closure that has no error channel.
+	var imgFS, tmplFS http.Handler
+	if cfg.ImageDir != "" {
+		imgFS, err = rootedFileServer(cfg.ImageDir, "/img/")
+		if err != nil {
+			return nil, fmt.Errorf("img file server: %w", err)
+		}
+	}
+	if cfg.TemplateDir != "" {
+		tmplFS, err = rootedFileServer(cfg.TemplateDir, "/template/")
+		if err != nil {
+			return nil, fmt.Errorf("template file server: %w", err)
+		}
+	}
+
 	r := chi.NewRouter()
 	// Inject the deployment base path into every request context so
 	// handlers and templates can generate correct URLs without knowing
@@ -313,20 +331,19 @@ func New(cfg *config.Config) (*App, error) {
 			publicH.Mount(r)
 		})
 
-		// /img/* serves uploaded media straight from disk. chi's
-		// FileServer pattern requires the wildcard suffix so the Dir
-		// handler receives the sub-path. Read-only by construction.
-		if cfg.ImageDir != "" {
-			fs := http.StripPrefix("/img/", http.FileServer(http.Dir(cfg.ImageDir)))
-			r.Get("/img/*", fs.ServeHTTP)
-			r.Head("/img/*", fs.ServeHTTP)
+		// /img/* serves uploaded media straight from disk. Backed by
+		// os.Root so traversal via "../" or symlinks pointing outside
+		// the configured root is rejected at the syscall layer rather
+		// than relying on URL cleaning alone. Read-only by construction.
+		if imgFS != nil {
+			r.Get("/img/*", imgFS.ServeHTTP)
+			r.Head("/img/*", imgFS.ServeHTTP)
 		}
 		// /template/<id>/<file> — logos, backgrounds, any asset
 		// referenced via the {site_parts} tag.
-		if cfg.TemplateDir != "" {
-			fs := http.StripPrefix("/template/", http.FileServer(http.Dir(cfg.TemplateDir)))
-			r.Get("/template/*", fs.ServeHTTP)
-			r.Head("/template/*", fs.ServeHTTP)
+		if tmplFS != nil {
+			r.Get("/template/*", tmplFS.ServeHTTP)
+			r.Head("/template/*", tmplFS.ServeHTTP)
 		}
 	})
 
