@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/serendipitynz/serenebach/internal/domain"
@@ -226,6 +227,37 @@ func TestMCPTokenPrefix(t *testing.T) {
 	tokens, _ := s.ListMCPTokens(ctx, 1)
 	if tokens[0].Prefix != "abcdefghijkl" {
 		t.Errorf("prefix = %q, want abcdefghijkl (first 12 chars)", tokens[0].Prefix)
+	}
+}
+
+func TestMCPTokenListOrdering(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	ids := make([]int64, 3)
+	for i := 0; i < 3; i++ {
+		id, err := s.CreateMCPToken(ctx, 1, fmt.Sprintf("Token %d", i),
+			fmt.Sprintf("sb_order_%d", i), domain.MCPScopeRead, 1)
+		if err != nil {
+			t.Fatalf("CreateMCPToken %d: %v", i, err)
+		}
+		ids[i] = id
+	}
+
+	tokens, err := s.ListMCPTokens(ctx, 1)
+	if err != nil {
+		t.Fatalf("ListMCPTokens: %v", err)
+	}
+	if len(tokens) != 3 {
+		t.Fatalf("len = %d, want 3", len(tokens))
+	}
+
+	// newest-first: created_at DESC, id DESC. Within the same second (same
+	// created_at), ids should appear in descending order — the most recently
+	// created token (highest id) comes first.
+	if tokens[0].ID != ids[2] || tokens[1].ID != ids[1] || tokens[2].ID != ids[0] {
+		t.Errorf("order = %d %d %d, want %d %d %d (newest first)",
+			tokens[0].ID, tokens[1].ID, tokens[2].ID, ids[2], ids[1], ids[0])
 	}
 }
 

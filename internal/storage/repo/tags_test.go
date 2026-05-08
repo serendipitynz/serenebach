@@ -283,6 +283,125 @@ func TestSetEntryTags(t *testing.T) {
 	}
 }
 
+func TestPublishedEntriesByTagFiltering(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	tagID, err := s.CreateTag(ctx, domain.Tag{WID: 1, Name: "Test", Slug: "test"})
+	if err != nil {
+		t.Fatalf("CreateTag: %v", err)
+	}
+	otherTagID, err := s.CreateTag(ctx, domain.Tag{WID: 2, Name: "Other", Slug: "other"})
+	if err != nil {
+		t.Fatalf("CreateTag wid=2: %v", err)
+	}
+
+	// Create published entries for WID 1 tagged "test"
+	pub1, err := s.CreateEntry(ctx, domain.Entry{
+		WID: 1, AuthorID: 1, Title: "Published 1", Body: "body",
+		Format: "markdown", Status: domain.EntryPublished,
+	})
+	if err != nil {
+		t.Fatalf("CreateEntry pub1: %v", err)
+	}
+	pub2, err := s.CreateEntry(ctx, domain.Entry{
+		WID: 1, AuthorID: 1, Title: "Published 2", Body: "body",
+		Format: "markdown", Status: domain.EntryPublished,
+	})
+	if err != nil {
+		t.Fatalf("CreateEntry pub2: %v", err)
+	}
+
+	// Create draft and closed entries for WID 1 tagged "test"
+	draftID, err := s.CreateEntry(ctx, domain.Entry{
+		WID: 1, AuthorID: 1, Title: "Draft", Body: "body",
+		Format: "markdown", Status: domain.EntryDraft,
+	})
+	if err != nil {
+		t.Fatalf("CreateEntry draft: %v", err)
+	}
+	closedID, err := s.CreateEntry(ctx, domain.Entry{
+		WID: 1, AuthorID: 1, Title: "Closed", Body: "body",
+		Format: "markdown", Status: domain.EntryClosed,
+	})
+	if err != nil {
+		t.Fatalf("CreateEntry closed: %v", err)
+	}
+
+	// Create an entry on WID 2 tagged "other" (different WID, same tag concept)
+	otherEntryID, err := s.CreateEntry(ctx, domain.Entry{
+		WID: 2, AuthorID: 1, Title: "Other WID", Body: "body",
+		Format: "markdown", Status: domain.EntryPublished,
+	})
+	if err != nil {
+		t.Fatalf("CreateEntry wid=2: %v", err)
+	}
+
+	// Assign tag to all WID 1 entries
+	if err := s.SetEntryTags(ctx, pub1, []int64{tagID}); err != nil {
+		t.Fatalf("SetEntryTags pub1: %v", err)
+	}
+	if err := s.SetEntryTags(ctx, pub2, []int64{tagID}); err != nil {
+		t.Fatalf("SetEntryTags pub2: %v", err)
+	}
+	if err := s.SetEntryTags(ctx, draftID, []int64{tagID}); err != nil {
+		t.Fatalf("SetEntryTags draft: %v", err)
+	}
+	if err := s.SetEntryTags(ctx, closedID, []int64{tagID}); err != nil {
+		t.Fatalf("SetEntryTags closed: %v", err)
+	}
+	// Other WID entry tagged with otherTagID
+	if err := s.SetEntryTags(ctx, otherEntryID, []int64{otherTagID}); err != nil {
+		t.Fatalf("SetEntryTags other: %v", err)
+	}
+
+	// PublishedEntriesByTag should return only published entries from WID 1
+	entries, err := s.PublishedEntriesByTag(ctx, 1, tagID, 100)
+	if err != nil {
+		t.Fatalf("PublishedEntriesByTag: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("PublishedEntriesByTag len = %d, want 2", len(entries))
+	}
+	for _, e := range entries {
+		if e.Status != domain.EntryPublished {
+			t.Errorf("unexpected status %d for entry %q", e.Status, e.Title)
+		}
+		if e.WID != 1 {
+			t.Errorf("unexpected wid %d for entry %q", e.WID, e.Title)
+		}
+	}
+
+	// CountPublishedEntriesByTag should count only published from this WID
+	count, err := s.CountPublishedEntriesByTag(ctx, 1, tagID)
+	if err != nil {
+		t.Fatalf("CountPublishedEntriesByTag: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("CountPublishedEntriesByTag = %d, want 2", count)
+	}
+
+	// PublishedEntriesByTagPage with limit=1 offset=0
+	page, err := s.PublishedEntriesByTagPage(ctx, 1, tagID, 1, 0)
+	if err != nil {
+		t.Fatalf("PublishedEntriesByTagPage page 1: %v", err)
+	}
+	if len(page) != 1 {
+		t.Fatalf("page 1 len = %d, want 1", len(page))
+	}
+	// Second page
+	page2, err := s.PublishedEntriesByTagPage(ctx, 1, tagID, 1, 1)
+	if err != nil {
+		t.Fatalf("PublishedEntriesByTagPage page 2: %v", err)
+	}
+	if len(page2) != 1 {
+		t.Fatalf("page 2 len = %d, want 1", len(page2))
+	}
+	if page[0].ID == page2[0].ID {
+		t.Error("page 1 and page 2 should have different entries")
+	}
+}
+
 func TestDeriveTagSlug(t *testing.T) {
 	tests := []struct {
 		name string
