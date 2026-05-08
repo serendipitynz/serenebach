@@ -15,6 +15,7 @@ package sbtemplate
 
 import (
 	"fmt"
+	"html"
 	"regexp"
 	"sort"
 	"strings"
@@ -204,8 +205,27 @@ func (t *Template) New() *Context {
 	}
 }
 
-// Tag records a value for {name} at the current iteration index (set via Num).
+// Tag records a plain-text value for {name} at the current iteration index
+// (set via Num). The value is HTML-escaped before storage so that callers
+// don't have to remember to wrap user-controlled strings — the safe path is
+// the default. Use TagHTML when the value is a pre-rendered HTML fragment
+// that must not be re-escaped (anchors, list markup, formatter output, …).
 func (c *Context) Tag(name, value string) {
+	c.tagRaw(name, html.EscapeString(value))
+}
+
+// TagHTML records a pre-rendered HTML fragment for {name}. The value is
+// stored verbatim — callers are responsible for any escaping inside the
+// fragment (URL pieces, embedded text). Use this for SB3-shaped tags like
+// {entry_time} that wrap their value in markup.
+func (c *Context) TagHTML(name, fragment string) {
+	c.tagRaw(name, fragment)
+}
+
+// tagRaw is the shared underlying setter — both Tag and TagHTML push into
+// the same per-iteration slice; the only difference is whether the caller
+// pre-escaped the value.
+func (c *Context) tagRaw(name, value string) {
 	key := "{" + name + "}"
 	vals := c.tags[key]
 	for len(vals) <= c.num {

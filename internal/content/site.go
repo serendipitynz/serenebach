@@ -47,7 +47,7 @@ func applyProfileBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Template,
 			name = u.Name
 		}
 		b.WriteString(`<li><a href="`)
-		b.WriteString(s.TopURL())
+		b.WriteString(html.EscapeString(s.TopURL()))
 		b.WriteString(`profile/`)
 		b.WriteString(strconv.FormatInt(u.ID, 10))
 		b.WriteString(`/">`)
@@ -56,7 +56,7 @@ func applyProfileBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Template,
 	}
 	b.WriteString("</ul>")
 	c.Num(0)
-	c.Tag("user_list", b.String())
+	c.TagHTML("user_list", b.String())
 	c.Block("profile", 1)
 }
 
@@ -78,14 +78,14 @@ func applyProfileAreaBlock(c *sbtemplate.Context, tmpl *sbtemplate.Template, u d
 	disp := displayName(u)
 	c.Num(0)
 	c.Tag("profile_id", strconv.FormatInt(u.ID, 10))
-	c.Tag("profile_name", html.EscapeString(disp))
-	c.Tag("profile_login", html.EscapeString(u.Name))
-	c.Tag("profile_description", renderDescription(u.Description, u.DescriptionFormat))
+	c.Tag("profile_name", disp)
+	c.Tag("profile_login", u.Name)
+	c.TagHTML("profile_description", renderDescription(u.Description, u.DescriptionFormat))
 	c.Tag("profile_email", "")
 	c.Tag("user_id", strconv.FormatInt(u.ID, 10))
-	c.Tag("user_name", html.EscapeString(u.Name))
-	c.Tag("user_disp_name", html.EscapeString(disp))
-	c.Tag("user_login", html.EscapeString(u.Name))
+	c.Tag("user_name", u.Name)
+	c.Tag("user_disp_name", disp)
+	c.Tag("user_login", u.Name)
 	c.Block("profile_area", 1)
 }
 
@@ -124,7 +124,7 @@ func applyCategoryAreaBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Temp
 	c.Num(0)
 	c.Tag("category_pagename", cat.Name)
 	c.Tag("category_fullname", categoryFullname(*cat, all))
-	c.Tag("category_description", renderDescription(cat.Description, cat.DescriptionFormat))
+	c.TagHTML("category_description", renderDescription(cat.Description, cat.DescriptionFormat))
 	c.Block("category_area", 1)
 }
 
@@ -470,7 +470,7 @@ func (s Site) Apply(c *sbtemplate.Context) {
 	// Title block tags — SB3 emits {blog_name} as a <a href="top/">
 	// anchor; templates that want the plain form use {blog_name_only}.
 	c.Tag("blog_name_only", s.Weblog.Title)
-	c.Tag("blog_name",
+	c.TagHTML("blog_name",
 		`<a href="`+html.EscapeString(s.TopURL())+`">`+html.EscapeString(s.Weblog.Title)+`</a>`)
 	c.Tag("blog_description", s.Weblog.Description)
 	// Pagination tags — populated by a future handler that wires real
@@ -485,7 +485,7 @@ func (s Site) Apply(c *sbtemplate.Context) {
 	// User-defined custom tags — raw HTML, injected after every built-in
 	// tag so they can reference (or shadow) standard names if desired.
 	for _, ct := range s.CustomTags {
-		c.Tag(ct.Name, ct.Value)
+		c.TagHTML(ct.Name, ct.Value)
 	}
 }
 

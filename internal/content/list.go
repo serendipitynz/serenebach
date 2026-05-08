@@ -91,8 +91,8 @@ func (v ListView) Render() (string, error) {
 	if v.Category != nil {
 		catLink := html.EscapeString(v.Site.CategoryPermalink(*v.Category))
 		catName := html.EscapeString(v.Category.Name)
-		c.Tag("category_name", `<a href="`+catLink+`">`+catName+`</a>`)
-		c.Tag("category_description", renderDescription(v.Category.Description, v.Category.DescriptionFormat))
+		c.TagHTML("category_name", `<a href="`+catLink+`">`+catName+`</a>`)
+		c.TagHTML("category_description", renderDescription(v.Category.Description, v.Category.DescriptionFormat))
 	}
 	applyCategoryAreaBlock(v.Site, c, tmpl, v.Category, v.Categories)
 
@@ -114,16 +114,16 @@ func (v ListView) Render() (string, error) {
 		c.Tag("entry_title", e.Title)
 		c.Tag("entry_date", v.Site.FormatListDate(e.PostedAt))
 		permalink := html.EscapeString(v.Site.EntryPermalink(e))
-		timeStr := html.EscapeString(v.Site.FormatEntryTime(e.PostedAt))
-		c.Tag("entry_time", `<a href="`+permalink+`">`+timeStr+`</a>`)
+		timeStr := v.Site.FormatEntryTime(e.PostedAt)
+		c.TagHTML("entry_time", `<a href="`+permalink+`">`+html.EscapeString(timeStr)+`</a>`)
 		c.Tag("entry_disp_time", timeStr)
-		c.Tag("entry_description", formatBody(e.Body, e.Format, "list.body"))
+		c.TagHTML("entry_description", formatBody(e.Body, e.Format, "list.body"))
 		if e.More != "" {
 			label := v.Site.ReadMoreLabel
 			if label == "" {
 				label = "read more ..."
 			}
-			c.Tag("entry_sequel", `<a href="`+permalink+`#sequel">`+html.EscapeString(label)+`</a>`)
+			c.TagHTML("entry_sequel", `<a href="`+permalink+`#sequel">`+html.EscapeString(label)+`</a>`)
 		} else {
 			c.Tag("entry_sequel", "")
 		}
@@ -135,23 +135,23 @@ func (v ListView) Render() (string, error) {
 		c.Tag("entry_keywords", e.Keywords)
 		c.Tag("entry_keyword", e.Keywords)
 		c.Tag("permalink", v.Site.EntryPermalink(e))
-		c.Tag("entry_tags", renderTagsFragment(v.Site, v.Tags[e.ID]))
+		c.TagHTML("entry_tags", renderTagsFragment(v.Site, v.Tags[e.ID]))
 		// {comment_num} / {comment_count}: list pages always show the
 		// link (comments are "accepted" on list regardless of mode).
 		// The count comes from the denormalised CommentsCount column.
 		label := commentNumLabel(v.Site.CommentNumLabel, e.CommentsCount)
 		href := html.EscapeString(v.Site.EntryPermalink(e) + "#comments")
-		c.Tag("comment_num", `<a href="`+href+`">`+label+`</a>`)
+		c.TagHTML("comment_num", `<a href="`+href+`">`+html.EscapeString(label)+`</a>`)
 		c.Tag("comment_count", strconv.FormatInt(e.CommentsCount, 10))
 		// SB3 emits a scroll anchor on list pages so permalinks can
 		// jump straight to the entry. The DefaultCallback already
 		// injected {sb_entry_marking} at the top of the entry block.
-		c.Tag("sb_entry_marking", `<a id="mark`+strconv.FormatInt(e.ID, 10)+`"></a>`)
+		c.TagHTML("sb_entry_marking", `<a id="mark`+strconv.FormatInt(e.ID, 10)+`"></a>`)
 
 		if cat, ok := v.Categories[e.CategoryID]; ok {
 			catLink := html.EscapeString(v.Site.CategoryPermalink(cat))
 			catName := html.EscapeString(cat.Name)
-			c.Tag("category_name", `<a href="`+catLink+`">`+catName+`</a>`)
+			c.TagHTML("category_name", `<a href="`+catLink+`">`+catName+`</a>`)
 			c.Tag("category_id", strconv.FormatInt(cat.ID, 10))
 			c.Tag("category_disp_name", cat.Name)
 		} else {
@@ -162,11 +162,11 @@ func (v ListView) Render() (string, error) {
 		if u, ok := v.Users[e.AuthorID]; ok {
 			// See entry.go for the SB3 semantics — user_name is the
 			// login name, user_disp_name is the display name. Both
-			// are self-edited, so escape on emission.
+			// are self-edited; Tag auto-escapes on emission.
 			disp := displayName(u)
-			c.Tag("user_name", html.EscapeString(u.Name))
-			c.Tag("user_disp_name", html.EscapeString(disp))
-			c.Tag("user_login", html.EscapeString(u.Name))
+			c.Tag("user_name", u.Name)
+			c.Tag("user_disp_name", disp)
+			c.Tag("user_login", u.Name)
 			c.Tag("user_id", strconv.FormatInt(u.ID, 10))
 		} else {
 			c.Tag("user_name", "")
