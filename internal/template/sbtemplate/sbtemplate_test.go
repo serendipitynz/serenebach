@@ -32,6 +32,31 @@ func TestSimpleTagSubstitution(t *testing.T) {
 	}
 }
 
+func TestTagAutoEscapesPlainText(t *testing.T) {
+	// Tag is the safe-by-default setter — anything user-controlled must
+	// land in the rendered HTML as escaped text, never as live markup.
+	c := mustParse(t, "{x}\n").New()
+	c.Tag("x", `<script>alert('xss')</script>`)
+	got := c.Render()
+	if strings.Contains(got, "<script>") {
+		t.Errorf("Tag must escape HTML, raw <script> leaked: %q", got)
+	}
+	if !strings.Contains(got, "&lt;script&gt;") {
+		t.Errorf("Tag should produce &lt;script&gt;, got %q", got)
+	}
+}
+
+func TestTagHTMLPassesThroughFragment(t *testing.T) {
+	// TagHTML is the explicit raw-fragment setter for SB3-style tags
+	// like {entry_time} that ship pre-built anchor markup.
+	c := mustParse(t, "{x}\n").New()
+	c.TagHTML("x", `<a href="https://example.com/">link</a>`)
+	got := c.Render()
+	if !strings.Contains(got, `<a href="https://example.com/">link</a>`) {
+		t.Errorf("TagHTML must pass markup through unchanged, got %q", got)
+	}
+}
+
 func TestUnsetTagBecomesEmpty(t *testing.T) {
 	got := mustParse(t, "[{missing}]\n").New().Render()
 	if got != "[]\n" {
