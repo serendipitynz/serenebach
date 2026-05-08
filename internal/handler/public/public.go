@@ -533,7 +533,7 @@ const defaultSidebarLatestLimit = 5
 // to empty slices — a missing sidebar is always better than a 500.
 func (h *Handler) loadSidebarData(ctx context.Context, logTag string) content.SidebarData {
 	var out content.SidebarData
-	if periods, err := h.Store.ArchivePeriodsWithCounts(ctx, h.WID); err == nil {
+	if periods, err := h.Store.ArchivePeriodsWithCounts(ctx, h.WID, h.tz()); err == nil {
 		out.Archives = periods
 	} else {
 		log.Printf("%s: archives: %v", logTag, err)

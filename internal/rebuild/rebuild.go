@@ -157,7 +157,7 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 	}
 	// SB3 sidebar block data is rebuilt once per Build() — identical
 	// across every page the rebuild emits.
-	sidebar, err := loadSidebarData(ctx, store, opts.WID)
+	sidebar, err := loadSidebarData(ctx, store, opts.WID, opts.TZ)
 	if err != nil {
 		return nil, fmt.Errorf("rebuild: load sidebar: %w", err)
 	}
@@ -374,9 +374,9 @@ func writeHome(ctx context.Context, store *repo.Store, outDir string, site conte
 // loadSidebarData mirrors the public handler's sidebar-inputs
 // loader — every block gates on HasBlock at render time, so a
 // missing input slice is always safe to pass through.
-func loadSidebarData(ctx context.Context, store *repo.Store, wid int64) (content.SidebarData, error) {
+func loadSidebarData(ctx context.Context, store *repo.Store, wid int64, loc *time.Location) (content.SidebarData, error) {
 	var out content.SidebarData
-	periods, err := store.ArchivePeriodsWithCounts(ctx, wid)
+	periods, err := store.ArchivePeriodsWithCounts(ctx, wid, loc)
 	if err != nil {
 		return out, fmt.Errorf("archives: %w", err)
 	}
@@ -582,7 +582,7 @@ func writeTags(ctx context.Context, store *repo.Store, opts Options, site conten
 }
 
 func writeArchives(ctx context.Context, store *repo.Store, opts Options, site content.Site, tmpl *domain.Template, cats map[int64]domain.Category, users map[int64]domain.User, profileUsers []domain.User, sidebar content.SidebarData, rep *Report) error {
-	periods, err := store.ArchivePeriods(ctx, opts.WID)
+	periods, err := store.ArchivePeriods(ctx, opts.WID, opts.TZ)
 	if err != nil {
 		return fmt.Errorf("rebuild: archive periods: %w", err)
 	}
