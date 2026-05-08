@@ -27,8 +27,7 @@ const (
 )
 
 type loginAttempt struct {
-	failures  []time.Time
-	blockedAt time.Time
+	failures []time.Time
 }
 
 type loginLimiter struct {
