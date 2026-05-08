@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -1088,31 +1089,47 @@ type ArchivePeriod struct {
 }
 
 // ArchivePeriodsWithCounts is ArchivePeriods + an entry-count per
-// bucket, for the sidebar `{archives_list}` fragment. One GROUP BY
-// keeps it to a single scan.
-func (s *Store) ArchivePeriodsWithCounts(ctx context.Context, wid int64) ([]ArchivePeriod, error) {
+// bucket, for the sidebar `{archives_list}` fragment. The (year,
+// month) bucket is computed against loc so the sidebar agrees with
+// the archive range queries that also key off the configured
+// timezone — without this they diverge for entries posted within a
+// few hours of midnight UTC. Pass nil for time.Local.
+func (s *Store) ArchivePeriodsWithCounts(ctx context.Context, wid int64, loc *time.Location) ([]ArchivePeriod, error) {
+	if loc == nil {
+		loc = time.Local
+	}
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT
-			CAST(strftime('%Y', datetime(posted_at, 'unixepoch')) AS INTEGER) AS y,
-			CAST(strftime('%m', datetime(posted_at, 'unixepoch')) AS INTEGER) AS m,
-			COUNT(*) AS c
+		SELECT posted_at
 		FROM entries
-		WHERE wid = ? AND status = ?
-		GROUP BY y, m
-		ORDER BY y DESC, m DESC`, wid, domain.EntryPublished)
+		WHERE wid = ? AND status = ?`, wid, domain.EntryPublished)
 	if err != nil {
 		return nil, fmt.Errorf("repo: ArchivePeriodsWithCounts: %w", err)
 	}
 	defer rows.Close()
-	var out []ArchivePeriod
+	type key struct{ y, m int }
+	counts := map[key]int64{}
 	for rows.Next() {
-		var p ArchivePeriod
-		if err := rows.Scan(&p.Year, &p.Month, &p.Count); err != nil {
+		var ts int64
+		if err := rows.Scan(&ts); err != nil {
 			return nil, fmt.Errorf("repo: scan period: %w", err)
 		}
-		out = append(out, p)
+		t := time.Unix(ts, 0).In(loc)
+		counts[key{t.Year(), int(t.Month())}]++
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	out := make([]ArchivePeriod, 0, len(counts))
+	for k, c := range counts {
+		out = append(out, ArchivePeriod{Year: k.y, Month: k.m, Count: c})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Year != out[j].Year {
+			return out[i].Year > out[j].Year
+		}
+		return out[i].Month > out[j].Month
+	})
+	return out, nil
 }
 
 // RecentApprovedMessage bundles one comment + its entry's title so the
@@ -1155,29 +1172,47 @@ func (s *Store) RecentApprovedMessages(ctx context.Context, wid int64, limit int
 }
 
 // ArchivePeriods returns every distinct (year, month) pair for which the
-// weblog has at least one published entry, newest first. Uses SQLite's
-// strftime to extract fields from the integer unix timestamp.
-func (s *Store) ArchivePeriods(ctx context.Context, wid int64) ([]ArchivePeriod, error) {
+// weblog has at least one published entry, newest first. The bucket is
+// computed in loc — passing nil falls back to time.Local — so the
+// rebuild emits the same per-month archive files the
+// ArchivePeriodsWithCounts sidebar links to. Without a shared zone the
+// two would disagree for posts within a few hours of UTC midnight.
+func (s *Store) ArchivePeriods(ctx context.Context, wid int64, loc *time.Location) ([]ArchivePeriod, error) {
+	if loc == nil {
+		loc = time.Local
+	}
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT DISTINCT
-			CAST(strftime('%Y', datetime(posted_at, 'unixepoch')) AS INTEGER) AS y,
-			CAST(strftime('%m', datetime(posted_at, 'unixepoch')) AS INTEGER) AS m
+		SELECT posted_at
 		FROM entries
-		WHERE wid = ? AND status = ?
-		ORDER BY y DESC, m DESC`, wid, domain.EntryPublished)
+		WHERE wid = ? AND status = ?`, wid, domain.EntryPublished)
 	if err != nil {
 		return nil, fmt.Errorf("repo: ArchivePeriods: %w", err)
 	}
 	defer rows.Close()
-	var out []ArchivePeriod
+	type key struct{ y, m int }
+	seen := map[key]struct{}{}
 	for rows.Next() {
-		var p ArchivePeriod
-		if err := rows.Scan(&p.Year, &p.Month); err != nil {
+		var ts int64
+		if err := rows.Scan(&ts); err != nil {
 			return nil, fmt.Errorf("repo: scan period: %w", err)
 		}
-		out = append(out, p)
+		t := time.Unix(ts, 0).In(loc)
+		seen[key{t.Year(), int(t.Month())}] = struct{}{}
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	out := make([]ArchivePeriod, 0, len(seen))
+	for k := range seen {
+		out = append(out, ArchivePeriod{Year: k.y, Month: k.m})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Year != out[j].Year {
+			return out[i].Year > out[j].Year
+		}
+		return out[i].Month > out[j].Month
+	})
+	return out, nil
 }
 
 // SearchPublishedEntries returns published entries whose title, body,

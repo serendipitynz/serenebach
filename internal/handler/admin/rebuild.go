@@ -34,6 +34,12 @@ type Rebuilder struct {
 	// TemplateDir is the source for per-template assets; mirrored into
 	// OutDir/template during rebuild. Empty means "skip".
 	TemplateDir string
+	// TZ is forwarded to rebuild.Options so archive year/month
+	// boundaries are bucketed in the configured timezone instead
+	// of the host clock. Nil falls back to time.Local in
+	// rebuild.Build, preserving the historical behaviour for
+	// callers that haven't been updated.
+	TZ *time.Location
 
 	mu       sync.Mutex
 	running  bool
@@ -75,6 +81,7 @@ func (rb *Rebuilder) Run(ctx context.Context, store *repo.Store, wid int64) (*re
 		BasePath:       rb.BasePath,
 		ImageDir:       rb.ImageDir,
 		TemplateDir:    rb.TemplateDir,
+		TZ:             rb.TZ,
 	})
 }
 

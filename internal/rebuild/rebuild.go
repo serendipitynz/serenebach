@@ -68,6 +68,12 @@ type Options struct {
 	// static snapshot carries every template's asset folder alongside
 	// the HTML. Empty means "skip template asset copy".
 	TemplateDir string
+	// TZ is the timezone used to bucket entries into year/month
+	// archive ranges. Nil falls back to time.Local so older callers
+	// (and tests) keep working. cmd/serenebach forwards config.TZ so
+	// the deployed binary renders identical archives regardless of
+	// the host clock.
+	TZ *time.Location
 }
 
 // Build generates the full static snapshot.
@@ -100,6 +106,9 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 	}
 	if opts.WID == 0 {
 		opts.WID = 1
+	}
+	if opts.TZ == nil {
+		opts.TZ = time.Local
 	}
 	weblog, err := store.WeblogByID(ctx, opts.WID)
 	if err != nil {
@@ -148,7 +157,7 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 	}
 	// SB3 sidebar block data is rebuilt once per Build() — identical
 	// across every page the rebuild emits.
-	sidebar, err := loadSidebarData(ctx, store, opts.WID)
+	sidebar, err := loadSidebarData(ctx, store, opts.WID, opts.TZ)
 	if err != nil {
 		return nil, fmt.Errorf("rebuild: load sidebar: %w", err)
 	}
@@ -157,7 +166,7 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 	if err != nil {
 		return nil, fmt.Errorf("rebuild: load custom tags: %w", err)
 	}
-	site := content.NewSite(*weblog).WithBasePath(opts.BasePath).WithCustomTags(customTags)
+	site := content.NewSite(*weblog).WithBasePath(opts.BasePath).WithCustomTags(customTags).WithTZ(opts.TZ)
 	finalOut := opts.OutDir
 	rep := &Report{OutDir: finalOut}
 
@@ -365,9 +374,9 @@ func writeHome(ctx context.Context, store *repo.Store, outDir string, site conte
 // loadSidebarData mirrors the public handler's sidebar-inputs
 // loader — every block gates on HasBlock at render time, so a
 // missing input slice is always safe to pass through.
-func loadSidebarData(ctx context.Context, store *repo.Store, wid int64) (content.SidebarData, error) {
+func loadSidebarData(ctx context.Context, store *repo.Store, wid int64, loc *time.Location) (content.SidebarData, error) {
 	var out content.SidebarData
-	periods, err := store.ArchivePeriodsWithCounts(ctx, wid)
+	periods, err := store.ArchivePeriodsWithCounts(ctx, wid, loc)
 	if err != nil {
 		return out, fmt.Errorf("archives: %w", err)
 	}
@@ -573,7 +582,7 @@ func writeTags(ctx context.Context, store *repo.Store, opts Options, site conten
 }
 
 func writeArchives(ctx context.Context, store *repo.Store, opts Options, site content.Site, tmpl *domain.Template, cats map[int64]domain.Category, users map[int64]domain.User, profileUsers []domain.User, sidebar content.SidebarData, rep *Report) error {
-	periods, err := store.ArchivePeriods(ctx, opts.WID)
+	periods, err := store.ArchivePeriods(ctx, opts.WID, opts.TZ)
 	if err != nil {
 		return fmt.Errorf("rebuild: archive periods: %w", err)
 	}
@@ -583,7 +592,7 @@ func writeArchives(ctx context.Context, store *repo.Store, opts Options, site co
 		// Year index — write once per year on first occurrence.
 		if _, done := yearSeen[p.Year]; !done {
 			yearSeen[p.Year] = struct{}{}
-			from := time.Date(p.Year, time.January, 1, 0, 0, 0, 0, time.Local)
+			from := time.Date(p.Year, time.January, 1, 0, 0, 0, 0, opts.TZ)
 			to := from.AddDate(1, 0, 0)
 			entries, err := store.PublishedEntriesInRange(ctx, opts.WID, from, to, opts.EntryListLimit)
 			if err != nil {
@@ -612,7 +621,7 @@ func writeArchives(ctx context.Context, store *repo.Store, opts Options, site co
 		}
 
 		// Month index.
-		from := time.Date(p.Year, time.Month(p.Month), 1, 0, 0, 0, 0, time.Local)
+		from := time.Date(p.Year, time.Month(p.Month), 1, 0, 0, 0, 0, opts.TZ)
 		to := from.AddDate(0, 1, 0)
 		entries, err := store.PublishedEntriesInRange(ctx, opts.WID, from, to, opts.EntryListLimit)
 		if err != nil {

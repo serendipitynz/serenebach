@@ -77,6 +77,21 @@ type Handler struct {
 	// no-op). app.New populates this with a closure around app.Seed
 	// to avoid a handler→app import cycle.
 	Setup SetupRunner
+	// TZ is the timezone admins type publish dates in (the
+	// posted_at form input is interpreted in this zone) and that
+	// the same value is rendered back into for editing. Nil falls
+	// back to time.Local so test callers keep working without
+	// extra wiring; app.New always sets this from config.Config.TZ.
+	TZ *time.Location
+}
+
+// tz returns the handler's configured timezone, falling back to
+// time.Local when the field has not been wired up.
+func (h *Handler) tz() *time.Location {
+	if h.TZ != nil {
+		return h.TZ
+	}
+	return time.Local
 }
 
 // root returns the deployment base path for the current request (e.g. "/sb4").

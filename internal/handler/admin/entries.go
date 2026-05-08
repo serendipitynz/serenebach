@@ -246,7 +246,7 @@ func (h *Handler) renderEntryForm(w http.ResponseWriter, r *http.Request, action
 		Action:        root(r) + action,
 		Entry:         entry,
 		StatusInt:     int(entry.Status),
-		PostedAtLocal: entry.PostedAt.Format("2006-01-02T15:04"),
+		PostedAtLocal: entry.PostedAt.In(h.tz()).Format("2006-01-02T15:04"),
 		Categories:    cats,
 		Formats:       buildFormatOptions(),
 		CurrentFormat: string(format.Normalize(entry.Format)),
@@ -259,7 +259,7 @@ func (h *Handler) renderEntryForm(w http.ResponseWriter, r *http.Request, action
 
 // ---- create / update ---------------------------------------------------
 
-func parseEntryForm(r *http.Request, base domain.Entry) (domain.Entry, string) {
+func (h *Handler) parseEntryForm(r *http.Request, base domain.Entry) (domain.Entry, string) {
 	if err := r.ParseForm(); err != nil {
 		return base, tr(r, "flash.formParseError")
 	}
@@ -328,7 +328,7 @@ func parseEntryForm(r *http.Request, base domain.Entry) (domain.Entry, string) {
 
 	postedRaw := r.PostFormValue("posted_at")
 	if postedRaw != "" {
-		if t, err := time.ParseInLocation("2006-01-02T15:04", postedRaw, time.Local); err == nil {
+		if t, err := time.ParseInLocation("2006-01-02T15:04", postedRaw, h.tz()); err == nil {
 			base.PostedAt = t
 		} else {
 			return base, tr(r, "entries.form.error.postedAtInvalid")
@@ -347,7 +347,7 @@ func (h *Handler) entryCreate(w http.ResponseWriter, r *http.Request) {
 		Status:     domain.EntryDraft,
 		PostedAt:   time.Now(),
 	}
-	entry, errMsg := parseEntryForm(r, base)
+	entry, errMsg := h.parseEntryForm(r, base)
 	tagNames, tagsCSV := parseTagNames(r.PostFormValue("tags"))
 	if errMsg != "" {
 		h.renderEntryForm(w, r, "/admin/entries/new", entry, tagsCSV, errMsg, tr(r, "entries.form.titleNew"), "entry-new", 0)
@@ -412,7 +412,7 @@ func (h *Handler) entryUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
-	entry, errMsg := parseEntryForm(r, *existing)
+	entry, errMsg := h.parseEntryForm(r, *existing)
 	tagNames, tagsCSV := parseTagNames(r.PostFormValue("tags"))
 	if errMsg != "" {
 		h.renderEntryForm(w, r, fmt.Sprintf("/admin/entries/%d/edit", id), entry, tagsCSV, errMsg, tr(r, "entries.form.titleEditPlain"), "entries", 0)

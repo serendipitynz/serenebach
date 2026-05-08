@@ -69,7 +69,7 @@ func siteWithLabel(w domain.Weblog, lang string) content.Site {
 // placeholders resolve on the rendered page. Errors are logged and
 // swallowed so a broken custom-tag query doesn't 500 the public site.
 func (h *Handler) buildSite(ctx context.Context, w domain.Weblog) content.Site {
-	s := siteWithLabel(w, w.Lang)
+	s := siteWithLabel(w, w.Lang).WithTZ(h.tz())
 	tags, err := h.Store.ListCustomTags(ctx, h.WID)
 	if err != nil {
 		log.Printf("public.buildSite: load custom tags: %v", err)
@@ -116,6 +116,22 @@ type Handler struct {
 	// directly-exposed binaries; operators behind a known proxy
 	// configure it via SB_TRUSTED_PROXIES.
 	TrustedProxies clientip.Resolver
+	// TZ is the timezone used when bucketing entries into year and
+	// month archive ranges. Nil falls back to time.Local for
+	// backwards compatibility; app.New always sets this from
+	// config.Config.TZ so the deployed behaviour is host-independent.
+	TZ *time.Location
+}
+
+// tz returns the handler's configured timezone, falling back to
+// time.Local when the field has not been wired up (test callers,
+// older callsites). Centralised so every archive boundary uses the
+// same fallback.
+func (h *Handler) tz() *time.Location {
+	if h.TZ != nil {
+		return h.TZ
+	}
+	return time.Local
 }
 
 // MountLegacy wires the SB3 `/sb.cgi` compatibility shim. Kept on a
@@ -517,7 +533,7 @@ const defaultSidebarLatestLimit = 5
 // to empty slices — a missing sidebar is always better than a 500.
 func (h *Handler) loadSidebarData(ctx context.Context, logTag string) content.SidebarData {
 	var out content.SidebarData
-	if periods, err := h.Store.ArchivePeriodsWithCounts(ctx, h.WID); err == nil {
+	if periods, err := h.Store.ArchivePeriodsWithCounts(ctx, h.WID, h.tz()); err == nil {
 		out.Archives = periods
 	} else {
 		log.Printf("%s: archives: %v", logTag, err)
@@ -767,7 +783,7 @@ func (h *Handler) archiveYear(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	size, asc := h.listTuning(ctx)
-	from := time.Date(year, time.January, 1, 0, 0, 0, 0, time.Local)
+	from := time.Date(year, time.January, 1, 0, 0, 0, 0, h.tz())
 	to := from.AddDate(1, 0, 0)
 	total, err := h.Store.CountPublishedEntriesInRange(ctx, h.WID, from, to)
 	if err != nil {
@@ -808,7 +824,7 @@ func (h *Handler) archiveMonth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	size, asc := h.listTuning(ctx)
-	from := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local)
+	from := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, h.tz())
 	to := from.AddDate(0, 1, 0)
 	total, err := h.Store.CountPublishedEntriesInRange(ctx, h.WID, from, to)
 	if err != nil {
