@@ -120,7 +120,7 @@ func applyArchivesBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Template
 	}
 	b.WriteString("</ul>")
 	c.Num(0)
-	c.Tag("archives_list", b.String())
+	c.TagHTML("archives_list", b.String())
 	c.Block("archives", 1)
 }
 
@@ -169,8 +169,8 @@ func applyCategorySidebarBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.T
 		return
 	}
 	c.Num(0)
-	c.Tag("category_list", topList)
-	c.Tag("subcategory_list", subList)
+	c.TagHTML("category_list", topList)
+	c.TagHTML("subcategory_list", subList)
 	c.Block("category", 1)
 }
 
@@ -242,7 +242,7 @@ func applyRecentCommentBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Tem
 	}
 	b.WriteString("</ul>")
 	c.Num(0)
-	c.Tag("recent_comment_list", b.String())
+	c.TagHTML("recent_comment_list", b.String())
 	c.Block("recent_comment", 1)
 }
 
@@ -309,7 +309,7 @@ func applyLinkBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Template, li
 		return
 	}
 	c.Num(0)
-	c.Tag("link_list", b.String())
+	c.TagHTML("link_list", b.String())
 	c.Block("link", 1)
 }
 
@@ -368,6 +368,6 @@ func applyLatestEntryBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Templ
 	}
 	b.WriteString("</ul>")
 	c.Num(0)
-	c.Tag("latest_entry_list", b.String())
+	c.TagHTML("latest_entry_list", b.String())
 	c.Block("latest_entry", 1)
 }

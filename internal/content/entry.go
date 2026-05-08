@@ -92,15 +92,15 @@ func (v EntryView) Render() (string, error) {
 	// SB3 wraps {entry_time} in a permalink anchor; {entry_disp_time}
 	// remains the bare formatted time.
 	permalink := html.EscapeString(v.Site.EntryPermalink(v.Entry))
-	timeStr := html.EscapeString(v.Site.FormatEntryTime(v.Entry.PostedAt))
-	c.Tag("entry_time", `<a href="`+permalink+`">`+timeStr+`</a>`)
+	timeStr := v.Site.FormatEntryTime(v.Entry.PostedAt)
+	c.TagHTML("entry_time", `<a href="`+permalink+`">`+html.EscapeString(timeStr)+`</a>`)
 	c.Tag("entry_disp_time", timeStr)
 	body := formatBody(v.Entry.Body, v.Entry.Format, "entry.body")
 	if v.Entry.More != "" {
 		body += `<a id="sequel"></a>`
 	}
-	c.Tag("entry_description", body)
-	c.Tag("entry_sequel", formatBody(v.Entry.More, v.Entry.Format, "entry.more"))
+	c.TagHTML("entry_description", body)
+	c.TagHTML("entry_sequel", formatBody(v.Entry.More, v.Entry.Format, "entry.more"))
 	c.Tag("entry_mode", "entry")
 	c.Tag("entry_likes_count", strconv.FormatInt(v.Entry.LikesCount, 10))
 	c.Tag("entry_like_url", v.Site.EntryPermalink(v.Entry)+"like")
@@ -130,13 +130,13 @@ func (v EntryView) Render() (string, error) {
 	// permalink is SB3's short alias for entry_permalink — both spellings
 	// appear in the shipped templates.
 	c.Tag("permalink", v.Site.EntryPermalink(v.Entry))
-	c.Tag("entry_tags", renderTagsFragment(v.Site, v.Tags))
+	c.TagHTML("entry_tags", renderTagsFragment(v.Site, v.Tags))
 	c.Tag("csrf_token", v.CSRFToken)
 
 	if v.Category != nil {
 		catLink := html.EscapeString(v.Site.CategoryPermalink(*v.Category))
 		catName := html.EscapeString(v.Category.Name)
-		c.Tag("category_name", `<a href="`+catLink+`">`+catName+`</a>`)
+		c.TagHTML("category_name", `<a href="`+catLink+`">`+catName+`</a>`)
 		c.Tag("category_id", strconv.FormatInt(v.Category.ID, 10))
 		c.Tag("category_disp_name", v.Category.Name)
 	}
@@ -146,12 +146,12 @@ func (v EntryView) Render() (string, error) {
 		//   {user_disp_name} = display name (SB3's authname)
 		//   {user_login}     = Go-port alias for the login name
 		//   {user_id}        = numeric id
-		// Display name is self-edited by the author; escape on
-		// emission so arbitrary role tiers can't inject HTML.
+		// Tag auto-escapes both fields on emission so a self-edited
+		// display name can't inject HTML into the rendered page.
 		disp := displayName(*v.Author)
-		c.Tag("user_name", html.EscapeString(v.Author.Name))
-		c.Tag("user_disp_name", html.EscapeString(disp))
-		c.Tag("user_login", html.EscapeString(v.Author.Name))
+		c.Tag("user_name", v.Author.Name)
+		c.Tag("user_disp_name", disp)
+		c.Tag("user_login", v.Author.Name)
 		c.Tag("user_id", strconv.FormatInt(v.Author.ID, 10))
 	}
 	// SB3's {comment_num} emits a link like <a href="…#comments">Comments(N)</a>
@@ -162,7 +162,7 @@ func (v EntryView) Render() (string, error) {
 	if v.CommentMode != domain.CommentClosed {
 		label := commentNumLabel(v.Site.CommentNumLabel, v.Entry.CommentsCount)
 		href := html.EscapeString(v.Site.EntryPermalink(v.Entry) + "#comments")
-		c.Tag("comment_num", `<a href="`+href+`">`+label+`</a>`)
+		c.TagHTML("comment_num", `<a href="`+href+`">`+html.EscapeString(label)+`</a>`)
 		c.Tag("comment_count", strconv.FormatInt(v.Entry.CommentsCount, 10))
 	} else {
 		c.Tag("comment_num", "-")
@@ -202,8 +202,8 @@ func (v EntryView) Render() (string, error) {
 			c.Tag("next_permalink", "")
 			c.Tag("next_title", "")
 		}
-		c.Tag("prev_entry", v.navLink(v.Prev, "« "))
-		c.Tag("next_entry", v.navLink(v.Next, " »"))
+		c.TagHTML("prev_entry", v.navLink(v.Prev, "« "))
+		c.TagHTML("next_entry", v.navLink(v.Next, " »"))
 		c.Block("sequel", 1)
 	}
 
@@ -240,18 +240,18 @@ func (v EntryView) applyComments(c *sbtemplate.Context, tmpl *sbtemplate.Templat
 	c.Num(0)
 	c.Tag("comment_post_url", v.Site.EntryPermalink(v.Entry)+"comment")
 	c.Tag("form_ts", strconv.FormatInt(v.FormTS, 10))
-	// `err` is reflected from a URL query param — escape so an
-	// attacker can't craft `?err=<script>…</script>` into a victim
+	// `err` is reflected from a URL query param; Tag auto-escapes so
+	// an attacker can't craft `?err=<script>…</script>` into a victim
 	// link and execute in their browser.
-	c.Tag("comment_error", html.EscapeString(v.FormError))
+	c.Tag("comment_error", v.FormError)
 	// Prefill cookies are user-controllable but land inside
-	// input `value="..."` attributes. Escape defensively so a
+	// input `value="..."` attributes. Tag auto-escapes so a
 	// self-planted cookie with a quote can't break out of the
 	// attribute.
-	c.Tag("cookie_name", html.EscapeString(v.CookieName))
-	c.Tag("cookie_email", html.EscapeString(v.CookieEmail))
-	c.Tag("cookie_url", html.EscapeString(v.CookieURL))
-	c.Tag("turnstile_widget", v.TurnstileHTML)
+	c.Tag("cookie_name", v.CookieName)
+	c.Tag("cookie_email", v.CookieEmail)
+	c.Tag("cookie_url", v.CookieURL)
+	c.TagHTML("turnstile_widget", v.TurnstileHTML)
 	// SB3 injected a <script> tag for cook.js here. The Go port has no
 	// reader-facing comment JS, so {sb_comment_js} is always empty.
 	// Setting it explicitly keeps the lint honest and mirrors
@@ -260,14 +260,14 @@ func (v EntryView) applyComments(c *sbtemplate.Context, tmpl *sbtemplate.Templat
 
 	for i, m := range v.Messages {
 		c.Num(i)
-		// Every comment field is untrusted — html-escape to neutralise
-		// stored XSS. comment_url additionally passes through a scheme
-		// allow-list so `javascript:` / `data:` / etc. can't leak past
-		// the submit-time check (belt + braces).
-		c.Tag("comment_name", html.EscapeString(m.AuthorName))
+		// Every comment field is untrusted — Tag auto-escapes to
+		// neutralise stored XSS. comment_url additionally passes
+		// through a scheme allow-list so `javascript:` / `data:` /
+		// etc. can't leak past the submit-time check (belt + braces).
+		c.Tag("comment_name", m.AuthorName)
 		c.Tag("comment_time", v.Site.FormatCommentTime(m.PostedAt))
-		c.Tag("comment_description", formatCommentBody(m.Body))
-		c.Tag("comment_url", html.EscapeString(safeExternalURL(m.AuthorURL)))
+		c.TagHTML("comment_description", formatCommentBody(m.Body))
+		c.Tag("comment_url", safeExternalURL(m.AuthorURL))
 		c.Tag("comment_icon", "") // reserved for a future avatar/icon feature
 	}
 	if tmpl.HasBlock("comment") {

@@ -79,9 +79,9 @@ func applyPageBlock(c *sbtemplate.Context, tmpl *sbtemplate.Template, pg Paginat
 		nextLink = `<a href="` + html.EscapeString(nextURL) + `" rel="next">&gt;&gt;</a>`
 	}
 	c.Tag("prev_page_url", prevURL)
-	c.Tag("prev_page_link", prevLink)
+	c.TagHTML("prev_page_link", prevLink)
 	c.Tag("next_page_url", nextURL)
-	c.Tag("next_page_link", nextLink)
+	c.TagHTML("next_page_link", nextLink)
 
 	if !tmpl.HasBlock("page") {
 		return
