@@ -8,7 +8,6 @@ import (
 
 	"github.com/serendipitynz/serenebach/internal/domain"
 	"github.com/serendipitynz/serenebach/internal/format"
-	"github.com/serendipitynz/serenebach/internal/template/sbtemplate"
 )
 
 // ListView renders a list page (home, category, archive — they all share the
@@ -64,7 +63,7 @@ func (v ListView) Render() (string, error) {
 		return "", fmt.Errorf("content.ListView: no template main body")
 	}
 
-	tmpl, err := sbtemplate.Parse(v.Template.MainBody, sbtemplate.DefaultCallback)
+	tmpl, err := cachedParse(v.Template, "main", v.Template.MainBody)
 	if err != nil {
 		return "", fmt.Errorf("content.ListView: parse: %w", err)
 	}
