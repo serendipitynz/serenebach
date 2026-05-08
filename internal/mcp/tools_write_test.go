@@ -1,14 +1,20 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"testing"
 	"time"
 
 	"github.com/serendipitynz/serenebach/internal/domain"
+	"github.com/serendipitynz/serenebach/internal/images"
 	"github.com/serendipitynz/serenebach/internal/mcpaudit"
 	"github.com/serendipitynz/serenebach/internal/storage"
 	"github.com/serendipitynz/serenebach/internal/storage/repo"
@@ -443,5 +449,90 @@ func TestParsePostedAtErrorOnInvalidTimestamp(t *testing.T) {
 	_, err := parsePostedAt(&bad, time.Now())
 	if err == nil {
 		t.Error("expected error for invalid timestamp")
+	}
+}
+
+func TestToolUploadImageSuccessAndAudit(t *testing.T) {
+	mainDB, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open main db: %v", err)
+	}
+	defer mainDB.Close()
+	if err := storage.Up(mainDB); err != nil {
+		t.Fatalf("migrate main: %v", err)
+	}
+
+	// Seed weblog.
+	now := time.Now().Unix()
+	mainDB.ExecContext(context.Background(), `
+		INSERT INTO weblogs (id, title, description, base_url, lang, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO NOTHING`,
+		1, "Test", "test", "", "en", now, now)
+
+	imgDir := t.TempDir()
+	srv := &Server{
+		Store:      repo.New(mainDB),
+		Audit:      mcpaudit.WrapMain(mainDB),
+		ImageStore: images.NewStore(imgDir),
+		WID:        1,
+	}
+
+	ctx := WithAuth(context.Background(), domain.MCPScopeWrite, 7, 13)
+
+	// Build a minimal valid PNG.
+	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	for x := 0; x < 2; x++ {
+		for y := 0; y < 2; y++ {
+			img.Set(x, y, color.RGBA{R: 100, G: 100, B: 100, A: 255})
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("encode png: %v", err)
+	}
+
+	result, err := srv.toolUploadImage(ctx, json.RawMessage(fmt.Sprintf(
+		`{"data":"%s","filename":"probe.png"}`, base64.StdEncoding.EncodeToString(buf.Bytes()))))
+	if err != nil {
+		t.Fatalf("toolUploadImage: %v", err)
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal([]byte(result), &resp); err != nil {
+		t.Fatalf("decode result: %v", err)
+	}
+	imageID := int64(resp["id"].(float64))
+	if imageID == 0 {
+		t.Fatal("expected non-zero image id")
+	}
+
+	// Verify audit row for upload_image.
+	var auditCount int
+	if err := mainDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM mcp_audit_log WHERE tool = 'upload_image' AND target_id = ?`, imageID).Scan(&auditCount); err != nil {
+		t.Fatalf("count audit: %v", err)
+	}
+	if auditCount != 1 {
+		t.Errorf("audit count for upload_image = %d, want 1", auditCount)
+	}
+
+	var tokenID, authorID, targetID int64
+	var tool string
+	if err := mainDB.QueryRowContext(ctx,
+		`SELECT tool, target_id, token_id, author_id FROM mcp_audit_log WHERE tool = 'upload_image'`,
+	).Scan(&tool, &targetID, &tokenID, &authorID); err != nil {
+		t.Fatalf("scan audit: %v", err)
+	}
+	if tool != "upload_image" {
+		t.Errorf("tool = %q, want upload_image", tool)
+	}
+	if targetID != imageID {
+		t.Errorf("target_id = %d, want %d", targetID, imageID)
+	}
+	if tokenID != 7 {
+		t.Errorf("token_id = %d, want 7", tokenID)
+	}
+	if authorID != 13 {
+		t.Errorf("author_id = %d, want 13", authorID)
 	}
 }

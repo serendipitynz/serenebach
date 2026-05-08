@@ -463,16 +463,18 @@ func TestEnsureSchemaIdempotent(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Run twice.
-	if err := ensureSchemaOn(db); err != nil {
+	s := &Store{db: db}
+	ctx := context.Background()
+
+	// Run twice — the second call must succeed without error.
+	if err := s.ensureSchema(ctx); err != nil {
 		t.Fatalf("first ensure: %v", err)
 	}
-	if err := ensureSchemaOn(db); err != nil {
+	if err := s.ensureSchema(ctx); err != nil {
 		t.Fatalf("second ensure: %v", err)
 	}
 
 	// Verify table exists.
 	var count int
 	db.QueryRow(`SELECT COUNT(*) FROM mcp_audit_log`).Scan(&count)
-	// Shouldn't error.
 }
