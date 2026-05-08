@@ -7,6 +7,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/serendipitynz/serenebach/internal/clientip"
 )
@@ -80,6 +81,26 @@ type Config struct {
 	// DevMode disables template and i18n caching so edits on disk are
 	// reflected on the next request. Intended for local development only.
 	DevMode bool
+	// HTTP server timeouts (server mode only; CGI mode uses the host's
+	// per-process model). Each field maps to the matching http.Server
+	// knob and is overridable via the corresponding SB_* env var
+	// (time.ParseDuration syntax, e.g. "10s", "1m"). Defaults are tuned
+	// to absorb OG-image generation while keeping Slowloris-class
+	// attacks from being practical. ReadTimeout defaults to 0 because
+	// http.Server.ReadTimeout covers the request body too; capping it
+	// would conflict with multi-megabyte image uploads on slow links.
+	// Body size is bounded by MaxBytesReader at the handler layer.
+	ReadHeaderTimeout time.Duration
+	ReadTimeout       time.Duration
+	WriteTimeout      time.Duration
+	IdleTimeout       time.Duration
+	// MaxHeaderBytes caps the size of request headers (request line +
+	// headers); 0 lets net/http fall back to its 1 MiB default.
+	MaxHeaderBytes int
+	// ShutdownTimeout bounds how long graceful shutdown waits for
+	// in-flight requests to drain after SIGINT/SIGTERM before the
+	// process exits.
+	ShutdownTimeout time.Duration
 }
 
 // Load parses top-level flags and returns the resulting Config, the name of
@@ -113,6 +134,12 @@ func Load(args []string) (*Config, string, []string, error) {
 		TemplateDir:            envOr("SB_TEMPLATE_DIR", "./data/templates"),
 		UploadMaxBytes:         parseUploadMaxBytes(os.Getenv("SB_UPLOAD_MAX_MB")),
 		DevMode:                os.Getenv("SB_DEV") == "1",
+		ReadHeaderTimeout:      parseDurationEnv(os.Getenv("SB_READ_HEADER_TIMEOUT"), DefaultReadHeaderTimeout),
+		ReadTimeout:            parseDurationEnv(os.Getenv("SB_READ_TIMEOUT"), DefaultReadTimeout),
+		WriteTimeout:           parseDurationEnv(os.Getenv("SB_WRITE_TIMEOUT"), DefaultWriteTimeout),
+		IdleTimeout:            parseDurationEnv(os.Getenv("SB_IDLE_TIMEOUT"), DefaultIdleTimeout),
+		MaxHeaderBytes:         parseMaxHeaderBytesEnv(os.Getenv("SB_MAX_HEADER_BYTES"), DefaultMaxHeaderBytes),
+		ShutdownTimeout:        parseDurationEnv(os.Getenv("SB_SHUTDOWN_TIMEOUT"), DefaultShutdownTimeout),
 	}
 
 	resolver, err := clientip.Parse(os.Getenv("SB_TRUSTED_PROXIES"))
@@ -173,6 +200,46 @@ const DefaultAnalyticsRetentionDays = 30
 // SB_UPLOAD_MAX_MB isn't set. Ten megabytes covers phone-camera JPEGs
 // without inviting abuse.
 const DefaultUploadMaxMB = 10
+
+// HTTP server timeout defaults. WriteTimeout is intentionally generous
+// because OG-image generation runs on the request goroutine on first
+// access. ReadTimeout defaults to 0 (no whole-request deadline) because
+// http.Server.ReadTimeout covers the body too — combining a short
+// deadline with the 10 MiB upload ceiling would cut off legitimate
+// uploads on slow links. Slowloris defence is carried by
+// ReadHeaderTimeout instead, and body size is bounded by
+// MaxBytesReader at the handler layer. ShutdownTimeout caps the drain
+// window after SIGINT/SIGTERM.
+const (
+	DefaultReadHeaderTimeout = 10 * time.Second
+	DefaultReadTimeout       = 0
+	DefaultWriteTimeout      = 60 * time.Second
+	DefaultIdleTimeout       = 120 * time.Second
+	DefaultMaxHeaderBytes    = 1 << 20 // 1 MiB
+	DefaultShutdownTimeout   = 15 * time.Second
+)
+
+func parseDurationEnv(raw string, fallback time.Duration) time.Duration {
+	if raw == "" {
+		return fallback
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d < 0 {
+		return fallback
+	}
+	return d
+}
+
+func parseMaxHeaderBytesEnv(raw string, fallback int) int {
+	if raw == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n <= 0 {
+		return fallback
+	}
+	return n
+}
 
 func parseUploadMaxBytes(raw string) int64 {
 	if raw == "" {
