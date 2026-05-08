@@ -209,6 +209,13 @@ type Site struct {
 	// CustomTags are user-defined {custom_*} sbtemplate placeholders.
 	// Injected by Apply so every page type receives them automatically.
 	CustomTags []domain.CustomTag
+	// TZ is the timezone every {*_date} / {*_time} tag is rendered
+	// in. Nil falls back to time.Local so the field can be left
+	// unset by call sites that haven't been updated yet (and by
+	// tests). Handlers and the rebuilder always seed this from
+	// config.Config.TZ via WithTZ so the deployed binary renders
+	// the same archive dates regardless of the host TZ.
+	TZ *time.Location
 }
 
 func NewSite(w domain.Weblog) Site {
@@ -285,6 +292,23 @@ func (s Site) WithCustomTags(tags []domain.CustomTag) Site {
 	return s
 }
 
+// WithTZ returns a copy bound to the given timezone so date/time tags
+// render against the same zone the archive boundaries are bucketed in.
+// nil is accepted and resets to "use time.Local on resolve".
+func (s Site) WithTZ(loc *time.Location) Site {
+	s.TZ = loc
+	return s
+}
+
+// resolveTZ centralises the "fall back to time.Local" rule so every
+// formatter goes through one path. Always returns a non-nil location.
+func (s Site) resolveTZ() *time.Location {
+	if s.TZ != nil {
+		return s.TZ
+	}
+	return time.Local
+}
+
 func (s Site) baseURL() string {
 	if s.Weblog.BaseURL != "" {
 		return strings.TrimRight(s.Weblog.BaseURL, "/") + "/"
@@ -340,12 +364,17 @@ func (s Site) PageOGImageURL(pageID int64) string {
 // formatWith expands an SB3 format string against t using the weblog's
 // lang, substituting pkgDefault when the weblog has nothing configured
 // for that context. Centralised so every {*_date}/{*_time} tag goes
-// through the same "fall back to default" path.
+// through the same "fall back to default" path. The instant is
+// projected into s.TZ first so the rendered hour/day matches the
+// timezone the archive boundaries are also bucketed in — without this
+// the same UTC posted_at would format to host-local on the dynamic
+// path and to the configured TZ on archive ranges, which is the
+// inconsistency SB_TZ exists to remove.
 func (s Site) formatWith(pattern, pkgDefault string, t time.Time) string {
 	if pattern == "" {
 		pattern = pkgDefault
 	}
-	return dateformat.Expand(pattern, t, s.Weblog.Lang)
+	return dateformat.Expand(pattern, t.In(s.resolveTZ()), s.Weblog.Lang)
 }
 
 // FormatEntryDate renders t as the author's configured entry-date

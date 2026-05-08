@@ -300,6 +300,7 @@ func runBuild(a *app.App, subArgs []string) {
 		BasePath:       a.Config.BasePath,
 		ImageDir:       a.Config.ImageDir,
 		TemplateDir:    a.Config.TemplateDir,
+		TZ:             a.Config.TZ,
 	})
 	if err != nil {
 		log.Fatalf("build: %v", err)

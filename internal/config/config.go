@@ -101,6 +101,19 @@ type Config struct {
 	// in-flight requests to drain after SIGINT/SIGTERM before the
 	// process exits.
 	ShutdownTimeout time.Duration
+	// TZ is the timezone used to render entry dates and to interpret
+	// archive month/year boundaries and admin form posted_at input.
+	// Defaults to time.Local so a fresh deploy keeps the historical
+	// "host TZ" behaviour. Override via SB_TZ (any IANA name, e.g.
+	// "Asia/Tokyo" or "UTC") so the same binary renders identical
+	// archives regardless of where it runs (Docker / Sakura / VPS).
+	// Always non-nil after Load(); callers can dereference safely.
+	//
+	// SB2/SB3 stored a per-entry TZ with conf_timezone as default.
+	// SB_TZ is the single-process equivalent and is the first step
+	// toward restoring that granularity (the per-weblog and per-entry
+	// columns are not yet implemented).
+	TZ *time.Location
 }
 
 // Load parses top-level flags and returns the resulting Config, the name of
@@ -140,6 +153,7 @@ func Load(args []string) (*Config, string, []string, error) {
 		IdleTimeout:            parseDurationEnv(os.Getenv("SB_IDLE_TIMEOUT"), DefaultIdleTimeout),
 		MaxHeaderBytes:         parseMaxHeaderBytesEnv(os.Getenv("SB_MAX_HEADER_BYTES"), DefaultMaxHeaderBytes),
 		ShutdownTimeout:        parseDurationEnv(os.Getenv("SB_SHUTDOWN_TIMEOUT"), DefaultShutdownTimeout),
+		TZ:                     parseTZEnv(os.Getenv("SB_TZ")),
 	}
 
 	resolver, err := clientip.Parse(os.Getenv("SB_TRUSTED_PROXIES"))
@@ -218,6 +232,22 @@ const (
 	DefaultMaxHeaderBytes    = 1 << 20 // 1 MiB
 	DefaultShutdownTimeout   = 15 * time.Second
 )
+
+// parseTZEnv resolves SB_TZ to a *time.Location. Empty input or an
+// unrecognised name falls back to time.Local so a typo never bricks
+// the boot path; misconfigurations are visible in logs (the first
+// archive page that renders) rather than at startup. Always non-nil.
+func parseTZEnv(raw string) *time.Location {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return time.Local
+	}
+	loc, err := time.LoadLocation(raw)
+	if err != nil {
+		return time.Local
+	}
+	return loc
+}
 
 func parseDurationEnv(raw string, fallback time.Duration) time.Duration {
 	if raw == "" {

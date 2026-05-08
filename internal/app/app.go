@@ -99,6 +99,7 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	rebuilder := admin.NewRebuilderWithImages(cfg.RebuildOutDir, cfg.ImageDir, cfg.TemplateDir, cfg.BasePath)
+	rebuilder.TZ = cfg.TZ
 	if cfg.DevMode {
 		admintpl.DevRoot = "web/templates/admin"
 		admin.DevMode = true
@@ -121,8 +122,9 @@ func New(cfg *config.Config) (*App, error) {
 		MCPAuditDBPath:      cfg.MCPAuditDBPath,
 		OG:                  ogRenderer,
 		AutoOG:              cfg.Mode != config.ModeCGI,
+		TZ:                  cfg.TZ,
 	}
-	publicH := &public.Handler{Store: store, WID: DefaultWID, Turnstile: cfVerifier, TrustedProxies: cfg.TrustedProxies}
+	publicH := &public.Handler{Store: store, WID: DefaultWID, Turnstile: cfVerifier, TrustedProxies: cfg.TrustedProxies, TZ: cfg.TZ}
 	// Load SB3 legacy URL inputs once at startup. A weblog never
 	// touched by the importer leaves all fields empty, which the
 	// redirect middleware reads as "off". Errors are non-fatal: a
