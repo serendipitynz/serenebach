@@ -62,7 +62,7 @@ func (v EntryView) Render() (string, error) {
 		return "", fmt.Errorf("content.EntryView: no template main body")
 	}
 
-	tmpl, err := sbtemplate.Parse(v.Template.MainBody, sbtemplate.DefaultCallback)
+	tmpl, err := cachedParse(v.Template, "main", v.Template.MainBody)
 	if err != nil {
 		return "", fmt.Errorf("content.EntryView: parse: %w", err)
 	}

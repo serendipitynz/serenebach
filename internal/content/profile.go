@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/serendipitynz/serenebach/internal/domain"
-	"github.com/serendipitynz/serenebach/internal/template/sbtemplate"
 )
 
 // ProfileView renders the public `/profile/{id}/` page — SB3's
@@ -27,7 +26,7 @@ func (v ProfileView) Render() (string, error) {
 		return "", fmt.Errorf("content.ProfileView: no template main body")
 	}
 
-	tmpl, err := sbtemplate.Parse(v.Template.MainBody, sbtemplate.DefaultCallback)
+	tmpl, err := cachedParse(v.Template, "main", v.Template.MainBody)
 	if err != nil {
 		return "", fmt.Errorf("content.ProfileView: parse: %w", err)
 	}

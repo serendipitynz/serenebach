@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/serendipitynz/serenebach/internal/domain"
-	"github.com/serendipitynz/serenebach/internal/template/sbtemplate"
 )
 
 // PageView renders a single flat page (not an entry). It reuses the
@@ -29,11 +28,13 @@ func (v PageView) Render() (string, error) {
 
 	// Prefer entry_body; fall back to main_body when empty.
 	bodyTmpl := v.Template.EntryBody
+	bodyField := "entry"
 	if bodyTmpl == "" {
 		bodyTmpl = v.Template.MainBody
+		bodyField = "main"
 	}
 
-	tmpl, err := sbtemplate.Parse(bodyTmpl, sbtemplate.DefaultCallback)
+	tmpl, err := cachedParse(v.Template, bodyField, bodyTmpl)
 	if err != nil {
 		return "", fmt.Errorf("content.PageView: parse: %w", err)
 	}
