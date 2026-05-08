@@ -10,8 +10,10 @@ import (
 	"net/http"
 	"net/http/cgi"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/serendipitynz/serenebach/internal/app"
@@ -159,8 +161,44 @@ func serve(a *app.App, cfg *config.Config) error {
 		// routes registered as /admin/... also match /sb4/admin/... etc.
 		h = http.StripPrefix(cfg.BasePath, h)
 	}
-	srv := &http.Server{Addr: cfg.Addr, Handler: h}
-	return srv.ListenAndServe()
+	srv := &http.Server{
+		Addr:              cfg.Addr,
+		Handler:           h,
+		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
+		ReadTimeout:       cfg.ReadTimeout,
+		WriteTimeout:      cfg.WriteTimeout,
+		IdleTimeout:       cfg.IdleTimeout,
+		MaxHeaderBytes:    cfg.MaxHeaderBytes,
+	}
+
+	// signal.NotifyContext lets the listener loop and the signal-watch
+	// path share one cancellation token; calling stop() in defer guarantees
+	// the signal handler is removed even on a Listen error.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- srv.ListenAndServe() }()
+
+	select {
+	case <-ctx.Done():
+		log.Printf("serenebach: shutdown signal received, draining (timeout=%s)", cfg.ShutdownTimeout)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("shutdown: %w", err)
+		}
+		// Drain the listen goroutine's terminal error so it cannot leak.
+		if err := <-errCh; err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+		return nil
+	case err := <-errCh:
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
+	}
 }
 
 // runExtractAssets writes the embedded admin static files (admin.css,
