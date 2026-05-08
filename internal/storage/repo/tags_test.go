@@ -291,10 +291,6 @@ func TestPublishedEntriesByTagFiltering(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateTag: %v", err)
 	}
-	otherTagID, err := s.CreateTag(ctx, domain.Tag{WID: 2, Name: "Other", Slug: "other"})
-	if err != nil {
-		t.Fatalf("CreateTag wid=2: %v", err)
-	}
 
 	// Create published entries for WID 1 tagged "test"
 	pub1, err := s.CreateEntry(ctx, domain.Entry{
@@ -328,7 +324,8 @@ func TestPublishedEntriesByTagFiltering(t *testing.T) {
 		t.Fatalf("CreateEntry closed: %v", err)
 	}
 
-	// Create an entry on WID 2 tagged "other" (different WID, same tag concept)
+	// Create an entry on WID 2, but deliberately attach it to WID 1's
+	// tagID so the test can verify that the WID predicate excludes it.
 	otherEntryID, err := s.CreateEntry(ctx, domain.Entry{
 		WID: 2, AuthorID: 1, Title: "Other WID", Body: "body",
 		Format: "markdown", Status: domain.EntryPublished,
@@ -350,12 +347,15 @@ func TestPublishedEntriesByTagFiltering(t *testing.T) {
 	if err := s.SetEntryTags(ctx, closedID, []int64{tagID}); err != nil {
 		t.Fatalf("SetEntryTags closed: %v", err)
 	}
-	// Other WID entry tagged with otherTagID
-	if err := s.SetEntryTags(ctx, otherEntryID, []int64{otherTagID}); err != nil {
+	// WID 2 entry also carries WID 1's tagID — must be excluded by the
+	// e.wid = ? predicate in PublishedEntriesByTag.
+	if err := s.SetEntryTags(ctx, otherEntryID, []int64{tagID}); err != nil {
 		t.Fatalf("SetEntryTags other: %v", err)
 	}
 
-	// PublishedEntriesByTag should return only published entries from WID 1
+	// PublishedEntriesByTag should return only published entries from WID 1.
+	// The WID 2 entry was deliberately attached to the same tagID but must
+	// not appear here — the e.wid = ? predicate bars cross-weblog leakage.
 	entries, err := s.PublishedEntriesByTag(ctx, 1, tagID, 100)
 	if err != nil {
 		t.Fatalf("PublishedEntriesByTag: %v", err)
@@ -368,7 +368,7 @@ func TestPublishedEntriesByTagFiltering(t *testing.T) {
 			t.Errorf("unexpected status %d for entry %q", e.Status, e.Title)
 		}
 		if e.WID != 1 {
-			t.Errorf("unexpected wid %d for entry %q", e.WID, e.Title)
+			t.Errorf("unexpected wid %d for entry %q (cross-wid leak)", e.WID, e.Title)
 		}
 	}
 
