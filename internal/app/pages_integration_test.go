@@ -266,6 +266,35 @@ func TestAdminPageRegularUserCannotEditOthers(t *testing.T) {
 	}
 }
 
+// TestAdminPageEditMissingID confirms the edit form returns 404 for
+// an unknown page id rather than rendering a blank form. Symmetric
+// with the OG endpoint case to lock in the contract across the
+// admin-pages surface.
+func TestAdminPageEditMissingID(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	cookies := login(t, a.Handler(), "admin", "changeme")
+
+	w := authedGET(t, a.Handler(), "/admin/pages/9999/edit", cookies)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("GET edit status = %d, want 404", w.Code)
+	}
+
+	form := url.Values{
+		"title": {"X"}, "body": {"b"}, "slug": {"/x"},
+		"status": {"1"}, "format": {"html"}, "template_id": {"0"},
+	}
+	w2 := authedPOSTForm(t, a.Handler(), "/admin/pages/9999/edit", form, cookies)
+	if w2.Code != http.StatusNotFound {
+		t.Errorf("POST edit status = %d, want 404", w2.Code)
+	}
+
+	w3 := authedPOSTForm(t, a.Handler(), "/admin/pages/9999/delete", url.Values{}, cookies)
+	if w3.Code != http.StatusNotFound {
+		t.Errorf("POST delete status = %d, want 404", w3.Code)
+	}
+}
+
 func TestAdminPageOGEndpoint(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
