@@ -56,14 +56,14 @@ docker compose up -d
 Official container images are published to GitHub Container Registry (`ghcr.io/serendipitynz/serenebach`).
 
 ```bash
-docker pull ghcr.io/serendipitynz/serenebach:4.0.0-beta.5
+docker pull ghcr.io/serendipitynz/serenebach:latest
 
-docker run -d -p 8080:8080 -v serenebach-data:/home/nonroot/data ghcr.io/serendipitynz/serenebach:4.0.0-beta.5
+docker run -d -p 8080:8080 -v serenebach-data:/home/nonroot/data ghcr.io/serendipitynz/serenebach:latest
 ```
 
 Available tags:
 - `latest` — most recent build on the default branch
-- `4.0.0-beta.5`, `4.0.0`, … — semver tags matching released versions
+- Release tags (`4.0.0-beta.N`, `4.0.0`, …) — see the [GitHub Releases page](https://github.com/serendipitynz/serenebach/releases) for the current version
 - `main` — tip of the `main` branch
 
 For production, prefer a pinned release tag over `latest`. See [docs/deployment.md](docs/deployment.md) for QNAP Container Station and VPS deployment examples.
