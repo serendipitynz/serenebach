@@ -1,3 +1,7 @@
+// Package sqlite opens the SQLite database file used by Serene Bach.
+// The driver is modernc.org/sqlite (pure Go) so the binary builds with
+// CGO_ENABLED=0 and runs on shared CGI hosts; see AGENTS.md hard
+// constraints.
 package sqlite
 
 import (
