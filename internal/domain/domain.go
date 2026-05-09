@@ -376,8 +376,10 @@ type Entry struct {
 	// can look up the absolute file path from ImageDir. Empty means
 	// "fall through to weblog.OGBGImagePath → embedded default".
 	OGBGImagePath string
-	PostedAt      time.Time
-	UpdatedAt     time.Time
+	// Pinned floats the entry to the top of home and category list page 1.
+	Pinned   bool
+	PostedAt time.Time
+	UpdatedAt time.Time
 	// LikesCount is a denormalised counter kept in sync by LikeEntry. The
 	// authoritative set of "who liked" lives in the entry_likes table; we
 	// read this column hot-path to avoid a COUNT(*) per render.
