@@ -1,3 +1,7 @@
+// Package app wires storage, handlers, and middleware into a single *App
+// that cmd/serenebach mounts and serves. The constructor takes a *sql.DB
+// plus configuration and returns an http.Handler ready for HTTP or CGI
+// hosting; no business logic lives here.
 package app
 
 import (
