@@ -298,7 +298,7 @@ func (s *Store) TagsByEntries(ctx context.Context, entryIDs []int64) (map[int64]
 // identical on both routes.
 func (s *Store) PublishedEntriesByTag(ctx context.Context, wid, tagID int64, limit int) ([]domain.Entry, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT e.id, e.wid, e.author_id, e.category_id, e.title, e.slug, e.keywords, e.body, e.more, e.format, e.status, e.posted_at, e.updated_at, e.likes_count, e.stamps_count, e.comments_count, e.og_bg_image_path, e.pinned
+		SELECT e.id, e.wid, e.author_id, e.category_id, e.title, e.slug, e.keywords, e.body, e.more, e.format, e.status, e.posted_at, e.updated_at, e.likes_count, e.stamps_count, e.comments_count, e.og_bg_image_path, e.pinned, e.accept_comments
 		FROM entries e
 		JOIN entry_tags et ON et.entry_id = e.id
 		WHERE e.wid = ? AND e.status = ? AND et.tag_id = ?
@@ -315,7 +315,7 @@ func (s *Store) PublishedEntriesByTag(ctx context.Context, wid, tagID int64, lim
 // PublishedEntriesByTag.
 func (s *Store) PublishedEntriesByTagPage(ctx context.Context, wid, tagID int64, limit, offset int) ([]domain.Entry, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT e.id, e.wid, e.author_id, e.category_id, e.title, e.slug, e.keywords, e.body, e.more, e.format, e.status, e.posted_at, e.updated_at, e.likes_count, e.stamps_count, e.comments_count, e.og_bg_image_path, e.pinned
+		SELECT e.id, e.wid, e.author_id, e.category_id, e.title, e.slug, e.keywords, e.body, e.more, e.format, e.status, e.posted_at, e.updated_at, e.likes_count, e.stamps_count, e.comments_count, e.og_bg_image_path, e.pinned, e.accept_comments
 		FROM entries e
 		JOIN entry_tags et ON et.entry_id = e.id
 		WHERE e.wid = ? AND e.status = ? AND et.tag_id = ?

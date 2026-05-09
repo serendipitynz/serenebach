@@ -35,17 +35,18 @@ func authorIDForCtx(ctx context.Context) int64 {
 // from "explicit empty" on update_entry — unset keeps the current
 // value, explicit empty clears it.
 type createEntryArgs struct {
-	Title      string   `json:"title"`
-	Body       string   `json:"body"`
-	More       *string  `json:"more"`
-	Slug       *string  `json:"slug"`
-	Keywords   *string  `json:"keywords"`
-	Format     *string  `json:"format"`
-	Status     *string  `json:"status"`
-	CategoryID *int64   `json:"category_id"`
-	Tags       []string `json:"tags"`
-	PostedAt   *string  `json:"posted_at"`
-	Pinned     *bool    `json:"pinned"`
+	Title          string   `json:"title"`
+	Body           string   `json:"body"`
+	More           *string  `json:"more"`
+	Slug           *string  `json:"slug"`
+	Keywords       *string  `json:"keywords"`
+	Format         *string  `json:"format"`
+	Status         *string  `json:"status"`
+	CategoryID     *int64   `json:"category_id"`
+	Tags           []string `json:"tags"`
+	PostedAt       *string  `json:"posted_at"`
+	Pinned         *bool    `json:"pinned"`
+	AcceptComments *bool    `json:"accept_comments"`
 }
 
 func (s *Server) toolCreateEntry(ctx context.Context, raw json.RawMessage) (string, error) {
@@ -77,18 +78,19 @@ func (s *Server) toolCreateEntry(ctx context.Context, raw json.RawMessage) (stri
 	}
 
 	entry := domain.Entry{
-		WID:        s.WID,
-		AuthorID:   authorIDForCtx(ctx),
-		CategoryID: derefInt64(args.CategoryID, 0),
-		Title:      args.Title,
-		Slug:       slug,
-		Keywords:   derefString(args.Keywords, ""),
-		Body:       args.Body,
-		More:       derefString(args.More, ""),
-		Format:     format,
-		Status:     status,
-		PostedAt:   postedAt,
-		Pinned:     args.Pinned != nil && *args.Pinned,
+		WID:            s.WID,
+		AuthorID:       authorIDForCtx(ctx),
+		CategoryID:     derefInt64(args.CategoryID, 0),
+		Title:          args.Title,
+		Slug:           slug,
+		Keywords:       derefString(args.Keywords, ""),
+		Body:           args.Body,
+		More:           derefString(args.More, ""),
+		Format:         format,
+		Status:         status,
+		PostedAt:       postedAt,
+		Pinned:         args.Pinned != nil && *args.Pinned,
+		AcceptComments: args.AcceptComments == nil || *args.AcceptComments,
 	}
 	id, err := s.Store.CreateEntry(ctx, entry)
 	if err != nil {
@@ -110,18 +112,19 @@ func (s *Server) toolCreateEntry(ctx context.Context, raw json.RawMessage) (stri
 }
 
 type updateEntryArgs struct {
-	ID         int64    `json:"id"`
-	Title      *string  `json:"title"`
-	Body       *string  `json:"body"`
-	More       *string  `json:"more"`
-	Slug       *string  `json:"slug"`
-	Keywords   *string  `json:"keywords"`
-	Format     *string  `json:"format"`
-	Status     *string  `json:"status"`
-	CategoryID *int64   `json:"category_id"`
-	Tags       []string `json:"tags"`
-	PostedAt   *string  `json:"posted_at"`
-	Pinned     *bool    `json:"pinned"`
+	ID             int64    `json:"id"`
+	Title          *string  `json:"title"`
+	Body           *string  `json:"body"`
+	More           *string  `json:"more"`
+	Slug           *string  `json:"slug"`
+	Keywords       *string  `json:"keywords"`
+	Format         *string  `json:"format"`
+	Status         *string  `json:"status"`
+	CategoryID     *int64   `json:"category_id"`
+	Tags           []string `json:"tags"`
+	PostedAt       *string  `json:"posted_at"`
+	Pinned         *bool    `json:"pinned"`
+	AcceptComments *bool    `json:"accept_comments"`
 }
 
 func (s *Server) toolUpdateEntry(ctx context.Context, raw json.RawMessage) (string, error) {
@@ -184,6 +187,9 @@ func (s *Server) toolUpdateEntry(ctx context.Context, raw json.RawMessage) (stri
 	}
 	if args.Pinned != nil {
 		updated.Pinned = *args.Pinned
+	}
+	if args.AcceptComments != nil {
+		updated.AcceptComments = *args.AcceptComments
 	}
 
 	if err := s.Store.UpdateEntry(ctx, updated); err != nil {

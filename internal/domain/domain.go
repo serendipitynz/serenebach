@@ -377,9 +377,15 @@ type Entry struct {
 	// "fall through to weblog.OGBGImagePath → embedded default".
 	OGBGImagePath string
 	// Pinned floats the entry to the top of home and category list page 1.
-	Pinned    bool
-	PostedAt  time.Time
-	UpdatedAt time.Time
+	Pinned bool
+	// AcceptComments lets the author opt this individual entry out of
+	// comment submissions even when the weblog's CommentMode is open or
+	// moderated. Defaults to true so existing entries keep their old
+	// behaviour. The weblog-level CommentMode still wins: when it is
+	// CommentClosed, AcceptComments has no effect.
+	AcceptComments bool
+	PostedAt       time.Time
+	UpdatedAt      time.Time
 	// LikesCount is a denormalised counter kept in sync by LikeEntry. The
 	// authoritative set of "who liked" lives in the entry_likes table; we
 	// read this column hot-path to avoid a COUNT(*) per render.

@@ -54,6 +54,8 @@ Comment behaviour is driven by the per-weblog `comment_mode` column:
 - `moderated` (default) — submissions sit in a queue; the admin approves them in `/admin/comments?status=waiting`. Returning commenters whose email has already been approved once are auto-approved ("trust memory").
 - `closed` — the form is not rendered and POSTs are rejected.
 
+Each entry additionally carries `entries.accept_comments` (default `1`). When the weblog mode is `open` or `moderated`, the entry form exposes a "Accept comments" checkbox; turning it off hides the form and existing comments on that entry's public page and rejects any POSTs to it. The weblog-level `closed` mode wins over the per-entry flag, so the checkbox is hidden in that case and every entry's comments stay off.
+
 A bundled pipeline drops bot-driven noise with no per-site setup:
 
 1. A hidden honeypot field and a minimum form-lifetime check reject the most obvious drive-by submissions silently.

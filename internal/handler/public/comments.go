@@ -60,6 +60,13 @@ func (h *Handler) commentSubmit(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	// Per-entry opt-out check runs after the publish-status gate so an
+	// unpublished entry stays 404 — surfacing 403 here would leak the
+	// existence of a draft / closed entry to unauthenticated readers.
+	if !entry.AcceptComments {
+		http.Error(w, "comments are closed", http.StatusForbidden)
+		return
+	}
 
 	// Preserve the URL key the user submitted from so the redirect lands
 	// on the same canonical surface (slug when present, id otherwise).
