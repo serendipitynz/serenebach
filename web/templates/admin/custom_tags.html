@@ -27,7 +27,7 @@
       <tbody>
       {{range .Tags}}
         <tr>
-          <td class="col-flex-wide"><code>{{printf "{%s}" .Name}}</code></td>
+          <td class="col-flex-wide"><button type="button" class="link copy-tag" data-copy-text="{{printf "{%s}" .Name}}" title="{{T `common.copyTitle`}}"><code>{{printf "{%s}" .Name}}</code></button></td>
           <td class="col-flex-wide"><pre class="tag-preview">{{.Preview}}</pre></td>
           <td class="col-actions">
             <a href="{{Root}}/admin/templates/custom-tags?edit={{.ID}}" class="btn-icon" aria-label="{{T `action.edit`}}" title="{{T `action.edit`}}">{{iconEdit}}</a>
