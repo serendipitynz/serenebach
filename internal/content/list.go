@@ -136,6 +136,13 @@ func (v ListView) Render() (string, error) {
 		c.Tag("entry_keyword", e.Keywords)
 		c.Tag("permalink", v.Site.EntryPermalink(e))
 		c.TagHTML("entry_tags", renderTagsFragment(v.Site, v.Tags[e.ID]))
+		if e.Pinned {
+			c.Tag("entry_pinned", "pinned")
+			c.Block("pinned_entry", 1)
+		} else {
+			c.Tag("entry_pinned", "")
+			c.Block("pinned_entry", 0)
+		}
 		// {comment_num} / {comment_count}: list pages always show the
 		// link (comments are "accepted" on list regardless of mode).
 		// The count comes from the denormalised CommentsCount column.
