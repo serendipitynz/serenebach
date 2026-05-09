@@ -20,6 +20,13 @@ Configure the blog-wide policy under **Comments > Settings**:
 
 The default is moderated. New blogs and anything spam-prone should stay moderated.
 
+### Per-entry opt-out
+
+When the blog-wide setting is **Accept** or **Moderated**, each entry can additionally turn off its own comment form. The "Accept comments" checkbox sits next to the pin toggle on the entry edit form and defaults to on.
+
+- An entry with the checkbox off hides the comment form and existing comments on its public page, and rejects new submissions.
+- When the blog-wide setting is **Don't accept**, the per-entry checkbox is hidden — the blog-wide policy wins and every entry's comments stay off.
+
 ## Managing comments
 
 The **Comments** screen filters by status:
