@@ -377,8 +377,8 @@ type Entry struct {
 	// "fall through to weblog.OGBGImagePath → embedded default".
 	OGBGImagePath string
 	// Pinned floats the entry to the top of home and category list page 1.
-	Pinned   bool
-	PostedAt time.Time
+	Pinned    bool
+	PostedAt  time.Time
 	UpdatedAt time.Time
 	// LikesCount is a denormalised counter kept in sync by LikeEntry. The
 	// authoritative set of "who liked" lives in the entry_likes table; we
