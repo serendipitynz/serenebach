@@ -66,6 +66,7 @@ Anything inside `{...}` is replaced at render time with the actual value.
 | Title | `title` | Page header. Always rendered once. |
 | Title | `toppage` | Shown only on the top (home) page. Hidden on category, archive, tag, single-entry, and profile pages. |
 | Entry | `entry` | Entry loop. Repeats per entry on list pages; once on single-entry pages. |
+| Entry | `pinned_entry` | **Single-entry pages only:** count = 1 for pinned entries, 0 otherwise. Always 0 on list pages (home, category, etc.) — use the `{entry_pinned}` tag for per-entry conditional styling on list pages instead. |
 | Entry | `option` | Shown only on single-entry pages. |
 | Entry | `sequel` | Shown only on single-entry pages. Contains prev/next entry navigation. |
 | Comments | `comment_area` | Shown on single-entry pages when comments are accepted. Contains the comment form. |
@@ -81,6 +82,38 @@ Anything inside `{...}` is replaced at render time with the actual value.
 | Lists | `recent_comment` | Recent comments list. |
 | Lists | `selected_entry` | Selected/recommended entries list. **Always 0 in the Go port.** |
 | Flat pages | `dedicated_page` | Shown only on flat pages. Hidden on regular entry pages and listings. |
+
+### Pinned entries (`{entry_pinned}` tag and `pinned_entry` block)
+
+Setting the **pinned** flag on an entry floats it to the top of the home page and category archive page 1. Use the following template constructs to adjust the appearance based on pin state.
+
+**On list pages (home / category)** use the `{entry_pinned}` tag. It yields `"pinned"` for pinned entries and `""` for regular ones, so you can inject it directly as a CSS class:
+
+```html
+<!-- BEGIN entry -->
+<article class="entry {entry_pinned}">
+  <h2><a href="{entry_permalink}">{entry_title}</a></h2>
+</article>
+<!-- END entry -->
+```
+
+```css
+/* Style pinned entries differently */
+.entry.pinned { border-left: 4px solid #f90; }
+```
+
+**On single-entry pages** the `pinned_entry` block can also be used (count = 1 when pinned, 0 otherwise):
+
+```html
+<!-- BEGIN entry -->
+<!-- BEGIN pinned_entry -->
+<span class="pin-badge">📌 Pinned</span>
+<!-- END pinned_entry -->
+<h2>{entry_title}</h2>
+<!-- END entry -->
+```
+
+> **Note:** `pinned_entry` is always 0 (hidden) on list pages. Use the `{entry_pinned}` tag for per-entry branching on list pages.
 
 ## Tag reference
 
@@ -144,6 +177,7 @@ Usable inside and outside the `page` block.
 | `{entry_keywords}` | Keywords (comma-separated) |
 | `{entry_keyword}` | SB3 spelling alias for `{entry_keywords}` |
 | `{entry_tags}` | Tag list HTML fragment |
+| `{entry_pinned}` | `"pinned"` for pinned entries, `""` (empty) otherwise. Can be injected directly as a CSS class (e.g. `class="entry {entry_pinned}"`). Works correctly per-entry on both list and single-entry pages. |
 | `{permalink}` | SB3 short alias for `{entry_permalink}` |
 | `{comment_num}` | Comments anchor HTML (`-` when comments are closed) |
 | `{comment_count}` | Raw comment count (empty when comments are closed) |
