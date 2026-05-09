@@ -68,6 +68,13 @@ Available tags:
 
 For production, prefer a pinned release tag over `latest`. See [docs/deployment.md](docs/deployment.md) for QNAP Container Station and VPS deployment examples.
 
+## Quality checks
+
+CI runs the same checks on every push and pull request:
+
+- `task lint` — runs `staticcheck` across the module via the `go.mod` tool directive
+- `task test` — runs `go test ./...`
+
 ## Companion tools
 
 | Tool | What it does |
