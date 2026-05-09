@@ -98,6 +98,57 @@ func TestAdminEntryCreateAndEditRoundtrip(t *testing.T) {
 	}
 }
 
+// TestAdminEntryFormPinnedRoundtrip pins the form-submission behaviour
+// of the pinned checkbox. A browser includes the field only when the
+// box is checked, so create with pinned=1 must pin and a later
+// submission without the field must unpin. (Regression: an earlier
+// version paired the checkbox with a hidden pinned=0 input, but
+// r.PostFormValue returns the first value, which made the pinned
+// flag unreachable from the form.)
+func TestAdminEntryFormPinnedRoundtrip(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	cookie := login(t, a.Handler(), "admin", "changeme")
+
+	form := url.Values{
+		"title":       {"pin-create"},
+		"body":        {"<p>x</p>"},
+		"category_id": {"-1"},
+		"status":      {"1"},
+		"posted_at":   {"2026-04-19T12:00"},
+		"pinned":      {"1"},
+	}
+	w := authedPOSTForm(t, a.Handler(), "/admin/entries/new", form, cookie)
+	if w.Code != http.StatusFound {
+		t.Fatalf("create status = %d, body:\n%s", w.Code, w.Body.String())
+	}
+	loc := w.Header().Get("Location")
+	if i := strings.Index(loc, "?"); i >= 0 {
+		loc = loc[:i]
+	}
+	editBody := authedGET(t, a.Handler(), loc, cookie).Body.String()
+	if !strings.Contains(editBody, `name="pinned" value="1" checked`) {
+		t.Errorf("pinned checkbox should be checked after create with pinned=1")
+	}
+
+	// Browser omits the field when the box is unchecked.
+	form2 := url.Values{
+		"title":       {"pin-create"},
+		"body":        {"<p>x</p>"},
+		"category_id": {"-1"},
+		"status":      {"1"},
+		"posted_at":   {"2026-04-19T12:00"},
+	}
+	w2 := authedPOSTForm(t, a.Handler(), loc, form2, cookie)
+	if w2.Code != http.StatusFound {
+		t.Fatalf("uncheck status = %d, body:\n%s", w2.Code, w2.Body.String())
+	}
+	editBody2 := authedGET(t, a.Handler(), loc, cookie).Body.String()
+	if strings.Contains(editBody2, `name="pinned" value="1" checked`) {
+		t.Errorf("pinned checkbox should be unchecked after update without pinned field")
+	}
+}
+
 func TestAdminEntryUpdateChangesContent(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)

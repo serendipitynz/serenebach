@@ -1491,6 +1491,21 @@ table.listing td.cell-clamp-host {
   .entry-form-options { grid-template-columns: 1fr; }
 }
 
+/* Row of inline boolean toggles (pinned, etc.). Designed to grow
+   horizontally as more flag-style checkboxes are added. */
+.entry-form-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0.5rem 0;
+}
+.entry-form-flags .checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  white-space: nowrap;
+}
+
 /* Input prefix: keeps the leading “/” and the text field on one line. */
 .input-prefix {
   display: flex;
