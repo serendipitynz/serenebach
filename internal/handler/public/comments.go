@@ -56,12 +56,15 @@ func (h *Handler) commentSubmit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "comments are closed", http.StatusForbidden)
 		return
 	}
-	if !entry.AcceptComments {
-		http.Error(w, "comments are closed", http.StatusForbidden)
-		return
-	}
 	if entry.Status != domain.EntryPublished {
 		http.NotFound(w, r)
+		return
+	}
+	// Per-entry opt-out check runs after the publish-status gate so an
+	// unpublished entry stays 404 — surfacing 403 here would leak the
+	// existence of a draft / closed entry to unauthenticated readers.
+	if !entry.AcceptComments {
+		http.Error(w, "comments are closed", http.StatusForbidden)
 		return
 	}
 
