@@ -288,6 +288,86 @@ func (s *Store) CountAdmins(ctx context.Context, wid int64) (int64, error) {
 	return n, nil
 }
 
+// UserByName looks up one user by login name. Used on login.
+func (s *Store) UserByName(ctx context.Context, name string) (*domain.User, string, error) {
+	var u domain.User
+	var hash string
+	var listVis int
+	var autoAlt int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id, wid, name, display_name, email, role, description, description_format, list_visible, sort_order,
+		       ai_kind, ai_base_url, ai_model, ai_api_key_enc, ai_auto_alt, ai_timeout_seconds,
+		       password_hash
+		FROM users WHERE name = ?`, name).Scan(
+		&u.ID, &u.WID, &u.Name, &u.DisplayName, &u.Email, &u.Role, &u.Description, &u.DescriptionFormat, &listVis, &u.SortOrder,
+		&u.AIKind, &u.AIBaseURL, &u.AIModel, &u.AIAPIKeyEnc, &autoAlt, &u.AITimeoutSeconds,
+		&hash)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, "", ErrNotFound
+		}
+		return nil, "", fmt.Errorf("repo: UserByName: %w", err)
+	}
+	u.ListVisible = listVis != 0
+	u.AIAutoAlt = autoAlt != 0
+	return &u, hash, nil
+}
+
+// UserByID looks up one user by primary key. Used by session middleware.
+func (s *Store) UserByID(ctx context.Context, id int64) (*domain.User, error) {
+	var u domain.User
+	var listVis, autoAlt int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id, wid, name, display_name, email, role, description, description_format, list_visible, sort_order,
+		       ai_kind, ai_base_url, ai_model, ai_api_key_enc, ai_auto_alt, ai_timeout_seconds
+		FROM users WHERE id = ?`, id).Scan(
+		&u.ID, &u.WID, &u.Name, &u.DisplayName, &u.Email, &u.Role, &u.Description, &u.DescriptionFormat, &listVis, &u.SortOrder,
+		&u.AIKind, &u.AIBaseURL, &u.AIModel, &u.AIAPIKeyEnc, &autoAlt, &u.AITimeoutSeconds)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("repo: UserByID: %w", err)
+	}
+	u.ListVisible = listVis != 0
+	u.AIAutoAlt = autoAlt != 0
+	return &u, nil
+}
+
+// UsersByIDs returns the users matching the given ids as a map keyed by id.
+func (s *Store) UsersByIDs(ctx context.Context, ids []int64) (map[int64]domain.User, error) {
+	if len(ids) == 0 {
+		return map[int64]domain.User{}, nil
+	}
+	args := make([]any, 0, len(ids))
+	placeholders := make([]byte, 0, 2*len(ids))
+	for i, id := range ids {
+		if i > 0 {
+			placeholders = append(placeholders, ',')
+		}
+		placeholders = append(placeholders, '?')
+		args = append(args, id)
+	}
+	q := "SELECT id, wid, name, display_name, email, role, description, description_format, list_visible, sort_order FROM users WHERE id IN (" + string(placeholders) + ")"
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("repo: UsersByIDs: %w", err)
+	}
+	defer rows.Close()
+
+	out := make(map[int64]domain.User, len(ids))
+	for rows.Next() {
+		var u domain.User
+		var listVis int
+		if err := rows.Scan(&u.ID, &u.WID, &u.Name, &u.DisplayName, &u.Email, &u.Role, &u.Description, &u.DescriptionFormat, &listVis, &u.SortOrder); err != nil {
+			return nil, fmt.Errorf("repo: scan user: %w", err)
+		}
+		u.ListVisible = listVis != 0
+		out[u.ID] = u
+	}
+	return out, rows.Err()
+}
+
 // isUniqueUserNameViolation narrows isUniqueViolation to collisions on
 // the users.name column. The users table doesn't carry a formal unique
 // index (yet) — name uniqueness is enforced in the admin handler via
