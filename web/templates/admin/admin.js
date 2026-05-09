@@ -943,6 +943,29 @@
     });
   });
 
+  // ---- custom-tag value hint ------------------------------------------
+  // Mirror the tag-name input into the hint paragraph so the operator
+  // sees the literal `{custom_<name>}` token they will paste into a
+  // template. Two pre-translated strings are exposed via data-hint-named
+  // and data-hint-empty; we pick between them based on whether the
+  // input currently has a value.
+  (function wireCustomTagHint() {
+    var input = document.querySelector('[data-customtag-name-input]');
+    var hint = document.querySelector('[data-customtag-value-hint]');
+    if (!input || !hint) return;
+    var named = hint.getAttribute('data-hint-named') || '';
+    var empty = hint.getAttribute('data-hint-empty') || '';
+    function update() {
+      var name = (input.value || '').trim();
+      if (!name) {
+        hint.textContent = empty;
+        return;
+      }
+      hint.textContent = named.replace('%s', '{custom_' + name + '}');
+    }
+    input.addEventListener('input', update);
+  })();
+
   function copyViaClipboard(text, btn) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () {
