@@ -75,6 +75,21 @@ Flat page characteristics:
 
 Paths may contain lowercase letters, digits, hyphens, and slashes. System-reserved paths such as `/entry` and `/admin` are rejected.
 
+## Pinned entries
+
+Tick **Pinned** in the entry editor to float the entry to the top of page 1 on the home page and on category archives. Use it for announcements, featured posts, or anything you want to keep visible.
+
+Where pinning takes effect:
+
+- Home page and category archive, page 1: floats to the top
+- Monthly and tag archives, feeds (RSS / Atom): **no effect** (normal date order)
+- Individual entry page, prev / next navigation: no effect
+- Page 2 and beyond: normal date order resumes
+
+When several entries are pinned, they appear at the top in the usual newest-first order, followed by the rest of the listing.
+
+For templates, pinned entries expose the `{entry_pinned}` tag (value `pinned` or empty) and the `pinned_entry` block. See [Templates](templates) for details.
+
 ## Entry list
 
 The **Entries** list supports title search and status filtering. Click a title to open the editor. The arrow opens the public page in a new tab for published entries.
