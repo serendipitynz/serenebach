@@ -385,7 +385,7 @@ type Entry struct {
 	// CommentClosed, AcceptComments has no effect.
 	AcceptComments bool
 	PostedAt       time.Time
-	UpdatedAt time.Time
+	UpdatedAt      time.Time
 	// LikesCount is a denormalised counter kept in sync by LikeEntry. The
 	// authoritative set of "who liked" lives in the entry_likes table; we
 	// read this column hot-path to avoid a COUNT(*) per render.
