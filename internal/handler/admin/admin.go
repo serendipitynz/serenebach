@@ -1,3 +1,9 @@
+// Package admin holds the HTTP handlers for the admin UI: entry / category /
+// tag CRUD, comments moderation, templates and design settings, users,
+// images, AI features, and the rebuild/setup flows. Routes are exposed in
+// two groups: MountProtected for session-guarded admin routes (the bulk of
+// the surface) and MountPublic for unauthenticated routes such as
+// /admin/login and /admin/static/*. CSRF protection wraps both groups.
 package admin
 
 import (

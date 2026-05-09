@@ -1,3 +1,7 @@
+// Package basepath carries the deployment base path (e.g. "/blog") through
+// context.Context so URL builders can prepend it without threading an extra
+// parameter through every handler and template helper. The value is set
+// once at request-entry middleware and read everywhere downstream.
 package basepath
 
 import "context"

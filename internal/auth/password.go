@@ -1,3 +1,5 @@
+// Package auth holds password hashing helpers used by the admin login flow.
+// Hashing is bcrypt; the cost factor is exposed so tests can dial it down.
 package auth
 
 import "golang.org/x/crypto/bcrypt"

@@ -1,3 +1,7 @@
+// Package config is the single source of truth for SB_* environment
+// variables and CLI flags consumed at startup. Loading happens once in
+// main; downstream packages receive a populated struct rather than reading
+// os.Getenv on their own.
 package config
 
 import (

@@ -1,3 +1,8 @@
+// Package public holds the reader-facing HTTP handlers: home, archive,
+// category/tag pages, individual entries, feeds (RSS/Atom/RSD), CSS, and
+// the comment / like / stamp endpoints. Mutating routes here run under
+// SameOriginGuard rather than the CSRF middleware (see sameorigin.go and
+// AGENTS.md "Public POST endpoints sit outside the CSRF middleware").
 package public
 
 import (

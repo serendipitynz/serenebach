@@ -1,3 +1,7 @@
+// Package storage owns database setup and goose-driven migrations.
+// Migrations run automatically at process start so tests and production
+// share the same path. Sub-packages hold the queries (repo) and the
+// pure-Go SQLite driver setup (sqlite).
 package storage
 
 import (
