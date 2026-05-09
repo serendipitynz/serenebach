@@ -265,6 +265,7 @@
   "entries.form.keywordsOptional": "go, sqlite, blog (optional)",
   "entries.form.tagsOptional": "retrospective, notes (optional)",
   "entries.form.pinned": "Pinned",
+  "entries.form.acceptComments": "Accept comments",
   "entries.form.ogBg": "OG card background",
   "entries.form.ogBg.pick": "Choose image",
   "entries.form.ogBg.clear": "Clear",

@@ -129,6 +129,12 @@ type entryFormPageData struct {
 	// file, used as a cache-busting query param on the preview img.
 	// Zero means the file doesn't exist yet.
 	OGCardTS int64
+	// CommentsAllowedOverall is true when the weblog-level comment
+	// mode is anything other than "closed". The form uses this to
+	// decide whether to render the per-entry "accept comments"
+	// checkbox; when comments are closed site-wide the per-entry
+	// flag is meaningless, so we hide the control.
+	CommentsAllowedOverall bool
 }
 
 // buildFormatOptions exposes the formatter catalogue to the template with
@@ -145,11 +151,12 @@ func (h *Handler) entryNewForm(w http.ResponseWriter, r *http.Request) {
 	u := session.UserFrom(r.Context())
 	now := time.Now()
 	entry := domain.Entry{
-		WID:        h.wid(),
-		AuthorID:   u.ID,
-		CategoryID: domain.Uncategorized,
-		Status:     domain.EntryDraft,
-		PostedAt:   now,
+		WID:            h.wid(),
+		AuthorID:       u.ID,
+		CategoryID:     domain.Uncategorized,
+		Status:         domain.EntryDraft,
+		PostedAt:       now,
+		AcceptComments: true,
 	}
 	h.renderEntryForm(w, r, "/admin/entries/new", entry, "", "", tr(r, "entries.form.titleNew"), "entry-new", 0)
 }
@@ -238,6 +245,12 @@ func (h *Handler) renderEntryForm(w http.ResponseWriter, r *http.Request, action
 	if err != nil {
 		log.Printf("admin.renderEntryForm: %v", err)
 	}
+	commentsAllowed := true
+	if weblog, err := h.Store.WeblogByID(r.Context(), h.wid()); err == nil {
+		commentsAllowed = weblog.CommentMode != domain.CommentClosed
+	} else {
+		log.Printf("admin.renderEntryForm: weblog: %v", err)
+	}
 	renderMain(w, r, pageEntryForm, entryFormPageData{
 		pageBase: pageBase{
 			Title:      title,
@@ -245,17 +258,18 @@ func (h *Handler) renderEntryForm(w http.ResponseWriter, r *http.Request, action
 			CSRFToken:  csrf.Token(r.Context()),
 			User:       session.UserFrom(r.Context()),
 		},
-		Action:        root(r) + action,
-		Entry:         entry,
-		StatusInt:     int(entry.Status),
-		PostedAtLocal: entry.PostedAt.In(h.tz()).Format("2006-01-02T15:04"),
-		Categories:    cats,
-		Formats:       buildFormatOptions(),
-		CurrentFormat: string(format.Normalize(entry.Format)),
-		TagsCSV:       tagsCSV,
-		Error:         errMsg,
-		Flash:         r.URL.Query().Get("ok"),
-		OGCardTS:      ogCardTS,
+		Action:                 root(r) + action,
+		Entry:                  entry,
+		StatusInt:              int(entry.Status),
+		PostedAtLocal:          entry.PostedAt.In(h.tz()).Format("2006-01-02T15:04"),
+		Categories:             cats,
+		Formats:                buildFormatOptions(),
+		CurrentFormat:          string(format.Normalize(entry.Format)),
+		TagsCSV:                tagsCSV,
+		Error:                  errMsg,
+		Flash:                  r.URL.Query().Get("ok"),
+		OGCardTS:               ogCardTS,
+		CommentsAllowedOverall: commentsAllowed,
 	})
 }
 
@@ -310,6 +324,15 @@ func (h *Handler) parseEntryForm(r *http.Request, base domain.Entry) (domain.Ent
 	// Checkbox: present = pinned, absent = not pinned.
 	base.Pinned = r.PostFormValue("pinned") == "1"
 
+	// Per-entry comment acceptance. The hidden `accept_comments_present`
+	// marker is only emitted when the form actually rendered the
+	// checkbox (i.e. comment_mode is not "closed"); without it we
+	// preserve the existing value so a globally-closed save doesn't
+	// silently flip the per-entry preference.
+	if r.PostFormValue("accept_comments_present") == "1" {
+		base.AcceptComments = r.PostFormValue("accept_comments") == "1"
+	}
+
 	catRaw := r.PostFormValue("category_id")
 	if catRaw != "" {
 		if v, err := strconv.ParseInt(catRaw, 10, 64); err == nil {
@@ -346,11 +369,12 @@ func (h *Handler) parseEntryForm(r *http.Request, base domain.Entry) (domain.Ent
 func (h *Handler) entryCreate(w http.ResponseWriter, r *http.Request) {
 	u := session.UserFrom(r.Context())
 	base := domain.Entry{
-		WID:        h.wid(),
-		AuthorID:   u.ID,
-		CategoryID: domain.Uncategorized,
-		Status:     domain.EntryDraft,
-		PostedAt:   time.Now(),
+		WID:            h.wid(),
+		AuthorID:       u.ID,
+		CategoryID:     domain.Uncategorized,
+		Status:         domain.EntryDraft,
+		PostedAt:       time.Now(),
+		AcceptComments: true,
 	}
 	entry, errMsg := h.parseEntryForm(r, base)
 	tagNames, tagsCSV := parseTagNames(r.PostFormValue("tags"))

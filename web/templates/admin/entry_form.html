@@ -104,6 +104,13 @@
       <input type="checkbox" name="pinned" value="1"{{if .Entry.Pinned}} checked{{end}}>
       <span>{{T "entries.form.pinned"}}</span>
     </label>
+    {{if .CommentsAllowedOverall}}
+    <input type="hidden" name="accept_comments_present" value="1">
+    <label class="checkbox-label">
+      <input type="checkbox" name="accept_comments" value="1"{{if .Entry.AcceptComments}} checked{{end}}>
+      <span>{{T "entries.form.acceptComments"}}</span>
+    </label>
+    {{end}}
   </div>
 
   <div class="form-row" data-og-bg-field>
