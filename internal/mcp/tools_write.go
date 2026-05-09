@@ -45,6 +45,7 @@ type createEntryArgs struct {
 	CategoryID *int64   `json:"category_id"`
 	Tags       []string `json:"tags"`
 	PostedAt   *string  `json:"posted_at"`
+	Pinned     *bool    `json:"pinned"`
 }
 
 func (s *Server) toolCreateEntry(ctx context.Context, raw json.RawMessage) (string, error) {
@@ -87,6 +88,7 @@ func (s *Server) toolCreateEntry(ctx context.Context, raw json.RawMessage) (stri
 		Format:     format,
 		Status:     status,
 		PostedAt:   postedAt,
+		Pinned:     args.Pinned != nil && *args.Pinned,
 	}
 	id, err := s.Store.CreateEntry(ctx, entry)
 	if err != nil {
@@ -119,6 +121,7 @@ type updateEntryArgs struct {
 	CategoryID *int64   `json:"category_id"`
 	Tags       []string `json:"tags"`
 	PostedAt   *string  `json:"posted_at"`
+	Pinned     *bool    `json:"pinned"`
 }
 
 func (s *Server) toolUpdateEntry(ctx context.Context, raw json.RawMessage) (string, error) {
@@ -178,6 +181,9 @@ func (s *Server) toolUpdateEntry(ctx context.Context, raw json.RawMessage) (stri
 			return "", err
 		}
 		updated.PostedAt = t
+	}
+	if args.Pinned != nil {
+		updated.Pinned = *args.Pinned
 	}
 
 	if err := s.Store.UpdateEntry(ctx, updated); err != nil {
