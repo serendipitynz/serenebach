@@ -34,6 +34,8 @@ func (h *Handler) mountEntries(r chi.Router) {
 	r.Post("/entries/{id}/edit", h.entryUpdate)
 	r.Post("/entries/{id}/delete", h.entryDelete)
 	r.Post("/entries/{id}/og", h.entryOGRegenerate)
+	r.Post("/entries/{id}/pin", h.entryPin)
+	r.Delete("/entries/{id}/pin", h.entryPin)
 }
 
 // ---- list ---------------------------------------------------------------
@@ -304,6 +306,9 @@ func (h *Handler) parseEntryForm(r *http.Request, base domain.Entry) (domain.Ent
 	// the weblog-level field; empty = inherit the site default. No
 	// validation — unresolvable paths fall back at render.
 	base.OGBGImagePath = strings.TrimSpace(r.PostFormValue("og_bg_image_path"))
+
+	// Checkbox: present = pinned, absent = not pinned.
+	base.Pinned = r.PostFormValue("pinned") == "1"
 
 	catRaw := r.PostFormValue("category_id")
 	if catRaw != "" {
@@ -615,6 +620,49 @@ func (h *Handler) entryOGRegenerate(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	fmt.Fprintf(w, `{"ok":true,"url":%q,"ts":%d}`, root(r)+urlPath, ts)
+}
+
+// entryPin handles POST (pin) and DELETE (unpin) for /admin/entries/{id}/pin.
+// It responds with JSON so the list page can toggle the badge without a full
+// reload.
+func (h *Handler) entryPin(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || id <= 0 {
+		http.Error(w, "bad id", http.StatusBadRequest)
+		return
+	}
+	u := session.UserFrom(r.Context())
+	if u == nil {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	existing, err := h.Store.EntryByID(r.Context(), h.wid(), id)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		log.Printf("admin.entryPin: load: %v", err)
+		http.Error(w, "internal", http.StatusInternalServerError)
+		return
+	}
+	if !u.CanEditEntry(existing.AuthorID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	pinned := r.Method == http.MethodPost
+	if err := h.Store.SetEntryPinned(r.Context(), h.wid(), id, pinned); err != nil {
+		log.Printf("admin.entryPin: %v", err)
+		http.Error(w, "internal", http.StatusInternalServerError)
+		return
+	}
+	h.maybeAutoRebuild(r.Context())
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if pinned {
+		fmt.Fprintf(w, `{"ok":true,"pinned":true}`)
+	} else {
+		fmt.Fprintf(w, `{"ok":true,"pinned":false}`)
+	}
 }
 
 // wid pins admin pages to the app's default weblog while multi-blog UX is

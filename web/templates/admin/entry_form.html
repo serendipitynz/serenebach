@@ -99,6 +99,14 @@
   </div>
 
 
+  <div class="form-row">
+    <label class="checkbox-label">
+      <input type="hidden" name="pinned" value="0">
+      <input type="checkbox" name="pinned" value="1"{{if .Entry.Pinned}} checked{{end}}>
+      {{T "entries.form.pinned"}}
+    </label>
+  </div>
+
   <div class="form-row" data-og-bg-field>
     <div class="label">{{T "entries.form.ogBg"}}</div>
     <div>
