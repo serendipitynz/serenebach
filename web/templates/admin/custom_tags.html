@@ -27,7 +27,7 @@
       <tbody>
       {{range .Tags}}
         <tr>
-          <td class="col-flex-wide"><code>{{printf "{%s}" .Name}}</code></td>
+          <td class="col-flex-wide"><button type="button" class="link copy-tag" data-copy-text="{{printf "{%s}" .Name}}" title="{{T `common.copyTitle`}}"><code>{{printf "{%s}" .Name}}</code></button></td>
           <td class="col-flex-wide"><pre class="tag-preview">{{.Preview}}</pre></td>
           <td class="col-actions">
             <a href="{{Root}}/admin/templates/custom-tags?edit={{.ID}}" class="btn-icon" aria-label="{{T `action.edit`}}" title="{{T `action.edit`}}">{{iconEdit}}</a>
@@ -57,7 +57,7 @@
         <div>
           <div class="input-prefix">
             <span class="prefix">custom_</span>
-            <input type="text" name="name" value="{{trimPrefix "custom_" .EditName}}" pattern="[a-z][a-z0-9_]{0,49}" required>
+            <input type="text" name="name" value="{{trimPrefix "custom_" .EditName}}" pattern="[a-z][a-z0-9_]{0,49}" required data-customtag-name-input>
           </div>
           {{if .NameError}}<p class="field-error">{{T .NameError}}</p>{{end}}
         </div>
@@ -67,7 +67,9 @@
         <div>
           <textarea name="value" rows="8" spellcheck="false">{{.EditValue}}</textarea>
           {{if .ValueError}}<p class="field-error">{{T .ValueError}}</p>{{end}}
-          <p class="hint">{{T "customTags.form.valueHint"}}</p>
+          <p class="hint" data-customtag-value-hint
+             data-hint-empty="{{T `customTags.form.valueHint.empty`}}"
+             data-hint-named="{{T `customTags.form.valueHint.named`}}">{{if .EditName}}{{Tf "customTags.form.valueHint.named" (printf "{%s}" .EditName)}}{{else}}{{T "customTags.form.valueHint.empty"}}{{end}}</p>
         </div>
       </div>
       <div class="form-actions">
@@ -88,7 +90,7 @@
         <div>
           <div class="input-prefix">
             <span class="prefix">custom_</span>
-            <input type="text" name="name" value="" pattern="[a-z][a-z0-9_]{0,49}" placeholder="ga_code" required>
+            <input type="text" name="name" value="" pattern="[a-z][a-z0-9_]{0,49}" placeholder="ga_code" required data-customtag-name-input>
           </div>
           {{if .NameError}}<p class="field-error">{{T .NameError}}</p>{{end}}
         </div>
@@ -98,7 +100,9 @@
         <div>
           <textarea name="value" rows="8" spellcheck="false"></textarea>
           {{if .ValueError}}<p class="field-error">{{T .ValueError}}</p>{{end}}
-          <p class="hint">{{T "customTags.form.valueHint"}}</p>
+          <p class="hint" data-customtag-value-hint
+             data-hint-empty="{{T `customTags.form.valueHint.empty`}}"
+             data-hint-named="{{T `customTags.form.valueHint.named`}}">{{T "customTags.form.valueHint.empty"}}</p>
         </div>
       </div>
       <div class="form-actions">
