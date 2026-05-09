@@ -68,6 +68,13 @@ docker run -d -p 8080:8080 -v serenebach-data:/home/nonroot/data ghcr.io/serendi
 
 本番運用では `latest` よりもリリースタグ固定を推奨します。QNAP Container Station / VPS での構成例は [docs/deployment.md](docs/deployment.md) を参照してください。
 
+## 品質チェック
+
+CI でも push / PR ごとに同じコマンドが走ります:
+
+- `task lint` — `go.mod` の tool directive 経由で `staticcheck` を実行
+- `task test` — `go test ./...` を実行
+
 ## 付属ツール
 
 | ツール | 用途 |

@@ -23,15 +23,6 @@ const maxCustomTagValueBytes = 65535
 
 var customTagNamePattern = regexp.MustCompile(`^custom_[a-z][a-z0-9_]{0,49}$`)
 
-// mountCustomTags registers /admin/templates/custom-tags routes under
-// the design-settings group (already gated by requireDesign).
-func (h *Handler) mountCustomTags(r chi.Router) {
-	r.Get("/templates/custom-tags", h.customTagList)
-	r.Post("/templates/custom-tags", h.customTagCreate)
-	r.Post("/templates/custom-tags/{id}/update", h.customTagUpdate)
-	r.Post("/templates/custom-tags/{id}/delete", h.customTagDelete)
-}
-
 type customTagRow struct {
 	domain.CustomTag
 	Preview string

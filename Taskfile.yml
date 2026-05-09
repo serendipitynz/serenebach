@@ -132,6 +132,11 @@ tasks:
     cmds:
       - go run {{.PKG}} extract-assets --out=./admin-static
 
+  lint:
+    desc: Run staticcheck across the module
+    cmds:
+      - go tool staticcheck ./...
+
   test:
     desc: Run the Go test suite
     cmds:
