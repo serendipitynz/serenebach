@@ -136,6 +136,15 @@ func (v ListView) Render() (string, error) {
 		c.Tag("entry_keyword", e.Keywords)
 		c.Tag("permalink", v.Site.EntryPermalink(e))
 		c.TagHTML("entry_tags", renderTagsFragment(v.Site, v.Tags[e.ID]))
+		// {entry_pinned} yields "pinned" or "" per iteration — usable as a
+		// CSS class. pinned_entry sub-block is 0-striped on list pages
+		// because sbtemplate block counts are global (not per-iteration);
+		// use {entry_pinned} tag for per-entry conditional styling instead.
+		if e.Pinned {
+			c.Tag("entry_pinned", "pinned")
+		} else {
+			c.Tag("entry_pinned", "")
+		}
 		// {comment_num} / {comment_count}: list pages always show the
 		// link (comments are "accepted" on list regardless of mode).
 		// The count comes from the denormalised CommentsCount column.
@@ -185,7 +194,7 @@ func (v ListView) Render() (string, error) {
 	// as empty rather than leaking the raw `{-name}` placeholder.
 	// profile_area / sequel / comment_area are entry-mode blocks; the
 	// trackback + recent_trackback blocks wait on the trackback feature.
-	for _, blk := range []string{"sequel", "comment_area", "trackback_area", "profile_area", "recent_trackback", "dedicated_page"} {
+	for _, blk := range []string{"pinned_entry", "sequel", "comment_area", "trackback_area", "profile_area", "recent_trackback", "dedicated_page"} {
 		if tmpl.HasBlock(blk) {
 			c.Block(blk, 0)
 		}

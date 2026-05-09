@@ -347,14 +347,11 @@ func resolveRefs(ctx context.Context, store *repo.Store, entries []domain.Entry)
 }
 
 func writeHome(ctx context.Context, store *repo.Store, outDir string, site content.Site, tmpl *domain.Template, all []domain.Entry, cats map[int64]domain.Category, users map[int64]domain.User, profileUsers []domain.User, sidebar content.SidebarData, limit int) error {
-	head := all
+	// Sort pinned-first so the static home page matches the dynamic route.
+	head := pinnedFirst(all)
 	if len(head) > limit {
 		head = head[:limit]
 	}
-	// Copy so we can reverse without mutating the caller's `all` slice
-	// — the same underlying array feeds writeEntries() and must stay
-	// newest-first there.
-	head = append([]domain.Entry(nil), head...)
 	if site.EntrySortAsc() {
 		reverseEntries(head)
 	}
@@ -415,6 +412,20 @@ func reverseEntries(es []domain.Entry) {
 	for i, j := 0, len(es)-1; i < j; i, j = i+1, j-1 {
 		es[i], es[j] = es[j], es[i]
 	}
+}
+
+// pinnedFirst returns a copy of entries sorted by pinned DESC, posted_at DESC —
+// the same stable order used by the dynamic home and category pages.
+func pinnedFirst(entries []domain.Entry) []domain.Entry {
+	out := make([]domain.Entry, len(entries))
+	copy(out, entries)
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Pinned != out[j].Pinned {
+			return out[i].Pinned
+		}
+		return out[i].PostedAt.After(out[j].PostedAt)
+	})
+	return out
 }
 
 // tagsForEntries fetches the per-entry tag map for a rendered slice.
@@ -509,7 +520,7 @@ func writeCategories(ctx context.Context, store *repo.Store, opts Options, site 
 	}
 	for _, c := range allCats {
 		cat := c // loop var escapes into pointer below
-		entries, err := store.PublishedEntriesByCategory(ctx, opts.WID, cat.ID, opts.EntryListLimit)
+		entries, err := store.PublishedEntriesByCategoryPage(ctx, opts.WID, cat.ID, opts.EntryListLimit, 0)
 		if err != nil {
 			return fmt.Errorf("rebuild: category %d entries: %w", cat.ID, err)
 		}

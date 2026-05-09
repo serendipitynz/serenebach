@@ -264,6 +264,7 @@
   "entries.form.slugOptional": "my-first-post (optional)",
   "entries.form.keywordsOptional": "go, sqlite, blog (optional)",
   "entries.form.tagsOptional": "retrospective, notes (optional)",
+  "entries.form.pinned": "Pinned (shown at top of home and category page 1)",
   "entries.form.ogBg": "OG card background",
   "entries.form.ogBg.pick": "Choose image",
   "entries.form.ogBg.clear": "Clear",

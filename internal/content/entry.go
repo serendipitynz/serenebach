@@ -132,6 +132,15 @@ func (v EntryView) Render() (string, error) {
 	c.Tag("permalink", v.Site.EntryPermalink(v.Entry))
 	c.TagHTML("entry_tags", renderTagsFragment(v.Site, v.Tags))
 	c.Tag("csrf_token", v.CSRFToken)
+	// {entry_pinned} / pinned_entry block: expose pin state on individual
+	// entry pages too so templates can apply consistent styling.
+	if v.Entry.Pinned {
+		c.Tag("entry_pinned", "pinned")
+		c.Block("pinned_entry", 1)
+	} else {
+		c.Tag("entry_pinned", "")
+		c.Block("pinned_entry", 0)
+	}
 
 	if v.Category != nil {
 		catLink := html.EscapeString(v.Site.CategoryPermalink(*v.Category))
