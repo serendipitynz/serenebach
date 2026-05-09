@@ -77,16 +77,17 @@ Paths may contain lowercase letters, digits, hyphens, and slashes. System-reserv
 
 ## Pinned entries
 
-Tick **Pinned** in the entry editor to float the entry to the top of page 1 on the home page and on category archives. Use it for announcements, featured posts, or anything you want to keep visible.
+Tick **Pinned** in the entry editor to float the entry to the top of the home page and category archives. Use it for announcements, featured posts, or anything you want to keep visible.
 
 Where pinning takes effect:
 
-- Home page and category archive, page 1: floats to the top
+- Home page and category archive: pinned entries float to the top
 - Monthly and tag archives, feeds (RSS / Atom): **no effect** (normal date order)
 - Individual entry page, prev / next navigation: no effect
-- Page 2 and beyond: normal date order resumes
 
-When several entries are pinned, they appear at the top in the usual newest-first order, followed by the rest of the listing.
+When several entries are pinned, they appear at the top in the usual newest-first order, followed by the rest of the listing in the usual date order.
+
+Pinned entries always group at the very front of the listing. If you pin more entries than fit on a single page, the overflow continues onto page 2 and beyond. In practice, keep the number of pinned entries within one page worth of entries.
 
 For templates, pinned entries expose the `{entry_pinned}` tag (value `pinned` or empty) and the `pinned_entry` block. See [Templates](templates) for details.
 
