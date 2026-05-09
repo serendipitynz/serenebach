@@ -139,9 +139,9 @@ func TestRecentPublishedEntriesPagePinnedFirst(t *testing.T) {
 		t.Errorf("page 1[0] = %q, want pinned-old (pinned entries must float to top)", page1[0].Title)
 	}
 
-	// Page 2 (offset=10, larger than total): plain date order, no
-	// special pinned treatment. Use a fresh store with just two entries
-	// so the offset-based switch is exercised with a real offset > 0.
+	// Page 2 (offset=1 in a page-size=1 view) must use the same stable
+	// ORDER BY pinned DESC, posted_at DESC so pages are consistent.
+	// Full order: [p-old (pinned), r-new]. Offset=1 yields [r-new].
 	s2 := newTestStore(t)
 	seedEntryAt2 := func(title string, pinned bool, offset time.Duration) {
 		t.Helper()
@@ -162,18 +162,15 @@ func TestRecentPublishedEntriesPagePinnedFirst(t *testing.T) {
 	seedEntryAt2("r-new", false, 2*time.Hour)
 	seedEntryAt2("p-old", true, time.Hour)
 
-	// With offset=1 (page 2 of a page-size=1 view), the ordering must
-	// be plain posted_at DESC — pinned sorting no longer applies.
 	page2, err := s2.RecentPublishedEntriesPage(ctx, 1, 10, 1)
 	if err != nil {
 		t.Fatalf("page 2: %v", err)
 	}
-	// Only one entry after offset=1; it should be p-old regardless of pin.
 	if len(page2) != 1 {
 		t.Fatalf("page 2 len = %d, want 1", len(page2))
 	}
-	if page2[0].Title != "p-old" {
-		t.Errorf("page 2[0] = %q, want p-old", page2[0].Title)
+	if page2[0].Title != "r-new" {
+		t.Errorf("page 2[0] = %q, want r-new (stable pinned-first order across pages)", page2[0].Title)
 	}
 }
 

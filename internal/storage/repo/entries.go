@@ -359,15 +359,11 @@ func (s *Store) CountPublishedEntriesInRange(ctx context.Context, wid int64, fro
 // the same shape SB3 implements via `LIMIT disp OFFSET (page*disp)`.
 // Caller computes offset = (page-1) * limit.
 func (s *Store) RecentPublishedEntriesPage(ctx context.Context, wid int64, limit, offset int) ([]domain.Entry, error) {
-	order := "posted_at DESC"
-	if offset == 0 {
-		order = "pinned DESC, posted_at DESC"
-	}
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned
 		FROM entries
 		WHERE wid = ? AND status = ?
-		ORDER BY `+order+`
+		ORDER BY pinned DESC, posted_at DESC
 		LIMIT ? OFFSET ?`, wid, domain.EntryPublished, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("repo: RecentPublishedEntriesPage: %w", err)
@@ -379,15 +375,11 @@ func (s *Store) RecentPublishedEntriesPage(ctx context.Context, wid int64, limit
 // PublishedEntriesByCategoryPage is the paginated sibling of
 // PublishedEntriesByCategory.
 func (s *Store) PublishedEntriesByCategoryPage(ctx context.Context, wid, catID int64, limit, offset int) ([]domain.Entry, error) {
-	order := "posted_at DESC"
-	if offset == 0 {
-		order = "pinned DESC, posted_at DESC"
-	}
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned
 		FROM entries
 		WHERE wid = ? AND status = ? AND category_id = ?
-		ORDER BY `+order+`
+		ORDER BY pinned DESC, posted_at DESC
 		LIMIT ? OFFSET ?`, wid, domain.EntryPublished, catID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("repo: PublishedEntriesByCategoryPage: %w", err)
