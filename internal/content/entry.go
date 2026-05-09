@@ -167,8 +167,10 @@ func (v EntryView) Render() (string, error) {
 	// when comments are open and a plain "-" when closed. {comment_count}
 	// is the raw number (empty string when closed). The link targets the
 	// entry permalink with a #comments anchor so readers jump straight to
-	// the comment section — matching SB3's mode=>'com' behaviour.
-	if v.CommentMode != domain.CommentClosed {
+	// the comment section — matching SB3's mode=>'com' behaviour. The
+	// per-entry AcceptComments flag mirrors a closed weblog when the
+	// author has opted this entry out individually.
+	if v.commentsActive() {
 		label := commentNumLabel(v.Site.CommentNumLabel, v.Entry.CommentsCount)
 		href := html.EscapeString(v.Site.EntryPermalink(v.Entry) + "#comments")
 		c.TagHTML("comment_num", `<a href="`+href+`">`+html.EscapeString(label)+`</a>`)
@@ -233,15 +235,23 @@ func (v EntryView) Render() (string, error) {
 	return c.Render(), nil
 }
 
+// commentsActive reports whether comments should appear for this entry.
+// True only when the weblog's CommentMode is not closed AND the author
+// has not opted this individual entry out via AcceptComments=false.
+func (v EntryView) commentsActive() bool {
+	return v.CommentMode != domain.CommentClosed && v.Entry.AcceptComments
+}
+
 // applyComments populates the `comment_area` and `comment` blocks with
 // approved comment data and the per-page form fields (post URL, entry id,
 // honeypot timestamp, optional error message). The `comment_area` block is
-// hidden entirely when the weblog's CommentMode is "closed".
+// hidden entirely when the weblog's CommentMode is "closed" or the entry
+// has comments turned off via AcceptComments=false.
 func (v EntryView) applyComments(c *sbtemplate.Context, tmpl *sbtemplate.Template) {
 	if !tmpl.HasBlock("comment_area") {
 		return
 	}
-	if v.CommentMode == domain.CommentClosed {
+	if !v.commentsActive() {
 		c.Block("comment_area", 0)
 		return
 	}

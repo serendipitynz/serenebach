@@ -56,6 +56,10 @@ func (h *Handler) commentSubmit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "comments are closed", http.StatusForbidden)
 		return
 	}
+	if !entry.AcceptComments {
+		http.Error(w, "comments are closed", http.StatusForbidden)
+		return
+	}
 	if entry.Status != domain.EntryPublished {
 		http.NotFound(w, r)
 		return
