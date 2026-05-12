@@ -92,4 +92,3 @@ func applyPageBlock(c *sbtemplate.Context, tmpl *sbtemplate.Template, pg Paginat
 	}
 	c.Block("page", 1)
 }
-
