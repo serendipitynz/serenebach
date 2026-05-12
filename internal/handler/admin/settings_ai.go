@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -96,92 +97,110 @@ func (h *Handler) renderSettingsAI(w http.ResponseWriter, r *http.Request, newRa
 
 	// Admin-only MCP block: fetch tokens, users, and the audit log.
 	if actor.CanManageUsers() {
-		tokens, err := h.Store.ListMCPTokens(r.Context(), h.wid())
-		if err != nil {
-			log.Printf("admin.settingsAI: list tokens: %v", err)
-			http.Error(w, "failed to list tokens", http.StatusInternalServerError)
+		if err := h.fillMCPBlock(r.Context(), &data, newRaw, newID, errMsg); err != nil {
+			log.Printf("admin.settingsAI: mcp block: %v", err)
+			http.Error(w, "failed to load MCP block", http.StatusInternalServerError)
 			return
-		}
-		users, err := h.Store.ListUsers(r.Context(), h.wid())
-		if err != nil {
-			log.Printf("admin.settingsAI: list users: %v", err)
-			http.Error(w, "failed to list users", http.StatusInternalServerError)
-			return
-		}
-		byID := make(map[int64]domain.User, len(users))
-		for _, u := range users {
-			byID[u.ID] = u
-		}
-		rows := make([]mcpTokenRow, 0, len(tokens))
-		tokenName := make(map[int64]string, len(tokens))
-		for _, t := range tokens {
-			label := "—"
-			if u, ok := byID[t.AuthorID]; ok {
-				if u.DisplayName != "" {
-					label = u.DisplayName
-				} else {
-					label = u.Name
-				}
-			}
-			rows = append(rows, mcpTokenRow{
-				MCPToken:      t,
-				CreatedAtFmt:  fmtUnix(t.CreatedAt),
-				LastUsedAtFmt: fmtUnixOrDash(t.LastUsedAt),
-				RevokedAtFmt:  fmtUnixOrDash(t.RevokedAt),
-				AuthorLabel:   label,
-			})
-			tokenName[t.ID] = t.Name
-		}
-
-		auditRows := make([]mcpAuditRow, 0)
-		if h.Audit != nil {
-			entries, err := h.Audit.Recent(r.Context(), h.wid(), 100)
-			if err != nil {
-				log.Printf("admin.settingsAI: audit recent: %v", err)
-			} else {
-				for _, e := range entries {
-					var tokenLabel string
-					if e.TokenID > 0 {
-						if n, ok := tokenName[e.TokenID]; ok {
-							tokenLabel = n
-						} else {
-							tokenLabel = "#" + strconv.FormatInt(e.TokenID, 10)
-						}
-					} else {
-						tokenLabel = "stdio"
-					}
-					authorLabel := "—"
-					if u, ok := byID[e.AuthorID]; ok {
-						if u.DisplayName != "" {
-							authorLabel = u.DisplayName
-						} else {
-							authorLabel = u.Name
-						}
-					}
-					auditRows = append(auditRows, mcpAuditRow{
-						ID:           e.ID,
-						Tool:         e.Tool,
-						TargetID:     e.TargetID,
-						TokenLabel:   tokenLabel,
-						AuthorLabel:  authorLabel,
-						Extra:        e.Extra,
-						CreatedAtFmt: fmtUnix(e.CreatedAt.Unix()),
-					})
-				}
-			}
-		}
-
-		data.Tokens = rows
-		data.Users = users
-		data.Audit = auditRows
-		data.NewRawToken = newRaw
-		data.NewTokenID = newID
-		if errMsg != "" {
-			data.AIError = "mcp:" + errMsg // leave a breadcrumb; template picks up raw errMsg
 		}
 	}
 
 	renderMain(w, r, pageSettingsAI, data)
+}
+
+// fillMCPBlock populates the admin-only MCP panel (tokens / users /
+// audit log) on settingsAIPageData. The caller has already gated on
+// CanManageUsers, so any error from the underlying store calls is a
+// hard failure and is returned for the caller to log + 500.
+func (h *Handler) fillMCPBlock(ctx context.Context, data *settingsAIPageData, newRaw string, newID int64, errMsg string) error {
+	tokens, err := h.Store.ListMCPTokens(ctx, h.wid())
+	if err != nil {
+		return fmt.Errorf("list tokens: %w", err)
+	}
+	users, err := h.Store.ListUsers(ctx, h.wid())
+	if err != nil {
+		return fmt.Errorf("list users: %w", err)
+	}
+	byID := make(map[int64]domain.User, len(users))
+	for _, u := range users {
+		byID[u.ID] = u
+	}
+	rows := make([]mcpTokenRow, 0, len(tokens))
+	tokenName := make(map[int64]string, len(tokens))
+	for _, t := range tokens {
+		rows = append(rows, mcpTokenRow{
+			MCPToken:      t,
+			CreatedAtFmt:  fmtUnix(t.CreatedAt),
+			LastUsedAtFmt: fmtUnixOrDash(t.LastUsedAt),
+			RevokedAtFmt:  fmtUnixOrDash(t.RevokedAt),
+			AuthorLabel:   userDisplayLabel(byID, t.AuthorID),
+		})
+		tokenName[t.ID] = t.Name
+	}
+	data.Tokens = rows
+	data.Users = users
+	data.Audit = h.buildMCPAuditRows(ctx, byID, tokenName)
+	data.NewRawToken = newRaw
+	data.NewTokenID = newID
+	if errMsg != "" {
+		data.AIError = "mcp:" + errMsg // leave a breadcrumb; template picks up raw errMsg
+	}
+	return nil
+}
+
+// buildMCPAuditRows returns the recent-audit table rows. A nil Audit
+// store or an error from Recent is non-fatal — the panel renders with
+// an empty audit list and the error (if any) is logged so operators
+// can see why.
+func (h *Handler) buildMCPAuditRows(ctx context.Context, byID map[int64]domain.User, tokenName map[int64]string) []mcpAuditRow {
+	out := make([]mcpAuditRow, 0)
+	if h.Audit == nil {
+		return out
+	}
+	entries, err := h.Audit.Recent(ctx, h.wid(), 100)
+	if err != nil {
+		log.Printf("admin.settingsAI: audit recent: %v", err)
+		return out
+	}
+	for _, e := range entries {
+		out = append(out, mcpAuditRow{
+			ID:           e.ID,
+			Tool:         e.Tool,
+			TargetID:     e.TargetID,
+			TokenLabel:   mcpTokenLabel(e.TokenID, tokenName),
+			AuthorLabel:  userDisplayLabel(byID, e.AuthorID),
+			Extra:        e.Extra,
+			CreatedAtFmt: fmtUnix(e.CreatedAt.Unix()),
+		})
+	}
+	return out
+}
+
+// userDisplayLabel resolves a user id to the dashboard's display string:
+// the user's DisplayName when set, else the login Name, falling back to
+// an em-dash placeholder when the user row is unavailable.
+func userDisplayLabel(byID map[int64]domain.User, id int64) string {
+	u, ok := byID[id]
+	if !ok {
+		return "—"
+	}
+	if u.DisplayName != "" {
+		return u.DisplayName
+	}
+	return u.Name
+}
+
+// mcpTokenLabel maps an audit-log token id to the column display value.
+// Zero/negative ids come from the stdio transport (no token row); a
+// missing tokenName entry means the row references a deleted token and
+// gets rendered as "#<id>" so the audit history stays intelligible.
+func mcpTokenLabel(tokenID int64, tokenName map[int64]string) string {
+	if tokenID <= 0 {
+		return "stdio"
+	}
+	if n, ok := tokenName[tokenID]; ok {
+		return n
+	}
+	return "#" + strconv.FormatInt(tokenID, 10)
 }
 
 // --- AI config save -------------------------------------------------
