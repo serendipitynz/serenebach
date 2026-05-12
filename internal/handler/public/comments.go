@@ -34,125 +34,18 @@ const commentRateLimit = 3
 func (h *Handler) commentSubmit(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	entry, _, err := h.resolveEntryKey(ctx, chi.URLParam(r, "key"))
-	if err != nil {
-		if errors.Is(err, repo.ErrNotFound) {
-			http.NotFound(w, r)
-			return
-		}
-		log.Printf("public.commentSubmit: load entry: %v", err)
-		http.Error(w, "failed to load entry", http.StatusInternalServerError)
+	entry, weblog, ok := h.loadCommentTarget(w, r, chi.URLParam(r, "key"))
+	if !ok {
 		return
 	}
-	entryID := entry.ID
-
-	weblog, err := h.Store.WeblogByID(ctx, h.WID)
-	if err != nil {
-		log.Printf("public.commentSubmit: load weblog: %v", err)
-		http.Error(w, "site not configured", http.StatusInternalServerError)
-		return
-	}
-	if weblog.CommentMode == domain.CommentClosed {
-		http.Error(w, "comments are closed", http.StatusForbidden)
-		return
-	}
-	if entry.Status != domain.EntryPublished {
-		http.NotFound(w, r)
-		return
-	}
-	// Per-entry opt-out check runs after the publish-status gate so an
-	// unpublished entry stays 404 — surfacing 403 here would leak the
-	// existence of a draft / closed entry to unauthenticated readers.
-	if !entry.AcceptComments {
-		http.Error(w, "comments are closed", http.StatusForbidden)
-		return
-	}
-
 	// Preserve the URL key the user submitted from so the redirect lands
 	// on the same canonical surface (slug when present, id otherwise).
 	siteBack := root(r) + "/entry/" + entryKeyFor(entry) + "/"
-	redirectBack := func(reason string) {
-		target := siteBack
-		if reason != "" {
-			target += "?err=" + url.QueryEscape(reason) + "#comment-form"
-		}
-		http.Redirect(w, r, target, http.StatusSeeOther)
-	}
+	redirectBack := makeCommentRedirect(w, r, siteBack)
 
-	if err := r.ParseForm(); err != nil {
-		redirectBack(tr(weblog, r, "comment.error.parseForm"))
+	fields, ok := h.screenCommentSubmission(w, r, weblog, redirectBack)
+	if !ok {
 		return
-	}
-
-	// Honeypot — legitimate users can't see or fill this field.
-	if strings.TrimSpace(r.PostFormValue("website")) != "" {
-		log.Printf("public.commentSubmit: honeypot tripped from %s", h.clientIP(r))
-		redirectBack("")
-		return
-	}
-
-	// IP blacklist — silent drop of any client matching a configured
-	// block range. Runs before any other anti-spam layer so blocked
-	// ranges never touch the DB or the Turnstile API. Empty /
-	// misconfigured lists are no-ops.
-	if blocklist := spam.ParseIPBlocklist(weblog.IPBlacklist); len(blocklist) > 0 {
-		if ipAddr := h.clientIP(r); ipAddr != "" && blocklist.Contains(ipAddr) {
-			log.Printf("public.commentSubmit: ip-blacklist hit from %s", ipAddr)
-			redirectBack("")
-			return
-		}
-	}
-
-	// Time check — reject submissions that arrive suspiciously soon after
-	// the form was rendered.
-	if ts, err := strconv.ParseInt(r.PostFormValue("_ts"), 10, 64); err == nil {
-		if time.Since(time.Unix(ts, 0)) < minFormLifetime {
-			redirectBack(tr(weblog, r, "comment.error.tooFast"))
-			return
-		}
-	}
-
-	name := strings.TrimSpace(r.PostFormValue("name"))
-	email := strings.TrimSpace(r.PostFormValue("email"))
-	urlField := strings.TrimSpace(r.PostFormValue("url"))
-	body := strings.TrimSpace(r.PostFormValue("description"))
-	if name == "" || body == "" {
-		redirectBack(tr(weblog, r, "comment.error.required"))
-		return
-	}
-	const maxBodyLen = 5000
-	if len(body) > maxBodyLen {
-		redirectBack(tr(weblog, r, "comment.error.tooLong"))
-		return
-	}
-	// URL allow-list: http / https / mailto only. Rejects
-	// javascript:, data:, vbscript:, etc. so a stored URL can never
-	// ride an anchor into a browser-executed script.
-	if urlField != "" && !isAllowedCommentURLScheme(urlField) {
-		redirectBack(tr(weblog, r, "comment.error.badScheme"))
-		return
-	}
-
-	// Spam-word check: silent rejection, same UX as honeypot trip.
-	if spam.MatchesAny([]string{name, email, urlField, body}, spam.ParseWords(weblog.SpamWords)) {
-		log.Printf("public.commentSubmit: spam word match from %s", h.clientIP(r))
-		redirectBack("")
-		return
-	}
-
-	// Turnstile verification. Skipped entirely when not configured.
-	if h.Turnstile != nil && h.Turnstile.Enabled() {
-		token := r.PostFormValue("cf-turnstile-response")
-		ok, err := h.Turnstile.Verify(ctx, token, h.clientIP(r))
-		if err != nil {
-			log.Printf("public.commentSubmit: turnstile error: %v", err)
-			redirectBack(tr(weblog, r, "comment.error.turnstileVerify"))
-			return
-		}
-		if !ok {
-			redirectBack(tr(weblog, r, "comment.error.turnstileFail"))
-			return
-		}
 	}
 
 	ip := h.clientIP(r)
@@ -163,17 +56,16 @@ func (h *Handler) commentSubmit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	status := resolveMessageStatus(ctx, h, weblog.CommentMode, email)
-
+	status := resolveMessageStatus(ctx, h, weblog.CommentMode, fields.email)
 	msg := domain.Message{
 		WID:         h.WID,
 		EntryID:     entry.ID,
 		Status:      status,
 		PostedAt:    time.Now(),
-		AuthorName:  name,
-		AuthorEmail: email,
-		AuthorURL:   urlField,
-		Body:        body,
+		AuthorName:  fields.name,
+		AuthorEmail: fields.email,
+		AuthorURL:   fields.url,
+		Body:        fields.body,
 		IPAddress:   ip,
 		UserAgent:   r.UserAgent(),
 	}
@@ -183,21 +75,180 @@ func (h *Handler) commentSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Cookie prefill — save on explicit opt-in, clear on opt-out so visitors
-	// can change machines / reset. Classic SB3 behaviour.
-	if r.PostFormValue("set_cookie") == "1" {
-		setPrefillCookie(w, r, commenterCookieName, name)
-		setPrefillCookie(w, r, commenterCookieEmail, email)
-		setPrefillCookie(w, r, commenterCookieURL, urlField)
-	} else {
-		clearPrefillCookie(w, commenterCookieName)
-		clearPrefillCookie(w, commenterCookieEmail)
-		clearPrefillCookie(w, commenterCookieURL)
-	}
+	applyCommenterCookies(w, r, fields)
 
 	// Successful submit: drop back to the entry page. Using SeeOther (303)
 	// converts the POST into a GET so refreshes don't resend.
-	http.Redirect(w, r, root(r)+fmt.Sprintf("/entry/%d/#comments", entryID), http.StatusSeeOther)
+	http.Redirect(w, r, root(r)+fmt.Sprintf("/entry/%d/#comments", entry.ID), http.StatusSeeOther)
+}
+
+// commentFields is the validated subset of the POST form that downstream
+// persistence and cookie writes need. screenCommentSubmission populates
+// it after every anti-spam layer has cleared.
+type commentFields struct {
+	name      string
+	email     string
+	url       string
+	body      string
+	setCookie bool
+}
+
+// loadCommentTarget resolves the entry-key URL parameter to a published
+// entry on a comment-accepting weblog. Every failure mode is wired to
+// the appropriate HTTP response so the caller only has to bail on the
+// `ok=false` return.
+//
+// The order of checks matters: per-entry AcceptComments runs *after*
+// the publish-status gate so an unpublished entry stays 404 — surfacing
+// 403 there would leak the existence of a draft / closed entry to
+// unauthenticated readers.
+func (h *Handler) loadCommentTarget(w http.ResponseWriter, r *http.Request, key string) (*domain.Entry, *domain.Weblog, bool) {
+	ctx := r.Context()
+	entry, _, err := h.resolveEntryKey(ctx, key)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			http.NotFound(w, r)
+			return nil, nil, false
+		}
+		log.Printf("public.commentSubmit: load entry: %v", err)
+		http.Error(w, "failed to load entry", http.StatusInternalServerError)
+		return nil, nil, false
+	}
+	weblog, err := h.Store.WeblogByID(ctx, h.WID)
+	if err != nil {
+		log.Printf("public.commentSubmit: load weblog: %v", err)
+		http.Error(w, "site not configured", http.StatusInternalServerError)
+		return nil, nil, false
+	}
+	if weblog.CommentMode == domain.CommentClosed {
+		http.Error(w, "comments are closed", http.StatusForbidden)
+		return nil, nil, false
+	}
+	if entry.Status != domain.EntryPublished {
+		http.NotFound(w, r)
+		return nil, nil, false
+	}
+	if !entry.AcceptComments {
+		http.Error(w, "comments are closed", http.StatusForbidden)
+		return nil, nil, false
+	}
+	return entry, weblog, true
+}
+
+// makeCommentRedirect builds the redirect-back closure used by every
+// anti-spam layer in the comment pipeline. An empty reason becomes a
+// "silent" redirect (no error fragment), matching the honeypot / IP
+// blacklist / spam-word UX that deliberately avoids surfacing why the
+// submission was rejected.
+func makeCommentRedirect(w http.ResponseWriter, r *http.Request, siteBack string) func(reason string) {
+	return func(reason string) {
+		target := siteBack
+		if reason != "" {
+			target += "?err=" + url.QueryEscape(reason) + "#comment-form"
+		}
+		http.Redirect(w, r, target, http.StatusSeeOther)
+	}
+}
+
+// screenCommentSubmission runs the anti-spam pipeline against the
+// posted form: parse, honeypot, IP blacklist, form-lifetime, required
+// fields + length, URL scheme allow-list, spam words, Turnstile. When
+// any layer rejects, it calls redirectBack with the appropriate reason
+// (or "" for the silent-drop variants) and returns ok=false; the caller
+// must stop without writing further to w.
+func (h *Handler) screenCommentSubmission(w http.ResponseWriter, r *http.Request, weblog *domain.Weblog, redirectBack func(string)) (commentFields, bool) {
+	_ = w // redirect helpers own w
+	if err := r.ParseForm(); err != nil {
+		redirectBack(tr(weblog, r, "comment.error.parseForm"))
+		return commentFields{}, false
+	}
+	// Honeypot — legitimate users can't see or fill this field.
+	if strings.TrimSpace(r.PostFormValue("website")) != "" {
+		log.Printf("public.commentSubmit: honeypot tripped from %s", h.clientIP(r))
+		redirectBack("")
+		return commentFields{}, false
+	}
+	// IP blacklist — silent drop of any client matching a configured
+	// block range. Runs before any other anti-spam layer so blocked
+	// ranges never touch the DB or the Turnstile API. Empty /
+	// misconfigured lists are no-ops.
+	if blocklist := spam.ParseIPBlocklist(weblog.IPBlacklist); len(blocklist) > 0 {
+		if ipAddr := h.clientIP(r); ipAddr != "" && blocklist.Contains(ipAddr) {
+			log.Printf("public.commentSubmit: ip-blacklist hit from %s", ipAddr)
+			redirectBack("")
+			return commentFields{}, false
+		}
+	}
+	// Time check — reject submissions that arrive suspiciously soon after
+	// the form was rendered.
+	if ts, err := strconv.ParseInt(r.PostFormValue("_ts"), 10, 64); err == nil {
+		if time.Since(time.Unix(ts, 0)) < minFormLifetime {
+			redirectBack(tr(weblog, r, "comment.error.tooFast"))
+			return commentFields{}, false
+		}
+	}
+
+	fields := commentFields{
+		name:      strings.TrimSpace(r.PostFormValue("name")),
+		email:     strings.TrimSpace(r.PostFormValue("email")),
+		url:       strings.TrimSpace(r.PostFormValue("url")),
+		body:      strings.TrimSpace(r.PostFormValue("description")),
+		setCookie: r.PostFormValue("set_cookie") == "1",
+	}
+	if fields.name == "" || fields.body == "" {
+		redirectBack(tr(weblog, r, "comment.error.required"))
+		return commentFields{}, false
+	}
+	const maxBodyLen = 5000
+	if len(fields.body) > maxBodyLen {
+		redirectBack(tr(weblog, r, "comment.error.tooLong"))
+		return commentFields{}, false
+	}
+	// URL allow-list: http / https / mailto only. Rejects
+	// javascript:, data:, vbscript:, etc. so a stored URL can never
+	// ride an anchor into a browser-executed script.
+	if fields.url != "" && !isAllowedCommentURLScheme(fields.url) {
+		redirectBack(tr(weblog, r, "comment.error.badScheme"))
+		return commentFields{}, false
+	}
+	// Spam-word check: silent rejection, same UX as honeypot trip.
+	if spam.MatchesAny([]string{fields.name, fields.email, fields.url, fields.body}, spam.ParseWords(weblog.SpamWords)) {
+		log.Printf("public.commentSubmit: spam word match from %s", h.clientIP(r))
+		redirectBack("")
+		return commentFields{}, false
+	}
+	// Turnstile verification. Skipped entirely when not configured.
+	if h.Turnstile != nil && h.Turnstile.Enabled() {
+		token := r.PostFormValue("cf-turnstile-response")
+		passed, err := h.Turnstile.Verify(r.Context(), token, h.clientIP(r))
+		if err != nil {
+			log.Printf("public.commentSubmit: turnstile error: %v", err)
+			redirectBack(tr(weblog, r, "comment.error.turnstileVerify"))
+			return commentFields{}, false
+		}
+		if !passed {
+			redirectBack(tr(weblog, r, "comment.error.turnstileFail"))
+			return commentFields{}, false
+		}
+	}
+	return fields, true
+}
+
+// applyCommenterCookies persists the visitor's name / email / url so
+// the form pre-fills on the next visit, mirroring SB3's behaviour.
+// Visitors opt in via the "set_cookie" form checkbox; opting out
+// clears any previously stored values so visitors can change machines
+// or reset cleanly.
+func applyCommenterCookies(w http.ResponseWriter, r *http.Request, fields commentFields) {
+	if fields.setCookie {
+		setPrefillCookie(w, r, commenterCookieName, fields.name)
+		setPrefillCookie(w, r, commenterCookieEmail, fields.email)
+		setPrefillCookie(w, r, commenterCookieURL, fields.url)
+		return
+	}
+	clearPrefillCookie(w, commenterCookieName)
+	clearPrefillCookie(w, commenterCookieEmail)
+	clearPrefillCookie(w, commenterCookieURL)
 }
 
 // resolveMessageStatus turns the weblog's CommentMode + the submitter's
