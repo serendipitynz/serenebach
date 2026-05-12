@@ -55,7 +55,7 @@ func (m *Manager) Create(ctx context.Context, w http.ResponseWriter, r *http.Req
 func (m *Manager) Destroy(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 	c, err := r.Cookie(CookieName)
 	if err != nil {
-		return nil
+		return nil //nolint:nilerr // missing cookie is the expected "no session to destroy" path.
 	}
 	if err := m.Store.DeleteSession(ctx, c.Value); err != nil {
 		return err

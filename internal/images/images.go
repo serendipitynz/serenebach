@@ -128,7 +128,7 @@ func (s *Store) SaveUpload(src io.Reader, originalName, mime string, now time.Ti
 	if decodeErr != nil {
 		// Keep the file — it passed the MIME check — but skip thumbnailing.
 		// The admin UI falls back to the original for its preview.
-		return stored, nil
+		return stored, nil //nolint:nilerr // decode failure is a non-fatal fallback; the stored original is still usable.
 	}
 	stored.Width = img.Bounds().Dx()
 	stored.Height = img.Bounds().Dy()
@@ -136,7 +136,7 @@ func (s *Store) SaveUpload(src io.Reader, originalName, mime string, now time.Ti
 	thumbName := strings.TrimSuffix(baseName, "."+ext) + ".thumb.jpg"
 	thumbAbs := filepath.Join(absDir, thumbName)
 	if err := writeThumbnail(img, thumbAbs); err != nil {
-		return stored, nil
+		return stored, nil //nolint:nilerr // thumbnail failure is non-fatal; admin UI falls back to the original.
 	}
 	stored.ThumbPath = filepath.ToSlash(filepath.Join(yearMonth, thumbName))
 	return stored, nil
