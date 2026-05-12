@@ -108,13 +108,14 @@ func (h *Handler) imagesGenerateAlt(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		msg := err.Error()
 		status := http.StatusOK // tool-error shape — non-transport errors use 200 + ok:false
-		if errors.Is(err, ai.ErrVisionUnsupported) {
+		switch {
+		case errors.Is(err, ai.ErrVisionUnsupported):
 			msg = "vision_unsupported"
-		} else if errors.Is(err, ai.ErrTimeout) {
+		case errors.Is(err, ai.ErrTimeout):
 			msg = "timeout"
-		} else if errors.Is(err, ai.ErrRateLimited) {
+		case errors.Is(err, ai.ErrRateLimited):
 			msg = "rate_limited"
-		} else if errors.Is(err, ai.ErrUnauthorized) {
+		case errors.Is(err, ai.ErrUnauthorized):
 			msg = "unauthorized"
 		}
 		h.auditAI(r.Context(), *actor, "ai.alt_generate", id, aiCallRecord{

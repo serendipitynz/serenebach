@@ -283,67 +283,17 @@ func (s *Store) TopEntries(ctx context.Context, mainDB *sql.DB, since time.Time,
 	}
 
 	if sort == SortByLikes || sort == SortByStamps {
-		q := `SELECT id, likes_count, stamps_count FROM entries ORDER BY ` + orderClause + ` LIMIT ?`
-		erows, err := mainDB.QueryContext(ctx, q, limit)
-		if err != nil {
-			return nil, fmt.Errorf("analytics: top entries engagement: %w", err)
-		}
-		defer erows.Close()
-		for erows.Next() {
-			var id, l, st int64
-			if err := erows.Scan(&id, &l, &st); err != nil {
-				return nil, err
-			}
-			ids = append(ids, id)
-			likesByID[id] = l
-			stampsByID[id] = st
-		}
-		if err := erows.Err(); err != nil {
+		if err := loadEngagementByOrder(ctx, mainDB, orderClause, limit, &ids, likesByID, stampsByID); err != nil {
 			return nil, err
 		}
 	} else {
-		// Views sort: pull likes/stamps for just the IDs in viewsByID
-		// so the table can still show those columns. When mainDB is nil
-		// (tests / analytics-only callers) the engagement columns stay
-		// at zero and views-sort still ranks correctly.
-		for id := range viewsByID {
-			ids = append(ids, id)
+		var err error
+		ids, err = collectViewsSortedIDs(ctx, mainDB, viewsByID, limit, likesByID, stampsByID)
+		if err != nil {
+			return nil, err
 		}
 		if len(ids) == 0 {
 			return nil, nil
-		}
-		if mainDB != nil {
-			placeholders := make([]byte, 0, 2*len(ids))
-			args := make([]any, 0, len(ids))
-			for i, id := range ids {
-				if i > 0 {
-					placeholders = append(placeholders, ',')
-				}
-				placeholders = append(placeholders, '?')
-				args = append(args, id)
-			}
-			q := `SELECT id, likes_count, stamps_count FROM entries WHERE id IN (` + string(placeholders) + `)`
-			erows, err := mainDB.QueryContext(ctx, q, args...)
-			if err != nil {
-				return nil, fmt.Errorf("analytics: top entries engagement: %w", err)
-			}
-			defer erows.Close()
-			for erows.Next() {
-				var id, l, st int64
-				if err := erows.Scan(&id, &l, &st); err != nil {
-					return nil, err
-				}
-				likesByID[id] = l
-				stampsByID[id] = st
-			}
-			if err := erows.Err(); err != nil {
-				return nil, err
-			}
-		}
-		// Sort IDs by view count descending for the final order.
-		sortByValueDesc(ids, viewsByID)
-		if len(ids) > limit {
-			ids = ids[:limit]
 		}
 	}
 
@@ -418,6 +368,84 @@ func NewVisitorID() (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+// collectViewsSortedIDs returns the entry ids visible in viewsByID, sorted
+// by view count descending and capped at `limit`. Views-sort still wants
+// likes_count / stamps_count populated so the table can show those
+// columns; when mainDB is nil (tests / analytics-only callers) the
+// engagement columns stay at zero and the views ranking is unaffected.
+func collectViewsSortedIDs(ctx context.Context, mainDB *sql.DB, viewsByID map[int64]int64, limit int, likesByID, stampsByID map[int64]int64) ([]int64, error) {
+	ids := make([]int64, 0, len(viewsByID))
+	for id := range viewsByID {
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	if mainDB != nil {
+		if err := loadEngagementByIDs(ctx, mainDB, ids, likesByID, stampsByID); err != nil {
+			return nil, err
+		}
+	}
+	sortByValueDesc(ids, viewsByID)
+	if len(ids) > limit {
+		ids = ids[:limit]
+	}
+	return ids, nil
+}
+
+// loadEngagementByOrder reads ids + likes_count + stamps_count from the
+// entries table ordered by `orderClause` (caller-provided; trusted), used
+// by the engagement-sorted TopEntries paths. The ids slice is grown via
+// the pointer so the caller's final ordering reflects the SQL order.
+func loadEngagementByOrder(ctx context.Context, mainDB *sql.DB, orderClause string, limit int, ids *[]int64, likesByID, stampsByID map[int64]int64) error {
+	q := `SELECT id, likes_count, stamps_count FROM entries ORDER BY ` + orderClause + ` LIMIT ?`
+	rows, err := mainDB.QueryContext(ctx, q, limit)
+	if err != nil {
+		return fmt.Errorf("analytics: top entries engagement: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, l, st int64
+		if err := rows.Scan(&id, &l, &st); err != nil {
+			return err
+		}
+		*ids = append(*ids, id)
+		likesByID[id] = l
+		stampsByID[id] = st
+	}
+	return rows.Err()
+}
+
+// loadEngagementByIDs fills likesByID / stampsByID for the specific id set,
+// used by the views-sorted TopEntries path so the table can show the
+// engagement columns even when the sort is not by them.
+func loadEngagementByIDs(ctx context.Context, mainDB *sql.DB, ids []int64, likesByID, stampsByID map[int64]int64) error {
+	placeholders := make([]byte, 0, 2*len(ids))
+	args := make([]any, 0, len(ids))
+	for i, id := range ids {
+		if i > 0 {
+			placeholders = append(placeholders, ',')
+		}
+		placeholders = append(placeholders, '?')
+		args = append(args, id)
+	}
+	q := `SELECT id, likes_count, stamps_count FROM entries WHERE id IN (` + string(placeholders) + `)`
+	rows, err := mainDB.QueryContext(ctx, q, args...)
+	if err != nil {
+		return fmt.Errorf("analytics: top entries engagement: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, l, st int64
+		if err := rows.Scan(&id, &l, &st); err != nil {
+			return err
+		}
+		likesByID[id] = l
+		stampsByID[id] = st
+	}
+	return rows.Err()
 }
 
 // EntryIDFromPath extracts the numeric entry id from /entry/<id>/ paths so
