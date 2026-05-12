@@ -4,13 +4,21 @@ version: "2"
 #
 # Scope: this file establishes the lint baseline that any developer
 # checkout (and, eventually, CI) can run as `golangci-lint run ./...`
-# with a clean exit. It does NOT enable additional linters beyond the
-# v2 default set (errcheck, govet, ineffassign, staticcheck, unused);
-# expanding the linter set (gosec, bodyclose, errorlint, ...) is
-# tracked separately and will land per-linter so review stays small.
+# with a clean exit. Additional linters are turned on one batch at a
+# time so review stays small; the v2 standard set plus the linters
+# listed under `enable` below are the current baseline.
 
 linters:
   default: standard
+  enable:
+    # All five of these came in already clean against the codebase
+    # when surveyed — turning them on adds protection going forward
+    # without requiring any code change today.
+    - bodyclose      # http.Response.Body left unclosed
+    - misspell       # English typos in comments / strings
+    - nakedret       # named-return functions that omit the return values
+    - prealloc       # slices that could be pre-allocated before append
+    - wastedassign   # values assigned but never read
   settings:
     errcheck:
       # Exclude conventional Go patterns where dropping the error is
