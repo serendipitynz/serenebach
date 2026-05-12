@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -81,7 +82,7 @@ func TestMCPTokenCRUD(t *testing.T) {
 
 	// MCPTokenByHash should return ErrNotFound for revoked token
 	_, err = s.MCPTokenByHash(ctx, hash)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for revoked token, got %v", err)
 	}
 }
@@ -163,12 +164,12 @@ func TestMCPTokenNotFoundErrors(t *testing.T) {
 	s := newTestStore(t)
 
 	_, err := s.MCPTokenByHash(ctx, HashMCPToken("nonexistent-token"))
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for MCPTokenByHash, got %v", err)
 	}
 
 	err = s.RevokeMCPToken(ctx, 1, 9999)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for RevokeMCPToken, got %v", err)
 	}
 }

@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
 
 	"github.com/serendipitynz/serenebach/internal/domain"
@@ -90,7 +91,7 @@ func TestCustomTagCRUD(t *testing.T) {
 		t.Fatalf("DeleteCustomTag: %v", err)
 	}
 	_, err = s.CustomTagByID(ctx, 1, id)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound after delete, got %v", err)
 	}
 }
@@ -104,7 +105,7 @@ func TestCustomTagDuplicateName(t *testing.T) {
 		t.Fatalf("first create: %v", err)
 	}
 	_, err = s.CreateCustomTag(ctx, domain.CustomTag{WID: 1, Name: "custom_x", Value: "b"})
-	if err != ErrSlugInUse {
+	if !errors.Is(err, ErrSlugInUse) {
 		t.Errorf("expected ErrSlugInUse for duplicate, got %v", err)
 	}
 }

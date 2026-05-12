@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -71,7 +72,7 @@ func TestSetEntryPinnedNotFound(t *testing.T) {
 	s := newTestStore(t)
 
 	err := s.SetEntryPinned(ctx, 1, 9999, true)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for missing entry, got %v", err)
 	}
 }
