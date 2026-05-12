@@ -958,100 +958,127 @@ func promoteExtraDirs(staging, finalOut string, pruneSet, oldRoots map[string]st
 	})
 
 	for _, root := range rootsByDepth {
-		stagedPath := filepath.Join(staging, filepath.FromSlash(root))
-		finalPath := filepath.Join(finalOut, filepath.FromSlash(root))
-
-		// Ensure the parent directory exists in finalOut so the
-		// rename below has a target.  MkdirAll is a no-op when the
-		// directory already exists (e.g. operator-managed dirs).
-		if err := os.MkdirAll(filepath.Dir(finalPath), 0o755); err != nil {
-			return fmt.Errorf("rebuild: mkdir parent %s: %w", finalPath, err)
-		}
-
-		// Identify active children that already live in finalPath (they
-		// were promoted in earlier iterations because we sort deepest
-		// first). We must preserve them across the parent rename.
-		var childrenToPreserve []string
-		for child := range pruneSet {
-			if child == root {
-				continue
-			}
-			if strings.HasPrefix(child, root+"/") {
-				childRel := child[len(root)+1:]
-				if dirExists(filepath.Join(finalPath, filepath.FromSlash(childRel))) {
-					childrenToPreserve = append(childrenToPreserve, child)
-				}
-			}
-		}
-
-		var backupDir string
-		finalExists := dirExists(finalPath)
-		if finalExists {
-			bd, err := os.MkdirTemp(finalOut, ".sb-backup-")
-			if err != nil {
-				return fmt.Errorf("rebuild: create backup dir: %w", err)
-			}
-			backupDir = bd
-			backupPath := filepath.Join(bd, "dir")
-			if err := os.Rename(finalPath, backupPath); err != nil {
-				_ = os.RemoveAll(bd)
-				return fmt.Errorf("rebuild: backup %s: %w", finalPath, err)
-			}
-		}
-		if err := os.Rename(stagedPath, finalPath); err != nil {
-			if finalExists {
-				_ = os.Rename(filepath.Join(backupDir, "dir"), finalPath)
-			}
-			return fmt.Errorf("rebuild: promote %s: %w", finalPath, err)
-		}
-
-		// Restore preserved children from the backup.
-		for _, child := range childrenToPreserve {
-			childRel := child[len(root)+1:]
-			backupChild := filepath.Join(filepath.Join(backupDir, "dir"), filepath.FromSlash(childRel))
-			finalChild := filepath.Join(finalPath, filepath.FromSlash(childRel))
-			if dirExists(backupChild) {
-				// Ensure the intermediate directories exist in the
-				// freshly-promoted parent.
-				if err := os.MkdirAll(filepath.Dir(finalChild), 0o755); err != nil {
-					return fmt.Errorf("rebuild: mkdir child parent %s: %w", finalChild, err)
-				}
-				// Remove any empty placeholder that the parent staging
-				// dir may have left behind.
-				_ = os.RemoveAll(finalChild)
-				if err := os.Rename(backupChild, finalChild); err != nil {
-					return fmt.Errorf("rebuild: restore child %s: %w", finalChild, err)
-				}
-			}
-		}
-
-		if finalExists {
-			_ = os.RemoveAll(backupDir)
+		if err := promoteOneExtraDir(staging, finalOut, root, pruneSet); err != nil {
+			return err
 		}
 	}
 
-	// Prune stale page directories. Skip a stale root if any active
-	// descendant is still present — removing the parent would delete
-	// the active child as well.  When a stale parent has active
-	// children, remove only the parent's own index.html so the stale
-	// flat page stops being served while the child directories and
-	// any operator-managed sibling files survive.
+	return pruneStaleRoots(finalOut, pruneSet, oldRoots)
+}
+
+// promoteOneExtraDir promotes a single flat-page root from staging to
+// finalOut, preserving any already-promoted active children that live
+// under it (since promoteExtraDirs walks deepest-first, child roots
+// may already exist in finalPath when we get here).
+func promoteOneExtraDir(staging, finalOut, root string, pruneSet map[string]struct{}) error {
+	stagedPath := filepath.Join(staging, filepath.FromSlash(root))
+	finalPath := filepath.Join(finalOut, filepath.FromSlash(root))
+
+	// Ensure the parent directory exists in finalOut so the rename
+	// below has a target. MkdirAll is a no-op when the directory
+	// already exists (e.g. operator-managed dirs).
+	if err := os.MkdirAll(filepath.Dir(finalPath), 0o755); err != nil {
+		return fmt.Errorf("rebuild: mkdir parent %s: %w", finalPath, err)
+	}
+
+	// Identify active children that already live in finalPath (they
+	// were promoted in earlier iterations because we sort deepest
+	// first). We must preserve them across the parent rename.
+	childrenToPreserve := activeChildrenOf(root, finalPath, pruneSet)
+
+	var backupDir string
+	finalExists := dirExists(finalPath)
+	if finalExists {
+		bd, err := os.MkdirTemp(finalOut, ".sb-backup-")
+		if err != nil {
+			return fmt.Errorf("rebuild: create backup dir: %w", err)
+		}
+		backupDir = bd
+		backupPath := filepath.Join(bd, "dir")
+		if err := os.Rename(finalPath, backupPath); err != nil {
+			_ = os.RemoveAll(bd)
+			return fmt.Errorf("rebuild: backup %s: %w", finalPath, err)
+		}
+	}
+	if err := os.Rename(stagedPath, finalPath); err != nil {
+		if finalExists {
+			_ = os.Rename(filepath.Join(backupDir, "dir"), finalPath)
+		}
+		return fmt.Errorf("rebuild: promote %s: %w", finalPath, err)
+	}
+
+	if err := restorePreservedChildren(backupDir, finalPath, root, childrenToPreserve); err != nil {
+		return err
+	}
+
+	if finalExists {
+		_ = os.RemoveAll(backupDir)
+	}
+	return nil
+}
+
+// activeChildrenOf returns the subset of pruneSet rooted under `root`
+// whose finalPath equivalents are already on disk — i.e. children that
+// were promoted in earlier deepest-first iterations and must survive
+// the parent's rename.
+func activeChildrenOf(root, finalPath string, pruneSet map[string]struct{}) []string {
+	var out []string
+	for child := range pruneSet {
+		if child == root {
+			continue
+		}
+		if !strings.HasPrefix(child, root+"/") {
+			continue
+		}
+		childRel := child[len(root)+1:]
+		if dirExists(filepath.Join(finalPath, filepath.FromSlash(childRel))) {
+			out = append(out, child)
+		}
+	}
+	return out
+}
+
+// restorePreservedChildren moves the preserved child dirs back into the
+// freshly-promoted parent. The backup dir is laid out as
+// <backupDir>/dir/<childRel>, mirroring what was previously at finalPath.
+func restorePreservedChildren(backupDir, finalPath, root string, children []string) error {
+	for _, child := range children {
+		childRel := child[len(root)+1:]
+		backupChild := filepath.Join(filepath.Join(backupDir, "dir"), filepath.FromSlash(childRel))
+		finalChild := filepath.Join(finalPath, filepath.FromSlash(childRel))
+		if !dirExists(backupChild) {
+			continue
+		}
+		// Ensure the intermediate directories exist in the
+		// freshly-promoted parent.
+		if err := os.MkdirAll(filepath.Dir(finalChild), 0o755); err != nil {
+			return fmt.Errorf("rebuild: mkdir child parent %s: %w", finalChild, err)
+		}
+		// Remove any empty placeholder that the parent staging dir
+		// may have left behind.
+		_ = os.RemoveAll(finalChild)
+		if err := os.Rename(backupChild, finalChild); err != nil {
+			return fmt.Errorf("rebuild: restore child %s: %w", finalChild, err)
+		}
+	}
+	return nil
+}
+
+// pruneStaleRoots removes flat-page directories that were tracked in the
+// previous manifest (`oldRoots`) but are no longer active (`pruneSet`).
+// A stale root with an active descendant only loses its index.html so
+// the descendant survives; operator-managed siblings on disk that were
+// never tracked are left untouched.
+func pruneStaleRoots(finalOut string, pruneSet, oldRoots map[string]struct{}) error {
 	for root := range oldRoots {
 		if _, stillActive := pruneSet[root]; stillActive {
 			continue
-		}
-		hasActiveDescendant := false
-		for active := range pruneSet {
-			if strings.HasPrefix(active, root+"/") {
-				hasActiveDescendant = true
-				break
-			}
 		}
 		stalePath := filepath.Join(finalOut, filepath.FromSlash(root))
 		if !dirExists(stalePath) {
 			continue
 		}
-		if hasActiveDescendant {
+		if hasActiveDescendant(root, pruneSet) {
 			staleIndex := filepath.Join(stalePath, "index.html")
 			if err := os.Remove(staleIndex); err != nil && !os.IsNotExist(err) {
 				return fmt.Errorf("rebuild: prune stale index %s: %w", staleIndex, err)
@@ -1063,6 +1090,17 @@ func promoteExtraDirs(staging, finalOut string, pruneSet, oldRoots map[string]st
 		}
 	}
 	return nil
+}
+
+// hasActiveDescendant reports whether any element of pruneSet sits
+// strictly under `root` on the URL path.
+func hasActiveDescendant(root string, pruneSet map[string]struct{}) bool {
+	for active := range pruneSet {
+		if strings.HasPrefix(active, root+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 // depth counts path segments.
