@@ -178,12 +178,18 @@ func handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// If an AUTH_PIN is configured, show a tiny HTML form instead of auto-approving.
-	if authPIN != "" {
-		if r.Method == http.MethodGet {
-			renderPINForm(w, r, state, redirectURI, codeChallenge)
+	if authPIN == "" {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		if r.Method == http.MethodPost {
+		// Fall through to code issuance below.
+	} else {
+		switch r.Method {
+		case http.MethodGet:
+			renderPINForm(w, r, state, redirectURI, codeChallenge)
+			return
+		case http.MethodPost:
 			if err := r.ParseForm(); err != nil {
 				http.Error(w, "bad form", http.StatusBadRequest)
 				return
@@ -198,13 +204,10 @@ func handleAuthorize(w http.ResponseWriter, r *http.Request) {
 			codeChallenge = r.FormValue("code_challenge")
 			codeChallengeMethod = r.FormValue("code_challenge_method")
 			// Fall through to code issuance below.
-		} else {
+		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-	} else if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
 	}
 
 	code := randomString(32)

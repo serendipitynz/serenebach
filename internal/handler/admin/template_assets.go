@@ -97,14 +97,7 @@ func (h *Handler) templateAssetUpload(w http.ResponseWriter, r *http.Request) {
 	// "text/plain" for a .css file). Try the filename extension when
 	// sniffing lands outside the allowlist.
 	if !allowedTemplateAssetMIME[mt] {
-		if byExt := mime.TypeByExtension(strings.ToLower(filepath.Ext(header.Filename))); byExt != "" {
-			if idx := strings.IndexByte(byExt, ';'); idx >= 0 {
-				byExt = strings.TrimSpace(byExt[:idx])
-			}
-			if allowedTemplateAssetMIME[byExt] {
-				mt = byExt
-			}
-		}
+		mt = templateAssetMIMEFromExt(mt, header.Filename)
 	}
 	if !allowedTemplateAssetMIME[mt] {
 		http.Error(w, trf(r, "common.error.unsupportedMime", mt), http.StatusUnsupportedMediaType)
@@ -199,4 +192,23 @@ func (h *Handler) templateAssetDelete(w http.ResponseWriter, r *http.Request) {
 	// file was already gone.
 	_ = os.Remove(filepath.Join(h.TemplateDir, strconv.FormatInt(tplID, 10), asset.Filename))
 	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/templates/%d/edit?ok=asset-deleted", tplID), http.StatusFound)
+}
+
+// templateAssetMIMEFromExt resolves the upload MIME by filename extension
+// when the sniffed `current` value sits outside the asset allowlist. It
+// returns `current` unchanged when the extension is unknown or the
+// extension-derived type is also outside the allowlist — the caller's
+// next allowlist check then rejects the upload.
+func templateAssetMIMEFromExt(current, filename string) string {
+	byExt := mime.TypeByExtension(strings.ToLower(filepath.Ext(filename)))
+	if byExt == "" {
+		return current
+	}
+	if idx := strings.IndexByte(byExt, ';'); idx >= 0 {
+		byExt = strings.TrimSpace(byExt[:idx])
+	}
+	if allowedTemplateAssetMIME[byExt] {
+		return byExt
+	}
+	return current
 }

@@ -139,26 +139,7 @@ func main() {
 
 func serve(a *app.App, cfg *config.Config) error {
 	if cfg.Mode == config.ModeCGI {
-		// Apache may set REQUEST_URI to the rewritten URI (e.g.
-		// /serenebach.cgi/admin/login) rather than the original path.
-		// Go's net/http/cgi uses REQUEST_URI first, which causes the
-		// chi router to see /serenebach.cgi/... and return 404.
-		// PATH_INFO always holds the correct path per the CGI spec.
-		log.Printf("cgi: method=%s path=%s content-length=%s",
-			os.Getenv("REQUEST_METHOD"),
-			os.Getenv("PATH_INFO"),
-			os.Getenv("CONTENT_LENGTH"),
-		)
-		if pathInfo := os.Getenv("PATH_INFO"); pathInfo != "" {
-			uri := pathInfo
-			if qs := os.Getenv("QUERY_STRING"); qs != "" {
-				uri += "?" + qs
-			}
-			if err := os.Setenv("REQUEST_URI", uri); err != nil {
-				log.Printf("cgi: setenv REQUEST_URI: %v", err)
-			}
-		}
-		return cgi.Serve(a.Handler())
+		return serveCGI(a)
 	}
 	log.Printf("serenebach: listening on %s (db=%s)", cfg.Addr, cfg.DBPath)
 	h := a.Handler()
@@ -205,6 +186,31 @@ func serve(a *app.App, cfg *config.Config) error {
 		}
 		return err
 	}
+}
+
+// serveCGI runs the handler under the Apache / Sakura CGI gateway.
+// Apache may set REQUEST_URI to the rewritten URI (e.g.
+// /serenebach.cgi/admin/login) rather than the original path. Go's
+// net/http/cgi uses REQUEST_URI first, which causes the chi router to
+// see /serenebach.cgi/... and return 404. PATH_INFO always holds the
+// correct path per the CGI spec, so it is promoted to REQUEST_URI
+// before handing the handler off to cgi.Serve.
+func serveCGI(a *app.App) error {
+	log.Printf("cgi: method=%s path=%s content-length=%s",
+		os.Getenv("REQUEST_METHOD"),
+		os.Getenv("PATH_INFO"),
+		os.Getenv("CONTENT_LENGTH"),
+	)
+	if pathInfo := os.Getenv("PATH_INFO"); pathInfo != "" {
+		uri := pathInfo
+		if qs := os.Getenv("QUERY_STRING"); qs != "" {
+			uri += "?" + qs
+		}
+		if err := os.Setenv("REQUEST_URI", uri); err != nil {
+			log.Printf("cgi: setenv REQUEST_URI: %v", err)
+		}
+	}
+	return cgi.Serve(a.Handler())
 }
 
 // runExtractAssets writes the embedded admin static files (admin.css,

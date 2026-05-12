@@ -70,21 +70,20 @@ func (h *Handler) tryLegacyEntryHTML(w http.ResponseWriter, r *http.Request) boo
 	// id-form first: {prefix}{N}. legacy_file values can't start with
 	// {prefix}+digits-only on a properly-administered SB3 (admin
 	// restricts entry_file to \w+) so this ordering is safe.
-	if cfg.IDPrefix != "" && strings.HasPrefix(key, cfg.IDPrefix) {
-		if n, err := strconv.ParseInt(key[len(cfg.IDPrefix):], 10, 64); err == nil {
-			ref, err := h.Store.EntryByLegacyID(r.Context(), h.WID, n)
-			if err == nil {
-				http.Redirect(w, r, root(r)+"/entry/"+entryKeyForRef(ref)+"/", http.StatusMovedPermanently)
-				return true
-			}
-			if !errors.Is(err, repo.ErrNotFound) {
-				http.Error(w, "lookup failed", http.StatusInternalServerError)
-				return true
-			}
-			// Not found by legacy_id falls through to legacy_file
-			// in case the operator stored "eid123" as a custom save
-			// name. This is an edge case but cheap to support.
+	hasIDPrefix := cfg.IDPrefix != "" && strings.HasPrefix(key, cfg.IDPrefix)
+	if n, perr := strconv.ParseInt(strings.TrimPrefix(key, cfg.IDPrefix), 10, 64); hasIDPrefix && perr == nil {
+		ref, err := h.Store.EntryByLegacyID(r.Context(), h.WID, n)
+		if err == nil {
+			http.Redirect(w, r, root(r)+"/entry/"+entryKeyForRef(ref)+"/", http.StatusMovedPermanently)
+			return true
 		}
+		if !errors.Is(err, repo.ErrNotFound) {
+			http.Error(w, "lookup failed", http.StatusInternalServerError)
+			return true
+		}
+		// Not found by legacy_id falls through to legacy_file in case
+		// the operator stored "eid123" as a custom save name. This is
+		// an edge case but cheap to support.
 	}
 	ref, err := h.Store.EntryByLegacyFile(r.Context(), h.WID, key)
 	if err != nil {

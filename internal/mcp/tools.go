@@ -322,17 +322,20 @@ func (s *Server) toolGetEntry(ctx context.Context, raw json.RawMessage) (string,
 	}
 	var entry *domain.Entry
 	var err error
-	if args.ID > 0 {
+	n, perr := strconv.ParseInt(args.Slug, 10, 64)
+	switch {
+	case args.ID > 0:
 		entry, err = s.Store.EntryByID(ctx, s.WID, args.ID)
-	} else {
-		if n, perr := strconv.ParseInt(args.Slug, 10, 64); perr == nil && n > 0 {
-			entry, err = s.Store.EntryByID(ctx, s.WID, n)
-			if errors.Is(err, repo.ErrNotFound) {
-				entry, err = s.Store.EntryBySlug(ctx, s.WID, args.Slug)
-			}
-		} else {
+	case perr == nil && n > 0:
+		// args.Slug is numeric — try the id form first so authors can
+		// paste either form. Fall back to slug lookup if no entry with
+		// that id exists (the slug may itself look numeric).
+		entry, err = s.Store.EntryByID(ctx, s.WID, n)
+		if errors.Is(err, repo.ErrNotFound) {
 			entry, err = s.Store.EntryBySlug(ctx, s.WID, args.Slug)
 		}
+	default:
+		entry, err = s.Store.EntryBySlug(ctx, s.WID, args.Slug)
 	}
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
