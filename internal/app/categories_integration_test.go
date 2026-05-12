@@ -167,6 +167,9 @@ func TestAdminCategoryReorderPersistsOrder(t *testing.T) {
 		_ = rows.Scan(&id)
 		ids = append(ids, id)
 	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
 	if len(ids) < 2 {
 		t.Fatalf("need at least 2 categories to reorder, got %d", len(ids))
 	}

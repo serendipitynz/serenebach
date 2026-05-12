@@ -319,6 +319,9 @@ func TestAdminLinkReorderPersistsOrder(t *testing.T) {
 		_ = rows.Scan(&id)
 		ids = append(ids, id)
 	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
 	if len(ids) < 3 {
 		t.Fatalf("expected 3 links, got %d", len(ids))
 	}
@@ -381,6 +384,9 @@ func TestAdminLinkMemberReorderPersistsOrder(t *testing.T) {
 		var id int64
 		_ = rows.Scan(&id)
 		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
 	}
 	if len(ids) < 3 {
 		t.Fatalf("expected 3 members, got %d", len(ids))
