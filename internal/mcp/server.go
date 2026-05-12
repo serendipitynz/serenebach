@@ -132,12 +132,16 @@ func (s *Server) Serve(ctx context.Context) error {
 	reader := bufio.NewReader(s.In)
 	enc := json.NewEncoder(s.Out)
 	for {
-		if err := ctx.Err(); err != nil {
+		// Context cancellation is the expected shutdown path for the
+		// long-running stdio loop.
+		select {
+		case <-ctx.Done():
 			return nil
+		default:
 		}
 		line, err := reader.ReadBytes('\n')
 		if len(line) == 0 && err == io.EOF {
-			return nil
+			return nil //nolint:nilerr // empty line + EOF is the normal end-of-input termination.
 		}
 		if err != nil && err != io.EOF {
 			return fmt.Errorf("mcp: read: %w", err)

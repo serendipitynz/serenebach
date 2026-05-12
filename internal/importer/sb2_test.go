@@ -274,6 +274,9 @@ func TestImportSB2UncategorisedFallback(t *testing.T) {
 		}
 		got[title] = cat
 	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
 	if got["Uncategorised Post"] != -1 {
 		t.Errorf("Uncategorised Post category_id = %d, want -1", got["Uncategorised Post"])
 	}

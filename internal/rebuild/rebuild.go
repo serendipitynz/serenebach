@@ -12,6 +12,7 @@ package rebuild
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -464,11 +465,11 @@ func writeEntries(ctx context.Context, store *repo.Store, opts Options, site con
 		// on the same repo API keeps behaviour identical to the dynamic
 		// permalink handler.
 		prev, err := store.PrevPublishedEntry(ctx, opts.WID, e)
-		if err != nil && err != repo.ErrNotFound {
+		if err != nil && !errors.Is(err, repo.ErrNotFound) {
 			return fmt.Errorf("rebuild: prev entry %d: %w", e.ID, err)
 		}
 		next, err := store.NextPublishedEntry(ctx, opts.WID, e)
-		if err != nil && err != repo.ErrNotFound {
+		if err != nil && !errors.Is(err, repo.ErrNotFound) {
 			return fmt.Errorf("rebuild: next entry %d: %w", e.ID, err)
 		}
 

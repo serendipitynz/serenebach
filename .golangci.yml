@@ -19,6 +19,14 @@ linters:
     - nakedret       # named-return functions that omit the return values
     - prealloc       # slices that could be pre-allocated before append
     - wastedassign   # values assigned but never read
+    # The next batch turns on linters whose findings were addressed
+    # in the same PR that introduced them. Justified exceptions sit
+    # next to the suppressed line as //nolint:<linter> comments.
+    - contextcheck   # missing context propagation
+    - errorlint      # err == sentinel comparisons that miss wrapped errors
+    - gochecknoinits # init() side-effects
+    - nilerr         # returning nil where the prior err was non-nil
+    - rowserrcheck   # sql.Rows.Err() not called after iteration
   settings:
     errcheck:
       # Exclude conventional Go patterns where dropping the error is
@@ -51,3 +59,11 @@ linters:
       - path: _test\.go
         linters:
           - errcheck
+      # The helpdocs package uses an init() to eagerly parse the embed.FS
+      # of Markdown help pages at startup. A package-level Load() would
+      # require every entry point (cmd/serenebach, MCP, importer, ...)
+      # to remember to call it; init() is the documented Go idiom for
+      # this kind of one-shot package bootstrap.
+      - path: docs/help/embed\.go
+        linters:
+          - gochecknoinits

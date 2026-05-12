@@ -68,7 +68,7 @@ func TestCacheStoresParseError(t *testing.T) {
 		t.Fatal("expected error for bad template")
 	}
 	_, err2 := c.Get("bad", badSrc, NoCallback)
-	if err1 != err2 {
+	if err1 != err2 { //nolint:errorlint // checking that the cache returns the same error instance, not a wrapped one.
 		t.Error("expected same error object to be returned from cache")
 	}
 }

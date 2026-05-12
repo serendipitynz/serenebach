@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/serendipitynz/serenebach/internal/domain"
@@ -118,7 +119,7 @@ func TestPageCRUD(t *testing.T) {
 		t.Fatalf("DeletePage: %v", err)
 	}
 	_, err = s.PageByID(ctx, 1, id)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound after delete, got %v", err)
 	}
 }
@@ -139,7 +140,7 @@ func TestPageSlugUnique(t *testing.T) {
 		WID: 1, AuthorID: 1, Title: "B", Body: "b",
 		Format: "html", Slug: "/about", Status: domain.PagePublished,
 	})
-	if err != ErrSlugInUse {
+	if !errors.Is(err, ErrSlugInUse) {
 		t.Errorf("expected ErrSlugInUse, got %v", err)
 	}
 }
@@ -152,7 +153,7 @@ func TestPageUpdateNotFound(t *testing.T) {
 		ID: 9999, WID: 1, Title: "X", Body: "b",
 		Format: "html", Slug: "/x", Status: domain.PagePublished,
 	})
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }
@@ -162,7 +163,7 @@ func TestPageDeleteNotFound(t *testing.T) {
 	s := newTestStore(t)
 
 	err := s.DeletePage(ctx, 1, 9999)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }

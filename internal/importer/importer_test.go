@@ -167,6 +167,9 @@ func TestImportCopiesFilteredContent(t *testing.T) {
 			category int64
 		}{body: body, author: author, category: cat}
 	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
 	pub1, ok := titles["Published One"]
 	if !ok {
 		t.Fatalf("Published One not imported; got %v", titles)

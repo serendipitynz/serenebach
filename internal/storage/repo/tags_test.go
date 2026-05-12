@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/serendipitynz/serenebach/internal/domain"
@@ -66,7 +67,7 @@ func TestTagCRUD(t *testing.T) {
 		t.Fatalf("DeleteTag: %v", err)
 	}
 	_, err = s.TagByID(ctx, 1, id)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound after delete, got %v", err)
 	}
 }
@@ -81,7 +82,7 @@ func TestTagSlugUnique(t *testing.T) {
 	}
 
 	_, err = s.CreateTag(ctx, domain.Tag{WID: 1, Name: "Tag B", Slug: "tag-a"})
-	if err != ErrSlugInUse {
+	if !errors.Is(err, ErrSlugInUse) {
 		t.Errorf("expected ErrSlugInUse for duplicate slug, got %v", err)
 	}
 }
@@ -95,7 +96,7 @@ func TestTagUpdateSlugUnique(t *testing.T) {
 
 	// Try to update tag 2 to use tag 1's slug
 	err := s.UpdateTag(ctx, domain.Tag{ID: id2, WID: 1, Name: "Tag B", Slug: "tag-a"})
-	if err != ErrSlugInUse {
+	if !errors.Is(err, ErrSlugInUse) {
 		t.Errorf("expected ErrSlugInUse on update collision, got %v", err)
 	}
 
@@ -146,11 +147,11 @@ func TestTagWIDScoping(t *testing.T) {
 
 	// TagByID with wrong wid should return ErrNotFound
 	_, err = s.TagByID(ctx, 2, id1)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for wrong wid, got %v", err)
 	}
 	_, err = s.TagByID(ctx, 1, id2)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for wrong wid, got %v", err)
 	}
 
@@ -170,22 +171,22 @@ func TestTagNotFoundErrors(t *testing.T) {
 	s := newTestStore(t)
 
 	_, err := s.TagByID(ctx, 1, 9999)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for TagByID, got %v", err)
 	}
 
 	_, err = s.TagBySlug(ctx, 1, "nonexistent")
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for TagBySlug, got %v", err)
 	}
 
 	err = s.UpdateTag(ctx, domain.Tag{ID: 9999, WID: 1, Name: "X", Slug: "x"})
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for UpdateTag, got %v", err)
 	}
 
 	err = s.DeleteTag(ctx, 1, 9999)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for DeleteTag, got %v", err)
 	}
 }

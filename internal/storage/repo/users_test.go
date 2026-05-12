@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -73,7 +74,7 @@ func TestUserCRUD(t *testing.T) {
 		t.Fatalf("DeleteUser: %v", err)
 	}
 	_, err = s.UserByID(ctx, id)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound after delete, got %v", err)
 	}
 }
@@ -94,7 +95,7 @@ func TestUserNameUnique(t *testing.T) {
 		WID: 1, Name: "dupname", DisplayName: "B", Email: "b@b.com",
 		Role: domain.RoleRegular,
 	}, "hash2")
-	if err != ErrUserNameInUse {
+	if !errors.Is(err, ErrUserNameInUse) {
 		t.Errorf("expected ErrUserNameInUse, got %v", err)
 	}
 }
@@ -119,7 +120,7 @@ func TestUserUpdateNameUnique(t *testing.T) {
 		ID: id2, WID: 1, Name: "user_a", DisplayName: "B", Email: "b@b.com",
 		Role: domain.RoleRegular,
 	})
-	if err != ErrUserNameInUse {
+	if !errors.Is(err, ErrUserNameInUse) {
 		t.Errorf("expected ErrUserNameInUse on update, got %v", err)
 	}
 }
@@ -232,7 +233,7 @@ func TestUserNotFoundErrors(t *testing.T) {
 	s := newTestStore(t)
 
 	_, err := s.UserByID(ctx, 9999)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for UserByID, got %v", err)
 	}
 
@@ -240,22 +241,22 @@ func TestUserNotFoundErrors(t *testing.T) {
 		ID: 9999, Name: "x", DisplayName: "X", Email: "x@x.com",
 		Role: domain.RoleRegular,
 	})
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for UpdateUser, got %v", err)
 	}
 
 	err = s.UpdateUserAIConfig(ctx, 9999, domain.User{})
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for UpdateUserAIConfig, got %v", err)
 	}
 
 	err = s.UpdateUserPassword(ctx, 9999, "hash")
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for UpdateUserPassword, got %v", err)
 	}
 
 	err = s.DeleteUser(ctx, 1, 9999)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for DeleteUser, got %v", err)
 	}
 }
@@ -408,7 +409,7 @@ func TestUserDeleteClearsSessions(t *testing.T) {
 
 	// Session should also be gone
 	_, err = s.SessionUser(ctx, "session-token-123")
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for session after user delete, got %v", err)
 	}
 }

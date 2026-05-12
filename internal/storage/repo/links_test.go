@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -79,7 +80,7 @@ func TestLinkCRUD(t *testing.T) {
 		t.Fatalf("DeleteLink: %v", err)
 	}
 	_, err = s.LinkByID(ctx, 1, id)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound after delete, got %v", err)
 	}
 }
@@ -181,11 +182,11 @@ func TestLinkWIDScoping(t *testing.T) {
 
 	// LinkByID with wrong wid should return ErrNotFound
 	_, err = s.LinkByID(ctx, 2, id1)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for wrong wid, got %v", err)
 	}
 	_, err = s.LinkByID(ctx, 1, id2)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for wrong wid, got %v", err)
 	}
 
@@ -219,19 +220,19 @@ func TestLinkNotFoundErrors(t *testing.T) {
 
 	// LinkByID with non-existent id
 	_, err := s.LinkByID(ctx, 1, 9999)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for LinkByID, got %v", err)
 	}
 
 	// UpdateLink with non-existent id
 	err = s.UpdateLink(ctx, domain.Link{ID: 9999, WID: 1, Name: "X", URL: "https://x.com", Kind: domain.LinkKindLink})
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for UpdateLink, got %v", err)
 	}
 
 	// DeleteLink with non-existent id
 	err = s.DeleteLink(ctx, 1, 9999)
-	if err != ErrNotFound {
+	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for DeleteLink, got %v", err)
 	}
 }
