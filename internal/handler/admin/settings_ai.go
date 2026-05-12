@@ -140,7 +140,7 @@ func (h *Handler) renderSettingsAI(w http.ResponseWriter, r *http.Request, newRa
 				log.Printf("admin.settingsAI: audit recent: %v", err)
 			} else {
 				for _, e := range entries {
-					tokenLabel := "—"
+					var tokenLabel string
 					if e.TokenID > 0 {
 						if n, ok := tokenName[e.TokenID]; ok {
 							tokenLabel = n
