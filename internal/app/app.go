@@ -72,21 +72,10 @@ func New(cfg *config.Config) (*App, error) {
 	sessions := session.NewManager(store)
 	cfVerifier := turnstile.New(cfg.TurnstileSiteKey, cfg.TurnstileSecret)
 
-	// Analytics store lives in the main DB by default. Operators with a
-	// retention policy that doesn't fit in the main file can point
-	// SB_ANALYTICS_DB at a dedicated SQLite file.
-	var analyticsStore *analytics.Store
-	if !cfg.AnalyticsDisabled {
-		if cfg.AnalyticsDBPath != "" && cfg.AnalyticsDBPath != cfg.DBPath {
-			var openErr error
-			analyticsStore, openErr = analytics.Open(cfg.AnalyticsDBPath, cfg.AnalyticsRetentionDays)
-			if openErr != nil {
-				_ = db.Close()
-				return nil, fmt.Errorf("app: analytics: %w", openErr)
-			}
-		} else {
-			analyticsStore = analytics.WrapMain(db, cfg.AnalyticsRetentionDays)
-		}
+	analyticsStore, err := openAnalyticsStore(cfg, db)
+	if err != nil {
+		_ = db.Close()
+		return nil, err
 	}
 
 	// Open Graph renderer pre-parses its fonts + default background at
@@ -156,21 +145,10 @@ func New(cfg *config.Config) (*App, error) {
 		mcpImageStore = images.NewStore(cfg.ImageDir)
 	}
 
-	// MCP audit log: default to the main DB (mcp_audit_log table shipped
-	// in migration 0030). When SB_MCP_AUDIT_DB is set to a different
-	// path, open a dedicated SQLite file — the mcpaudit package creates
-	// the schema on first open so operators don't need a second
-	// migration run.
-	var auditStore *mcpaudit.Store
-	if cfg.MCPAuditDBPath != "" && cfg.MCPAuditDBPath != cfg.DBPath {
-		var openErr error
-		auditStore, openErr = mcpaudit.Open(cfg.MCPAuditDBPath)
-		if openErr != nil {
-			_ = db.Close()
-			return nil, fmt.Errorf("app: mcp audit: %w", openErr)
-		}
-	} else {
-		auditStore = mcpaudit.WrapMain(db)
+	auditStore, err := openAuditStore(cfg, db)
+	if err != nil {
+		_ = db.Close()
+		return nil, err
 	}
 	adminH.Audit = auditStore
 
@@ -234,22 +212,9 @@ func New(cfg *config.Config) (*App, error) {
 		return err
 	}
 
-	// Build the static asset handlers up front so any FS error
-	// (missing parent directory we cannot create, EACCES, etc.)
-	// fails the App constructor instead of being smuggled into a
-	// request handler closure that has no error channel.
-	var imgFS, tmplFS http.Handler
-	if cfg.ImageDir != "" {
-		imgFS, err = rootedFileServer(cfg.ImageDir, "/img/")
-		if err != nil {
-			return nil, fmt.Errorf("img file server: %w", err)
-		}
-	}
-	if cfg.TemplateDir != "" {
-		tmplFS, err = rootedFileServer(cfg.TemplateDir, "/template/")
-		if err != nil {
-			return nil, fmt.Errorf("template file server: %w", err)
-		}
+	imgFS, tmplFS, err := buildAssetFS(cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	r := chi.NewRouter()
@@ -358,6 +323,67 @@ func New(cfg *config.Config) (*App, error) {
 }
 
 func (a *App) Handler() http.Handler { return a.handler }
+
+// openAnalyticsStore opens the per-deployment analytics store. The main
+// DB is the default so a fresh install needs no extra config. Operators
+// with a retention policy that doesn't fit alongside the page rows can
+// point SB_ANALYTICS_DB at a dedicated SQLite file. Returns (nil, nil)
+// when analytics is disabled — the caller's middleware checks for nil
+// before installing the request-recording layer.
+func openAnalyticsStore(cfg *config.Config, db *sql.DB) (*analytics.Store, error) {
+	if cfg.AnalyticsDisabled {
+		return nil, nil //nolint:nilnil // a nil store is the documented "disabled" sentinel.
+	}
+	if cfg.AnalyticsDBPath != "" && cfg.AnalyticsDBPath != cfg.DBPath {
+		s, err := analytics.Open(cfg.AnalyticsDBPath, cfg.AnalyticsRetentionDays)
+		if err != nil {
+			return nil, fmt.Errorf("app: analytics: %w", err)
+		}
+		return s, nil
+	}
+	return analytics.WrapMain(db, cfg.AnalyticsRetentionDays), nil
+}
+
+// openAuditStore opens the MCP audit-log store. The mcp_audit_log table
+// shipped in migration 0030 lives in the main DB; SB_MCP_AUDIT_DB lets
+// operators redirect it to a dedicated SQLite file, in which case the
+// mcpaudit package creates the schema on first open so no second
+// migration run is required.
+func openAuditStore(cfg *config.Config, db *sql.DB) (*mcpaudit.Store, error) {
+	if cfg.MCPAuditDBPath != "" && cfg.MCPAuditDBPath != cfg.DBPath {
+		s, err := mcpaudit.Open(cfg.MCPAuditDBPath)
+		if err != nil {
+			return nil, fmt.Errorf("app: mcp audit: %w", err)
+		}
+		return s, nil
+	}
+	return mcpaudit.WrapMain(db), nil
+}
+
+// buildAssetFS constructs the os.Root-backed static asset handlers used
+// for /img and /template. Building them up front means any FS error
+// (missing parent directory we cannot create, EACCES, etc.) fails the
+// App constructor instead of being smuggled into a request handler
+// closure that has no error channel. Either return slot may be nil
+// when the corresponding directory is not configured.
+func buildAssetFS(cfg *config.Config) (http.Handler, http.Handler, error) {
+	var imgFS, tmplFS http.Handler
+	if cfg.ImageDir != "" {
+		h, err := rootedFileServer(cfg.ImageDir, "/img/")
+		if err != nil {
+			return nil, nil, fmt.Errorf("img file server: %w", err)
+		}
+		imgFS = h
+	}
+	if cfg.TemplateDir != "" {
+		h, err := rootedFileServer(cfg.TemplateDir, "/template/")
+		if err != nil {
+			return nil, nil, fmt.Errorf("template file server: %w", err)
+		}
+		tmplFS = h
+	}
+	return imgFS, tmplFS, nil
+}
 
 // setupGate redirects every request to /setup until an admin user has
 // been created. Once an admin exists the gate caches that fact in an
