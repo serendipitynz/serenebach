@@ -81,7 +81,11 @@ func main() {
 	if err != nil {
 		fatal("app: %v", err)
 	}
-	defer a.Close()
+	defer func() {
+		if err := a.Close(); err != nil {
+			log.Printf("app close: %v", err)
+		}
+	}()
 
 	switch subcmd {
 	case "", "serve":
@@ -150,7 +154,9 @@ func serve(a *app.App, cfg *config.Config) error {
 			if qs := os.Getenv("QUERY_STRING"); qs != "" {
 				uri += "?" + qs
 			}
-			os.Setenv("REQUEST_URI", uri)
+			if err := os.Setenv("REQUEST_URI", uri); err != nil {
+				log.Printf("cgi: setenv REQUEST_URI: %v", err)
+			}
 		}
 		return cgi.Serve(a.Handler())
 	}
