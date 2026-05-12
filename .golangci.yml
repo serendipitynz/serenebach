@@ -30,6 +30,8 @@ linters:
     # Style + refactor batch.
     - gocritic       # general style / performance / refactor suggestions
     - nestif         # deeply-nested if blocks
+    # Complexity batch.
+    - gocognit       # cognitive complexity (nesting-weighted)
   settings:
     errcheck:
       # Exclude conventional Go patterns where dropping the error is
@@ -59,9 +61,15 @@ linters:
       # surrounding *testing.T assertions or panic-on-bad-fixture style
       # already make the intent obvious. Strict errcheck here trades
       # readability for noise without catching real bugs.
+      #
+      # Cognitive complexity is also relaxed: end-to-end test functions
+      # naturally accumulate sequential assertions and setup steps that
+      # push gocognit past its threshold without indicating a refactor
+      # opportunity — production code stays under the threshold.
       - path: _test\.go
         linters:
           - errcheck
+          - gocognit
       # The helpdocs package uses an init() to eagerly parse the embed.FS
       # of Markdown help pages at startup. A package-level Load() would
       # require every entry point (cmd/serenebach, MCP, importer, ...)
