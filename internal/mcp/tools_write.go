@@ -107,7 +107,7 @@ func (s *Server) toolCreateEntry(ctx context.Context, raw json.RawMessage) (stri
 			return "", fmt.Errorf("entry %d created, but tag sync failed: %w", id, err)
 		}
 	}
-	s.auditWrite(ctx, "create_entry", id, "")
+	s.auditWrite(ctx, "create_entry", id)
 	return s.entryPayload(ctx, id)
 }
 
@@ -164,7 +164,7 @@ func (s *Server) toolUpdateEntry(ctx context.Context, raw json.RawMessage) (stri
 			return "", fmt.Errorf("entry %d updated, but tag sync failed: %w", updated.ID, err)
 		}
 	}
-	s.auditWrite(ctx, "update_entry", updated.ID, "")
+	s.auditWrite(ctx, "update_entry", updated.ID)
 	return s.entryPayload(ctx, updated.ID)
 }
 
@@ -202,7 +202,7 @@ func (s *Server) toolPublishEntry(ctx context.Context, raw json.RawMessage) (str
 	if err := s.Store.UpdateEntry(ctx, updated); err != nil {
 		return "", err
 	}
-	s.auditWrite(ctx, "publish_entry", updated.ID, "")
+	s.auditWrite(ctx, "publish_entry", updated.ID)
 	return s.entryPayload(ctx, updated.ID)
 }
 
@@ -282,7 +282,7 @@ func (s *Server) toolUploadImage(ctx context.Context, raw json.RawMessage) (stri
 		return "", fmt.Errorf("create image row: %w", err)
 	}
 
-	s.auditWrite(ctx, "upload_image", id, "")
+	s.auditWrite(ctx, "upload_image", id)
 
 	resp := map[string]any{
 		"id":          id,
@@ -487,13 +487,9 @@ func derefInt64(p *int64, fallback int64) int64 {
 // render "who did what when" without scraping the process log. Insert
 // failures are logged only — audit is observational, never a gate on
 // the mutation itself.
-func (s *Server) auditWrite(ctx context.Context, tool string, id int64, extra string) {
+func (s *Server) auditWrite(ctx context.Context, tool string, id int64) {
 	auth := authFromContext(ctx)
-	suffix := ""
-	if extra != "" {
-		suffix = " " + extra
-	}
-	log.Printf("mcp.write: tool=%s id=%d token=%d author=%d%s", tool, id, auth.TokenID, auth.AuthorID, suffix)
+	log.Printf("mcp.write: tool=%s id=%d token=%d author=%d", tool, id, auth.TokenID, auth.AuthorID)
 
 	if s.Audit == nil {
 		return
@@ -504,7 +500,6 @@ func (s *Server) auditWrite(ctx context.Context, tool string, id int64, extra st
 		AuthorID: auth.AuthorID,
 		Tool:     tool,
 		TargetID: id,
-		Extra:    extra,
 	}); err != nil {
 		log.Printf("mcp.write: audit insert: %v", err)
 	}

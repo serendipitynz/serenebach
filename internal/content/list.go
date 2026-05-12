@@ -94,7 +94,7 @@ func (v ListView) Render() (string, error) {
 		c.TagHTML("category_name", `<a href="`+catLink+`">`+catName+`</a>`)
 		c.TagHTML("category_description", renderDescription(v.Category.Description, v.Category.DescriptionFormat))
 	}
-	applyCategoryAreaBlock(v.Site, c, tmpl, v.Category, v.Categories)
+	applyCategoryAreaBlock(c, tmpl, v.Category, v.Categories)
 
 	// Show the header "title" block once for list pages.
 	c.Block("title", 1)

@@ -32,6 +32,8 @@ linters:
     - nestif         # deeply-nested if blocks
     # Complexity batch.
     - gocognit       # cognitive complexity (nesting-weighted)
+    # Dead-parameter batch.
+    - unparam        # parameters / returns that are dead or always the same
   settings:
     errcheck:
       # Exclude conventional Go patterns where dropping the error is
@@ -70,6 +72,11 @@ linters:
         linters:
           - errcheck
           - gocognit
+          # `unparam` is relaxed for test helpers: a fixture builder
+          # whose `entryID` parameter currently always receives 1 is
+          # signalling future flexibility, not dead code. The few real
+          # production hits were addressed inline.
+          - unparam
       # The helpdocs package uses an init() to eagerly parse the embed.FS
       # of Markdown help pages at startup. A package-level Load() would
       # require every entry point (cmd/serenebach, MCP, importer, ...)

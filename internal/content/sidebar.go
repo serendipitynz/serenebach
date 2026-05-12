@@ -84,7 +84,7 @@ func applySidebarBlocks(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Template
 	applyCategorySidebarBlock(s, c, tmpl, data.CategoryTree)
 	applyRecentCommentBlock(s, c, tmpl, data.RecentComments)
 	applyLatestEntryBlock(s, c, tmpl, data.LatestEntries)
-	applyLinkBlock(s, c, tmpl, data.Links)
+	applyLinkBlock(c, tmpl, data.Links)
 	// selected_entry (SB3's "recommended posts") relies on a flag
 	// we haven't modelled yet — strip to 0 so imported templates
 	// don't trip on the raw marker.
@@ -252,7 +252,7 @@ func applyRecentCommentBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Tem
 // with no visible children are skipped entirely (SB3 behaviour), and
 // links without a URL are skipped. The block count is 1 when at least
 // one row survives the filter, 0 otherwise.
-func applyLinkBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Template, links []domain.Link) {
+func applyLinkBlock(c *sbtemplate.Context, tmpl *sbtemplate.Template, links []domain.Link) {
 	if !tmpl.HasBlock("link") {
 		return
 	}

@@ -158,10 +158,10 @@ func (h *Handler) buildRebuildPageData(r *http.Request) rebuildPageData {
 	case "ok":
 		data.Report = &rebuild.Report{
 			Home:         q.Get("home") == "true",
-			Entries:      atoiOr(q.Get("entries"), 0),
-			Categories:   atoiOr(q.Get("categories"), 0),
-			ArchiveYear:  atoiOr(q.Get("archive_year"), 0),
-			ArchiveMonth: atoiOr(q.Get("archive_month"), 0),
+			Entries:      atoiOrZero(q.Get("entries")),
+			Categories:   atoiOrZero(q.Get("categories")),
+			ArchiveYear:  atoiOrZero(q.Get("archive_year")),
+			ArchiveMonth: atoiOrZero(q.Get("archive_month")),
 			CSSWritten:   q.Get("css") == "true",
 			OutDir:       data.OutDir,
 		}
@@ -190,10 +190,10 @@ func lastBuildTime(outDir string) time.Time {
 	return info.ModTime()
 }
 
-func atoiOr(s string, fallback int) int {
+func atoiOrZero(s string) int {
 	n, err := strconv.Atoi(s)
 	if err != nil {
-		return fallback
+		return 0
 	}
 	return n
 }

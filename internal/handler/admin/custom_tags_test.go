@@ -32,9 +32,6 @@ func newAdminTestHandler(t *testing.T) (*Handler, *sql.DB) {
 }
 
 func TestValidateCustomTagRejectsInvalidName(t *testing.T) {
-	ctx := context.Background()
-	store := repo.New(nil) // nil is fine; validateCustomTag does not touch store for name checks
-
 	// Boundary cases: exactly 49, 50, and 51 characters after "custom_"
 	name49 := "custom_" + strings.Repeat("a", 49)
 	name50 := "custom_" + strings.Repeat("a", 50)
@@ -59,7 +56,7 @@ func TestValidateCustomTagRejectsInvalidName(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		valid, _ := validateCustomTag(ctx, store, 1, 0, c.name, "v")
+		valid, _ := validateCustomTag(c.name, "v")
 		if valid != c.want {
 			t.Errorf("validateCustomTag(name=%q) = %v, want %v", c.name, valid, c.want)
 		}
@@ -67,18 +64,15 @@ func TestValidateCustomTagRejectsInvalidName(t *testing.T) {
 }
 
 func TestValidateCustomTagRejectsLongValue(t *testing.T) {
-	ctx := context.Background()
-	store := repo.New(nil)
-
 	short := strings.Repeat("a", maxCustomTagValueBytes)
 	long := strings.Repeat("a", maxCustomTagValueBytes+1)
 
-	valid, _ := validateCustomTag(ctx, store, 1, 0, "custom_ok", short)
+	valid, _ := validateCustomTag("custom_ok", short)
 	if !valid {
 		t.Error("expected valid for max-length value")
 	}
 
-	valid, _ = validateCustomTag(ctx, store, 1, 0, "custom_ok", long)
+	valid, _ = validateCustomTag("custom_ok", long)
 	if valid {
 		t.Error("expected invalid for over-long value")
 	}

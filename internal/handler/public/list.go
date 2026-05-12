@@ -60,7 +60,7 @@ func (h *Handler) renderList(w http.ResponseWriter, r *http.Request, entries []d
 		if useArchiveTemplate {
 			pinID = weblog.ArchiveTemplateID
 		}
-		tmpl, err = h.pickTemplate(ctx, weblog, pinID)
+		tmpl, err = h.pickTemplate(ctx, pinID)
 		if err != nil {
 			log.Printf("%s: load template: %v", logTag, err)
 			http.Error(w, "no active template", http.StatusInternalServerError)
@@ -115,7 +115,7 @@ func (h *Handler) renderList(w http.ResponseWriter, r *http.Request, entries []d
 // it tries that template first; otherwise it falls through to the
 // currently-active template. Tolerant of a stale pin: if the referenced row
 // is gone we log and fall back to active rather than erroring out the page.
-func (h *Handler) pickTemplate(ctx context.Context, weblog *domain.Weblog, pinID int64) (*domain.Template, error) {
+func (h *Handler) pickTemplate(ctx context.Context, pinID int64) (*domain.Template, error) {
 	if pinID != 0 {
 		if t, err := h.Store.TemplateByID(ctx, h.WID, pinID); err == nil {
 			return t, nil

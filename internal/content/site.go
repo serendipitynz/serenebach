@@ -113,7 +113,7 @@ func renderDescription(body, kind string) string {
 // cat is the category the page is scoped to — nil on home / tag /
 // archive pages. all is the id→Category lookup ListView already
 // builds; we use it to walk up the parent chain.
-func applyCategoryAreaBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Template, cat *domain.Category, all map[int64]domain.Category) {
+func applyCategoryAreaBlock(c *sbtemplate.Context, tmpl *sbtemplate.Template, cat *domain.Category, all map[int64]domain.Category) {
 	if !tmpl.HasBlock("category_area") {
 		return
 	}

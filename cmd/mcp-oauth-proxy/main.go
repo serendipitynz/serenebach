@@ -187,7 +187,7 @@ func handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	} else {
 		switch r.Method {
 		case http.MethodGet:
-			renderPINForm(w, r, state, redirectURI, codeChallenge)
+			renderPINForm(w, state, redirectURI, codeChallenge)
 			return
 		case http.MethodPost:
 			if err := r.ParseForm(); err != nil {
@@ -231,7 +231,7 @@ func handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, u.String(), http.StatusFound)
 }
 
-func renderPINForm(w http.ResponseWriter, r *http.Request, state, redirectURI, codeChallenge string) {
+func renderPINForm(w http.ResponseWriter, state, redirectURI, codeChallenge string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprintf(w, `<!doctype html>
 <html>
