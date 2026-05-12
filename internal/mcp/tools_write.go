@@ -145,51 +145,9 @@ func (s *Server) toolUpdateEntry(ctx context.Context, raw json.RawMessage) (stri
 		return "", err
 	}
 
-	updated := *existing
-	if args.Title != nil {
-		updated.Title = *args.Title
-	}
-	if args.Body != nil {
-		updated.Body = *args.Body
-	}
-	if args.More != nil {
-		updated.More = *args.More
-	}
-	if args.Keywords != nil {
-		updated.Keywords = *args.Keywords
-	}
-	if args.Format != nil && *args.Format != "" {
-		updated.Format = *args.Format
-	}
-	if args.CategoryID != nil {
-		updated.CategoryID = *args.CategoryID
-	}
-	if args.Slug != nil {
-		slug, err := normaliseSlug(args.Slug)
-		if err != nil {
-			return "", err
-		}
-		updated.Slug = slug
-	}
-	if args.Status != nil {
-		status, err := parseEntryStatus(args.Status, existing.Status)
-		if err != nil {
-			return "", err
-		}
-		updated.Status = status
-	}
-	if args.PostedAt != nil {
-		t, err := parsePostedAt(args.PostedAt, existing.PostedAt)
-		if err != nil {
-			return "", err
-		}
-		updated.PostedAt = t
-	}
-	if args.Pinned != nil {
-		updated.Pinned = *args.Pinned
-	}
-	if args.AcceptComments != nil {
-		updated.AcceptComments = *args.AcceptComments
+	updated, err := applyEntryUpdates(*existing, args)
+	if err != nil {
+		return "", err
 	}
 
 	if err := s.Store.UpdateEntry(ctx, updated); err != nil {
@@ -414,6 +372,60 @@ func (s *Server) entryPayload(ctx context.Context, id int64) (string, error) {
 		"author_id":   entry.AuthorID,
 		"tags":        tagNames,
 	})
+}
+
+// applyEntryUpdates merges the partial update represented by args into a
+// copy of entry. Any field present (non-nil pointer) on args wins; fields
+// that need parsing (slug / status / posted_at) bail out with a non-nil
+// error so the caller can surface the validation message before the
+// repo write.
+func applyEntryUpdates(entry domain.Entry, args updateEntryArgs) (domain.Entry, error) {
+	if args.Title != nil {
+		entry.Title = *args.Title
+	}
+	if args.Body != nil {
+		entry.Body = *args.Body
+	}
+	if args.More != nil {
+		entry.More = *args.More
+	}
+	if args.Keywords != nil {
+		entry.Keywords = *args.Keywords
+	}
+	if args.Format != nil && *args.Format != "" {
+		entry.Format = *args.Format
+	}
+	if args.CategoryID != nil {
+		entry.CategoryID = *args.CategoryID
+	}
+	if args.Slug != nil {
+		slug, err := normaliseSlug(args.Slug)
+		if err != nil {
+			return entry, err
+		}
+		entry.Slug = slug
+	}
+	if args.Status != nil {
+		status, err := parseEntryStatus(args.Status, entry.Status)
+		if err != nil {
+			return entry, err
+		}
+		entry.Status = status
+	}
+	if args.PostedAt != nil {
+		t, err := parsePostedAt(args.PostedAt, entry.PostedAt)
+		if err != nil {
+			return entry, err
+		}
+		entry.PostedAt = t
+	}
+	if args.Pinned != nil {
+		entry.Pinned = *args.Pinned
+	}
+	if args.AcceptComments != nil {
+		entry.AcceptComments = *args.AcceptComments
+	}
+	return entry, nil
 }
 
 func parseEntryStatus(raw *string, fallback domain.EntryStatus) (domain.EntryStatus, error) {
