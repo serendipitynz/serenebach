@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"log"
 	"net/http"
 	"time"
 
@@ -73,9 +74,10 @@ func (m *Manager) UserFromRequest(r *http.Request) *domain.User {
 	u, err := m.Store.SessionUser(r.Context(), c.Value)
 	if err != nil {
 		if !errors.Is(err, repo.ErrNotFound) {
-			// Log in caller's layer if desired — here we treat every lookup
-			// failure as "not authenticated" to avoid leaking rows to an
-			// attacker via error responses.
+			// Treat every lookup failure as "not authenticated" to avoid leaking
+			// row state to an attacker via error responses, but record server-side
+			// since the caller's interface (*domain.User) cannot surface the error.
+			log.Printf("session.UserFromRequest: lookup: %v", err)
 		}
 		return nil
 	}

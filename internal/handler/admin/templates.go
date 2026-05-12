@@ -2,6 +2,7 @@ package admin
 
 import (
 	"html/template"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -341,6 +342,7 @@ func renderMain(w http.ResponseWriter, r *http.Request, page string, data any) {
 	tmpl.Funcs(localeFuncs(r))
 	if err := tmpl.ExecuteTemplate(w, "layout", data); err != nil {
 		// Not http.Error — headers already written. Server-side log only.
+		log.Printf("admin.renderMain: execute %q: %v", page, err)
 	}
 }
 
