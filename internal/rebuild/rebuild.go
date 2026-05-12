@@ -105,6 +105,81 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 	if opts.OutDir == "" {
 		return nil, fmt.Errorf("rebuild: OutDir is required")
 	}
+	env, err := prepareBuildEnv(ctx, store, &opts)
+	if err != nil {
+		return nil, err
+	}
+	data, err := loadBuildData(ctx, store, opts.WID, opts.TZ)
+	if err != nil {
+		return nil, err
+	}
+	site := content.NewSite(*env.weblog).WithBasePath(opts.BasePath).WithCustomTags(data.customTags).WithTZ(opts.TZ)
+	finalOut := opts.OutDir
+	rep := &Report{OutDir: finalOut}
+
+	staging, err := makeStagingDir(finalOut)
+	if err != nil {
+		return nil, err
+	}
+	// Always best-effort clean staging on exit. promoteStaging removes
+	// it on the happy path; this defer covers every error return.
+	defer os.RemoveAll(staging)
+
+	// Redirect writers to staging via a copy of opts so the original
+	// (used for rep.OutDir + image/template copies) keeps the real path.
+	stagedOpts := opts
+	stagedOpts.OutDir = staging
+
+	pageRoots, err := writeStagedPages(ctx, store, stagedOpts, site, env, data, rep)
+	if err != nil {
+		return nil, err
+	}
+	if err := writeStagedExtras(staging, site, env.tmpl, env.weblog, data, rep); err != nil {
+		return nil, err
+	}
+
+	// Every render + write succeeded. Swap the staged tree into
+	// place; failures inside promoteStaging leave the previous
+	// snapshot intact thanks to the rename-via-backup pattern.
+	if err := promoteStaging(finalOut, staging, env.weblog.LLMSEnabled, pageRoots); err != nil {
+		return nil, err
+	}
+
+	if err := writeAdditiveAssets(ctx, store, site, opts, finalOut, rep); err != nil {
+		return nil, err
+	}
+	return rep, nil
+}
+
+// buildEnv is the per-Build configuration snapshot resolved from opts
+// and the weblog row: the weblog itself plus the active and
+// archive-pinned templates. Built once at the top of Build so the
+// downstream writers can rely on stable pointers.
+type buildEnv struct {
+	weblog      *domain.Weblog
+	tmpl        *domain.Template
+	archiveTmpl *domain.Template
+}
+
+// buildData is the read-side snapshot fetched once per Build so the
+// downstream writers never have to call back into the repo. Each field
+// is consumed by multiple writers (entries, categories, tags, ...) —
+// loading them centrally keeps the SQL fan-out at O(1) regardless of
+// how many static pages the rebuild emits.
+type buildData struct {
+	all          []domain.Entry
+	cats         map[int64]domain.Category
+	users        map[int64]domain.User
+	profileUsers []domain.User
+	sidebar      content.SidebarData
+	customTags   []domain.CustomTag
+}
+
+// prepareBuildEnv resolves opts defaults (WID, TZ, EntryListLimit) and
+// loads the weblog row plus the active / archive-pinned templates.
+// opts is mutated in place so the caller's downstream reads of opts
+// (BasePath, OutDir, EntryListLimit, ...) see the resolved values.
+func prepareBuildEnv(ctx context.Context, store *repo.Store, opts *Options) (*buildEnv, error) {
 	if opts.WID == 0 {
 		opts.WID = 1
 	}
@@ -138,10 +213,15 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 			archiveTmpl = t
 		}
 	}
+	return &buildEnv{weblog: weblog, tmpl: tmpl, archiveTmpl: archiveTmpl}, nil
+}
 
+// loadBuildData pre-fetches every dataset the writers will need so the
+// downstream loop avoids per-page DB calls.
+func loadBuildData(ctx context.Context, store *repo.Store, wid int64, tz *time.Location) (*buildData, error) {
 	// Every published entry is fetched once and re-used so a large blog
 	// needs a single DB scan, not one per page.
-	all, err := store.AllPublishedEntries(ctx, opts.WID)
+	all, err := store.AllPublishedEntries(ctx, wid)
 	if err != nil {
 		return nil, fmt.Errorf("rebuild: load entries: %w", err)
 	}
@@ -152,125 +232,125 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 	// Pre-fetch the profile-area iteration slice once; every writer
 	// passes it straight into ListView / EntryView so the renderer
 	// never has to call back into the repo.
-	profileUsers, err := store.VisibleProfileUsers(ctx, opts.WID)
+	profileUsers, err := store.VisibleProfileUsers(ctx, wid)
 	if err != nil {
 		return nil, fmt.Errorf("rebuild: load profile users: %w", err)
 	}
 	// SB3 sidebar block data is rebuilt once per Build() — identical
 	// across every page the rebuild emits.
-	sidebar, err := loadSidebarData(ctx, store, opts.WID, opts.TZ)
+	sidebar, err := loadSidebarData(ctx, store, wid, tz)
 	if err != nil {
 		return nil, fmt.Errorf("rebuild: load sidebar: %w", err)
 	}
-
-	customTags, err := store.ListCustomTags(ctx, opts.WID)
+	customTags, err := store.ListCustomTags(ctx, wid)
 	if err != nil {
 		return nil, fmt.Errorf("rebuild: load custom tags: %w", err)
 	}
-	site := content.NewSite(*weblog).WithBasePath(opts.BasePath).WithCustomTags(customTags).WithTZ(opts.TZ)
-	finalOut := opts.OutDir
-	rep := &Report{OutDir: finalOut}
+	return &buildData{
+		all:          all,
+		cats:         cats,
+		users:        users,
+		profileUsers: profileUsers,
+		sidebar:      sidebar,
+		customTags:   customTags,
+	}, nil
+}
 
-	// Stage every page write under OutDir/.sb-rebuild-XXXX/ so a
-	// later failure leaves the live snapshot untouched. Same-FS
-	// guarantee comes from putting staging *inside* OutDir, which
-	// keeps later rename(2) calls atomic.
+// makeStagingDir creates OutDir/.sb-rebuild-XXXX/ so every page write
+// in this rebuild lands somewhere a later failure can throw away
+// without touching the live snapshot. Same-FS guarantee comes from
+// putting staging *inside* OutDir, which keeps later rename(2) calls
+// atomic.
+func makeStagingDir(finalOut string) (string, error) {
 	if err := os.MkdirAll(finalOut, 0o755); err != nil {
-		return nil, fmt.Errorf("rebuild: mkdir out: %w", err)
+		return "", fmt.Errorf("rebuild: mkdir out: %w", err)
 	}
 	staging, err := os.MkdirTemp(finalOut, ".sb-rebuild-")
 	if err != nil {
-		return nil, fmt.Errorf("rebuild: create staging dir: %w", err)
+		return "", fmt.Errorf("rebuild: create staging dir: %w", err)
 	}
-	// Always best-effort clean staging on exit. promoteStaging removes
-	// it on the happy path; this defer covers every error return.
-	defer os.RemoveAll(staging)
+	return staging, nil
+}
 
-	// Redirect writers to staging via a copy of opts so the original
-	// (used for rep.OutDir + image/template copies) keeps the real path.
-	stagedOpts := opts
-	stagedOpts.OutDir = staging
-
-	if err := writeHome(ctx, store, staging, site, tmpl, all, cats, users, profileUsers, sidebar, opts.EntryListLimit); err != nil {
+// writeStagedPages drives the six page-tree writers (home, entries,
+// pages, categories, tags, archives) in order. Returns the flat-page
+// roots so the staging-swap can hand them to promoteStaging.
+func writeStagedPages(ctx context.Context, store *repo.Store, stagedOpts Options, site content.Site, env *buildEnv, data *buildData, rep *Report) (map[string]struct{}, error) {
+	staging := stagedOpts.OutDir
+	if err := writeHome(ctx, store, staging, site, env.tmpl, data.all, data.cats, data.users, data.profileUsers, data.sidebar, stagedOpts.EntryListLimit); err != nil {
 		return nil, err
 	}
 	rep.Home = true
 
-	if err := writeEntries(ctx, store, stagedOpts, site, tmpl, weblog, all, cats, users, profileUsers, sidebar, rep); err != nil {
+	if err := writeEntries(ctx, store, stagedOpts, site, env.tmpl, env.weblog, data.all, data.cats, data.users, data.profileUsers, data.sidebar, rep); err != nil {
 		return nil, err
 	}
-
-	pageRoots, err := writePages(ctx, store, stagedOpts, site, profileUsers, sidebar, rep)
+	pageRoots, err := writePages(ctx, store, stagedOpts, site, data.profileUsers, data.sidebar, rep)
 	if err != nil {
 		return nil, err
 	}
-
-	if err := writeCategories(ctx, store, stagedOpts, site, archiveTmpl, cats, users, profileUsers, sidebar, rep); err != nil {
+	if err := writeCategories(ctx, store, stagedOpts, site, env.archiveTmpl, data.cats, data.users, data.profileUsers, data.sidebar, rep); err != nil {
 		return nil, err
 	}
-
-	if err := writeTags(ctx, store, stagedOpts, site, archiveTmpl, cats, users, profileUsers, sidebar, rep); err != nil {
+	if err := writeTags(ctx, store, stagedOpts, site, env.archiveTmpl, data.cats, data.users, data.profileUsers, data.sidebar, rep); err != nil {
 		return nil, err
 	}
-
-	if err := writeArchives(ctx, store, stagedOpts, site, archiveTmpl, cats, users, profileUsers, sidebar, rep); err != nil {
+	if err := writeArchives(ctx, store, stagedOpts, site, env.archiveTmpl, data.cats, data.users, data.profileUsers, data.sidebar, rep); err != nil {
 		return nil, err
 	}
+	return pageRoots, nil
+}
 
+// writeStagedExtras emits the assets that ride along with the staged
+// page tree (template CSS at the staged root, feeds, llms manifests).
+// llms*.txt only land when the weblog has opted in — the static
+// snapshot mirrors whatever the dynamic routes would serve.
+func writeStagedExtras(staging string, site content.Site, tmpl *domain.Template, weblog *domain.Weblog, data *buildData, rep *Report) error {
 	if tmpl.CSS != "" {
-		// Render so {site_parts} / {site_encoding} land as actual
-		// values instead of dead literals — mirrors the dynamic
-		// /style.css handler.
+		// Render so {site_parts} / {site_encoding} land as actual values
+		// instead of dead literals — mirrors the dynamic /style.css
+		// handler.
 		body := content.RenderTemplateCSS(site, tmpl)
 		if err := writeFile(filepath.Join(staging, "style.css"), []byte(body)); err != nil {
-			return nil, fmt.Errorf("rebuild: write css: %w", err)
+			return fmt.Errorf("rebuild: write css: %w", err)
 		}
 		rep.CSSWritten = true
 	}
-
-	if err := writeFeeds(staging, site, all, cats, users, rep); err != nil {
-		return nil, err
+	if err := writeFeeds(staging, site, data.all, data.cats, data.users, rep); err != nil {
+		return err
 	}
-
-	// llms.txt + llms-full.txt. Only written when the weblog has
-	// opted in — the static snapshot mirrors whatever the dynamic
-	// routes would serve.
 	if weblog.LLMSEnabled {
-		if err := writeLLMsTxt(staging, *weblog, all, rep); err != nil {
-			return nil, err
+		if err := writeLLMsTxt(staging, *weblog, data.all, rep); err != nil {
+			return err
 		}
 	}
+	return nil
+}
 
-	// Every render + write succeeded. Swap the staged tree into
-	// place; failures inside promoteStaging leave the previous
-	// snapshot intact thanks to the rename-via-backup pattern.
-	if err := promoteStaging(finalOut, staging, weblog.LLMSEnabled, pageRoots); err != nil {
-		return nil, err
-	}
-
-	// Per-template stylesheets, image mirror, and template-asset
-	// mirror are NOT part of the staging swap: they are additive
-	// copies whose lifecycle is decoupled from the page tree, and a
-	// partial copy is recoverable on the next rebuild.
+// writeAdditiveAssets emits the assets whose lifecycle sits outside the
+// staging swap: per-template stylesheets and the image/template
+// mirrors. These are additive copies — a partial copy is recoverable
+// on the next rebuild — so they intentionally bypass the rename-on-
+// success guarantee.
+func writeAdditiveAssets(ctx context.Context, store *repo.Store, site content.Site, opts Options, finalOut string, rep *Report) error {
 	if err := writeTemplateCSS(ctx, store, site, opts.WID, finalOut); err != nil {
-		return nil, err
+		return err
 	}
 	if opts.ImageDir != "" {
 		n, err := copyImageTree(opts.ImageDir, filepath.Join(finalOut, "img"))
 		if err != nil {
-			return nil, fmt.Errorf("rebuild: copy images: %w", err)
+			return fmt.Errorf("rebuild: copy images: %w", err)
 		}
 		rep.ImagesCopied = n
 	}
 	if opts.TemplateDir != "" {
 		n, err := copyImageTree(opts.TemplateDir, filepath.Join(finalOut, "template"))
 		if err != nil {
-			return nil, fmt.Errorf("rebuild: copy templates: %w", err)
+			return fmt.Errorf("rebuild: copy templates: %w", err)
 		}
 		rep.TemplateAssetsCopied = n
 	}
-
-	return rep, nil
+	return nil
 }
 
 // copyImageTree walks src and mirrors every regular file into dst (creating
