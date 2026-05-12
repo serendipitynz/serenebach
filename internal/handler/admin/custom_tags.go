@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"context"
 	"errors"
 	"log"
 	"net/http"
@@ -99,7 +98,7 @@ func (h *Handler) customTagCreate(w http.ResponseWriter, r *http.Request) {
 		name = "custom_" + name
 	}
 
-	valid, verr := validateCustomTag(ctx, h.Store, h.wid(), 0, name, value)
+	valid, verr := validateCustomTag(name, value)
 	if !valid {
 		http.Redirect(w, r, root(r)+"/admin/templates/custom-tags?err="+urlEncode(verr), http.StatusFound)
 		return
@@ -151,7 +150,7 @@ func (h *Handler) customTagUpdate(w http.ResponseWriter, r *http.Request) {
 		name = "custom_" + name
 	}
 
-	valid, verr := validateCustomTag(ctx, h.Store, h.wid(), id, name, value)
+	valid, verr := validateCustomTag(name, value)
 	if !valid {
 		http.Redirect(w, r, root(r)+"/admin/templates/custom-tags?edit="+strconv.FormatInt(id, 10)+"&err="+urlEncode(verr), http.StatusFound)
 		return
@@ -198,7 +197,7 @@ func (h *Handler) customTagDelete(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, root(r)+"/admin/templates/custom-tags?ok=deleted", http.StatusFound)
 }
 
-func validateCustomTag(ctx context.Context, store *repo.Store, wid, id int64, name, value string) (bool, string) {
+func validateCustomTag(name, value string) (bool, string) {
 	if !customTagNamePattern.MatchString(name) {
 		return false, "customTags.error.invalidName"
 	}

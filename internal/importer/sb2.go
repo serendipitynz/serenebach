@@ -124,7 +124,7 @@ func importSB2(ctx context.Context, dest *sql.DB, dataDir string, opts Options) 
 	if err != nil {
 		return nil, err
 	}
-	if err := importSB2Messages(ctx, tx, messages, entryMap, opts, report); err != nil {
+	if err := importSB2Messages(ctx, tx, messages, entryMap, opts); err != nil {
 		return nil, err
 	}
 
@@ -599,7 +599,7 @@ func importSB2Entries(ctx context.Context, tx *sql.Tx, entries []sb2Entry, catMa
 // destination messages.status: 0=waiting, 1=approved, -1=closed; pass
 // it through directly. Comments whose entry was filtered out by
 // OnlyPublished are skipped silently — there's no entry to attach to.
-func importSB2Messages(ctx context.Context, tx *sql.Tx, msgs []sb2Message, entryMap map[int64]int64, opts Options, report *Report) error {
+func importSB2Messages(ctx context.Context, tx *sql.Tx, msgs []sb2Message, entryMap map[int64]int64, opts Options) error {
 	if len(msgs) == 0 {
 		return nil
 	}
