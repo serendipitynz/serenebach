@@ -80,8 +80,6 @@ func TestCategoryPageHidesEntriesInOtherCategories(t *testing.T) {
 	}
 
 	// But the other category's own page must show it.
-	req2 := httptest.NewRequest("GET", "/category/"+strings.TrimSpace(strings.ReplaceAll("  ", " ", " "))+"", nil)
-	_ = req2 // silence unused in some refactor paths
 	req3 := httptest.NewRequest("GET", "/category/2", nil)
 	w3 := httptest.NewRecorder()
 	a.Handler().ServeHTTP(w3, req3)

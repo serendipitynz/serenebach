@@ -58,7 +58,7 @@ var tmplFuncs = template.FuncMap{
 		}
 		return "?"
 	},
-	"appVersion": func() string { return version.Full() },
+	"appVersion": version.Full,
 	// iconTrash returns the shared trash-can SVG used on every
 	// destructive row button. Shipped as a template func rather than a
 	// {{template}} include so page templates can drop it inline in

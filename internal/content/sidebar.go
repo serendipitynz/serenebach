@@ -41,8 +41,7 @@ func firstOfMonth(year, month int, loc *time.Location) time.Time {
 // commenter, picked off the blog's configured language. Engine chrome
 // only — author-visible admin copy resolves through internal/i18n.
 func noNameLabel(lang string) string {
-	switch lang {
-	case "en":
+	if lang == "en" {
 		return "(no name)"
 	}
 	return "(名前なし)"

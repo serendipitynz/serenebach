@@ -117,7 +117,7 @@ func main() {
 				fmt.Fprintln(os.Stderr, "seed: admin already exists, skipping")
 				return
 			}
-			log.Fatalf("seed: %v", err)
+			log.Fatalf("seed: %v", err) //nolint:gocritic // intentional fail-fast; deferred a.Close is best-effort and the OS reclaims handles on exit.
 		}
 		fmt.Fprintln(os.Stderr, "seed: ok")
 	case "migrate":
