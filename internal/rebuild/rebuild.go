@@ -843,50 +843,83 @@ func promoteStaging(finalOut, staging string, llmsEnabled bool, pruneSet map[str
 	}
 
 	for _, sub := range []string{"entry", "category", "tag", "archive"} {
-		stagedPath := filepath.Join(staging, sub)
-		finalPath := filepath.Join(finalOut, sub)
-
-		stagedExists := dirExists(stagedPath)
-		finalExists := dirExists(finalPath)
-
-		if !stagedExists {
-			// Staging didn't render this subtree — usually means
-			// the DB has no rows of this type. Remove the live
-			// copy so deletes propagate.
-			if finalExists {
-				if err := os.RemoveAll(finalPath); err != nil {
-					return fmt.Errorf("rebuild: prune %s: %w", finalPath, err)
-				}
-			}
-			continue
-		}
-
-		var backupDir string
-		if finalExists {
-			bd, err := os.MkdirTemp(finalOut, ".sb-backup-")
-			if err != nil {
-				return fmt.Errorf("rebuild: create backup dir: %w", err)
-			}
-			backupDir = bd
-			backupPath := filepath.Join(bd, "dir")
-			if err := os.Rename(finalPath, backupPath); err != nil {
-				_ = os.RemoveAll(bd)
-				return fmt.Errorf("rebuild: backup %s: %w", finalPath, err)
-			}
-		}
-		if err := os.Rename(stagedPath, finalPath); err != nil {
-			// Restore previous output so the live snapshot is
-			// not left partially overwritten.
-			if finalExists {
-				_ = os.Rename(filepath.Join(backupDir, "dir"), finalPath)
-			}
-			return fmt.Errorf("rebuild: promote %s: %w", finalPath, err)
-		}
-		if finalExists {
-			_ = os.RemoveAll(backupDir)
+		if err := promoteManagedSubtree(staging, finalOut, sub); err != nil {
+			return err
 		}
 	}
 
+	if err := promoteTopLevelFiles(staging, finalOut); err != nil {
+		return err
+	}
+
+	// Flat pages land as top-level directories (e.g. "about/"). Promote
+	// every directory that isn't one of the known managed subtrees or
+	// the asset mirrors.
+	if err := promoteExtraDirs(staging, finalOut, pruneSet, oldRoots); err != nil {
+		return err
+	}
+
+	if err := promotePagesManifest(staging, finalOut); err != nil {
+		return err
+	}
+
+	return cleanupLLMs(finalOut, llmsEnabled)
+}
+
+// promoteManagedSubtree swaps the staged copy of a known subtree
+// (entry, category, tag, archive) into finalOut via the same
+// backup-and-rename pattern used for flat pages. A missing staged
+// subtree means "the DB has no rows of this type" — the live copy is
+// deleted so removals propagate to the static snapshot.
+func promoteManagedSubtree(staging, finalOut, sub string) error {
+	stagedPath := filepath.Join(staging, sub)
+	finalPath := filepath.Join(finalOut, sub)
+
+	stagedExists := dirExists(stagedPath)
+	finalExists := dirExists(finalPath)
+
+	if !stagedExists {
+		if finalExists {
+			if err := os.RemoveAll(finalPath); err != nil {
+				return fmt.Errorf("rebuild: prune %s: %w", finalPath, err)
+			}
+		}
+		return nil
+	}
+
+	var backupDir string
+	if finalExists {
+		bd, err := os.MkdirTemp(finalOut, ".sb-backup-")
+		if err != nil {
+			return fmt.Errorf("rebuild: create backup dir: %w", err)
+		}
+		backupDir = bd
+		backupPath := filepath.Join(bd, "dir")
+		if err := os.Rename(finalPath, backupPath); err != nil {
+			_ = os.RemoveAll(bd)
+			return fmt.Errorf("rebuild: backup %s: %w", finalPath, err)
+		}
+	}
+	if err := os.Rename(stagedPath, finalPath); err != nil {
+		// Restore previous output so the live snapshot is not left
+		// partially overwritten.
+		if finalExists {
+			_ = os.Rename(filepath.Join(backupDir, "dir"), finalPath)
+		}
+		return fmt.Errorf("rebuild: promote %s: %w", finalPath, err)
+	}
+	if finalExists {
+		_ = os.RemoveAll(backupDir)
+	}
+	return nil
+}
+
+// promoteTopLevelFiles renames the well-known top-level files
+// (index.html, style.css, the two feeds, both llms manifests) one at a
+// time. Single-file rename is atomic on POSIX, so each file flips in
+// place without needing a backup step. Missing staged files are
+// expected (e.g. llms*.txt when the toggle is off) and skipped.
+func promoteTopLevelFiles(staging, finalOut string) error {
 	for _, name := range []string{"index.html", "style.css", "rss.xml", "atom.xml", "llms.txt", "llms-full.txt"} {
 		stagedPath := filepath.Join(staging, name)
 		finalPath := filepath.Join(finalOut, name)
@@ -900,31 +933,38 @@ func promoteStaging(finalOut, staging string, llmsEnabled bool, pruneSet map[str
 			return fmt.Errorf("rebuild: promote %s: %w", finalPath, err)
 		}
 	}
+	return nil
+}
 
-	// Flat pages land as top-level directories (e.g. "about/"). Promote
-	// every directory that isn't one of the known managed subtrees or
-	// the asset mirrors.
-	if err := promoteExtraDirs(staging, finalOut, pruneSet, oldRoots); err != nil {
-		return err
-	}
-
-	// Carry the new manifest forward so the next rebuild knows which
-	// directories it managed.
+// promotePagesManifest carries the new flat-page manifest into finalOut
+// so the next rebuild knows which directories it managed. A missing
+// staged manifest is not fatal — older rebuild paths or test fixtures
+// may not emit one.
+func promotePagesManifest(staging, finalOut string) error {
 	stagedManifest := filepath.Join(staging, pagesManifestName)
 	finalManifest := filepath.Join(finalOut, pagesManifestName)
-	if _, err := os.Stat(stagedManifest); err == nil {
-		if err := os.Rename(stagedManifest, finalManifest); err != nil {
-			return fmt.Errorf("rebuild: promote pages manifest: %w", err)
+	if _, err := os.Stat(stagedManifest); err != nil {
+		if os.IsNotExist(err) {
+			return nil
 		}
-	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("rebuild: stat pages manifest: %w", err)
 	}
+	if err := os.Rename(stagedManifest, finalManifest); err != nil {
+		return fmt.Errorf("rebuild: promote pages manifest: %w", err)
+	}
+	return nil
+}
 
-	if !llmsEnabled {
-		for _, name := range []string{"llms.txt", "llms-full.txt"} {
-			if err := os.Remove(filepath.Join(finalOut, name)); err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("rebuild: remove %s: %w", name, err)
-			}
+// cleanupLLMs deletes the llms*.txt files when the toggle has been
+// turned off so flipping the switch off propagates to the static
+// snapshot. Missing files are fine — they may never have existed.
+func cleanupLLMs(finalOut string, llmsEnabled bool) error {
+	if llmsEnabled {
+		return nil
+	}
+	for _, name := range []string{"llms.txt", "llms-full.txt"} {
+		if err := os.Remove(filepath.Join(finalOut, name)); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("rebuild: remove %s: %w", name, err)
 		}
 	}
 	return nil
