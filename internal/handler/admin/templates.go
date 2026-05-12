@@ -403,7 +403,10 @@ func localeFuncs(r *http.Request) template.FuncMap {
 			return template.JS(bundle.JSCatalogueJSON(locale, "js."))
 		},
 		"Locale": func() string { return locale },
-		"Root":   func() string { return basepath.FromContext(r.Context()) },
+		// Template FuncMap closures cannot accept a context parameter,
+		// so the request context has to be captured via the enclosing
+		// scope.
+		"Root": func() string { return basepath.FromContext(r.Context()) }, //nolint:contextcheck // see comment above.
 		// statusLabel / humanTime are registered as static stubs in
 		// tmplFuncs (so parse-time strict checks pass). Re-bind them
 		// here so the rendered text picks up the active locale rather
