@@ -27,6 +27,9 @@ linters:
     - gochecknoinits # init() side-effects
     - nilerr         # returning nil where the prior err was non-nil
     - rowserrcheck   # sql.Rows.Err() not called after iteration
+    # Style + refactor batch.
+    - gocritic       # general style / performance / refactor suggestions
+    - nestif         # deeply-nested if blocks
   settings:
     errcheck:
       # Exclude conventional Go patterns where dropping the error is
