@@ -34,7 +34,19 @@ linters:
     - gocognit       # cognitive complexity (nesting-weighted)
     # Dead-parameter batch.
     - unparam        # parameters / returns that are dead or always the same
+    # revive is opted into with a single rule rather than its default
+    # bundle: most revive rules (`exported`, `unused-parameter`, ...)
+    # are cosmetic for this project, but `redefines-builtin-id` catches
+    # genuine breakage as Go's built-in surface keeps growing (`min` /
+    # `max` arrived in 1.21, `any` in 1.18). Enabling the one rule
+    # costs nothing and prevents the same shadowing from creeping back.
+    - revive
   settings:
+    revive:
+      # `rules` overrides revive's default ruleset, so listing only
+      # `redefines-builtin-id` keeps the other revive rules off.
+      rules:
+        - name: redefines-builtin-id
     errcheck:
       # Exclude conventional Go patterns where dropping the error is
       # idiomatic, not negligent:

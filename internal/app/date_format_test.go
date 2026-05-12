@@ -69,13 +69,6 @@ func TestDateFormatSettingsRoundtripAndApply(t *testing.T) {
 	}
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // TestDateFormatSettingsPageRendersPreview sanity-checks that the form
 // page exposes both the placeholder (= default) and the server-rendered
 // sample so the section is useful before any JS runs.

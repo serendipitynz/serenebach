@@ -149,15 +149,15 @@ func applyCategorySidebarBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.T
 		return
 	}
 	byParent := map[int64][]SidebarCategory{}
-	any := false
+	hasVisible := false
 	for _, sc := range cats {
 		if sc.Count <= 0 {
 			continue
 		}
 		byParent[sc.Category.ParentID] = append(byParent[sc.Category.ParentID], sc)
-		any = true
+		hasVisible = true
 	}
-	if !any {
+	if !hasVisible {
 		c.Block("category", 0)
 		return
 	}
