@@ -40,8 +40,8 @@ func Parse(r io.Reader) (map[string]string, error) {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		key, raw, ok := splitKeyValue(line)
-		if !ok || key == "" {
+		key, raw := splitKeyValue(line)
+		if key == "" {
 			continue
 		}
 		key = decode(key)
@@ -78,19 +78,19 @@ func ParseFile(path string) (map[string]string, error) {
 // $sep defaults to \s+ (any whitespace run). The first whitespace run
 // separates key from value; everything after the run — including any
 // further whitespace or tabs — is the verbatim raw value.
-func splitKeyValue(line string) (key, val string, ok bool) {
+func splitKeyValue(line string) (key, val string) {
 	for i, r := range line {
 		if r == ' ' || r == '\t' {
 			j := i
 			for j < len(line) && (line[j] == ' ' || line[j] == '\t') {
 				j++
 			}
-			return line[:i], line[j:], true
+			return line[:i], line[j:]
 		}
 	}
 	// No separator: the whole line is a bare key with empty value. SB
 	// treats this as a present-but-empty entry, which round-trips cleanly.
-	return line, "", true
+	return line, ""
 }
 
 // isArrayOrHash returns true when the raw value is wrapped in `[...]`
