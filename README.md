@@ -1,4 +1,9 @@
-# Serene Bach
+<a href="https://go.serenebach.net/"><img src="https://raw.githubusercontent.com/serendipitynz/serenebach/main/web/templates/admin/assets/sb_logo_dark.svg?sanitize=true" alt="Serene Bach" width="400"></a>
+
+[![CI result](https://github.com/serendipitynz/serenebach/workflows/CI/badge.svg)](https://github.com/serendipitynz/serenebach/actions?query=workflow%3ACI)
+[![Go Report Card](https://goreportcard.com/badge/github.com/serendipitynz/serenebach)](https://goreportcard.com/report/github.com/serendipitynz/serenebach)
+
+---
 
 A self-hostable Go weblog engine — a lighter path between WordPress and Hugo. Small to place, familiar to publish.
 
