@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/serendipitynz/serenebach/internal/app"
 )
 
 // fakeOpenAIServer stands up a tiny HTTP endpoint speaking the
@@ -47,16 +49,33 @@ func TestImagesGenerateAltEndToEnd(t *testing.T) {
 	fake := fakeOpenAIServer(t, "A red square on a blank background.")
 	defer fake.Close()
 
+	configureFakeAutoAltAI(t, a, cookies, fake.URL)
+	id := uploadProbeImage(t, a, cookies)
+	assertProbeImageStored(t, a, id)
+	assertAltGenerationResponse(t, a, cookies, id)
+	assertAltGenerationPersisted(t, a, id)
+}
+
+// configureFakeAutoAltAI flips the signed-in user's AI config to the
+// fake OpenAI-compat server with auto-alt turned on so the upload
+// handler triggers the alt request flow.
+func configureFakeAutoAltAI(t *testing.T, a *app.App, cookies []*http.Cookie, baseURL string) {
+	t.Helper()
 	_ = authedPOSTForm(t, a.Handler(), "/admin/settings/ai", url.Values{
 		"ai_enabled":  {"on"},
 		"ai_kind":     {"openai-compat"},
-		"ai_base_url": {fake.URL},
+		"ai_base_url": {baseURL},
 		"ai_model":    {"fake-vision"},
 		"ai_auto_alt": {"on"},
 	}, cookies)
+}
 
-	// Build a real PNG so the upload handler's image.Decode succeeds
-	// and the stored file exists on disk for the alt reader.
+// uploadProbeImage builds an 8×8 red PNG, posts it through the admin
+// upload endpoint, and returns the new image's id. A real PNG is
+// required so the upload handler's image.Decode succeeds and the
+// stored file shows up on disk for the alt reader.
+func uploadProbeImage(t *testing.T, a *app.App, cookies []*http.Cookie) int64 {
+	t.Helper()
 	img := image.NewRGBA(image.Rect(0, 0, 8, 8))
 	for x := 0; x < 8; x++ {
 		for y := 0; y < 8; y++ {
@@ -83,7 +102,11 @@ func TestImagesGenerateAltEndToEnd(t *testing.T) {
 	if got, _ := upload["auto_alt_requested"].(bool); !got {
 		t.Fatalf("expected auto_alt_requested=true after enabling auto-alt")
 	}
+	return id
+}
 
+func assertProbeImageStored(t *testing.T, a *app.App, id int64) {
+	t.Helper()
 	var stored string
 	_ = a.DB.QueryRow(`SELECT stored_path FROM images WHERE id = ?`, id).Scan(&stored)
 	if stored == "" {
@@ -92,8 +115,11 @@ func TestImagesGenerateAltEndToEnd(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(a.Config.ImageDir, filepath.FromSlash(stored))); err != nil {
 		t.Fatalf("stored file missing: %v", err)
 	}
+}
 
-	w = authedPOSTForm(t, a.Handler(), "/admin/images/"+strconv.FormatInt(id, 10)+"/alt", url.Values{}, cookies)
+func assertAltGenerationResponse(t *testing.T, a *app.App, cookies []*http.Cookie, id int64) {
+	t.Helper()
+	w := authedPOSTForm(t, a.Handler(), "/admin/images/"+strconv.FormatInt(id, 10)+"/alt", url.Values{}, cookies)
 	if w.Code != 200 {
 		t.Fatalf("alt endpoint = %d, body=%s", w.Code, w.Body.String())
 	}
@@ -107,13 +133,15 @@ func TestImagesGenerateAltEndToEnd(t *testing.T) {
 	if got, _ := resp["alt"].(string); !strings.Contains(got, "red square") {
 		t.Errorf("alt = %q, want fake-reply text", got)
 	}
+}
 
+func assertAltGenerationPersisted(t *testing.T, a *app.App, id int64) {
+	t.Helper()
 	var savedAlt string
 	_ = a.DB.QueryRow(`SELECT alt_text FROM images WHERE id = ?`, id).Scan(&savedAlt)
 	if !strings.Contains(savedAlt, "red square") {
 		t.Errorf("saved alt_text = %q", savedAlt)
 	}
-
 	var auditCount int
 	_ = a.DB.QueryRow(`SELECT COUNT(*) FROM mcp_audit_log WHERE tool = 'ai.alt_generate'`).Scan(&auditCount)
 	if auditCount != 1 {
