@@ -212,42 +212,18 @@ func parsePageForm(r *http.Request, base domain.Page) (domain.Page, string) {
 		return base, tr(r, "pages.form.error.titleRequired")
 	}
 
-	slug := strings.TrimSpace(r.PostFormValue("slug"))
-	if slug == "" {
-		return base, tr(r, "pages.form.error.slugRequired")
+	slug, errMsg := normalisePageSlug(r, r.PostFormValue("slug"))
+	// Mirror the pre-refactor behaviour: when the input was non-empty
+	// but failed segment / reserved-prefix validation, surface the
+	// normalised slug back through base so the re-rendered form shows
+	// the user what was rejected. Empty input (= slug-required error)
+	// leaves base.Slug at the caller-supplied default — "/" for create,
+	// the saved value for edit — same as before.
+	if slug != "" {
+		base.Slug = slug
 	}
-	// Ensure leading slash.
-	if slug[0] != '/' {
-		slug = "/" + slug
-	}
-	// Normalize: no trailing slash except root (which we already reject).
-	slug = strings.TrimRight(slug, "/")
-	if slug == "" {
-		slug = "/"
-	}
-	base.Slug = slug
-
-	// Validate slug characters: only lowercase alphanumerics, hyphens, and slashes.
-	// Each segment (between slashes) must be non-empty and valid.
-	segments := strings.Split(slug[1:], "/")
-	for _, seg := range segments {
-		if seg == "" {
-			return base, tr(r, "pages.form.error.slugInvalid")
-		}
-		for _, c := range seg {
-			if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' {
-				continue
-			}
-			return base, tr(r, "pages.form.error.slugInvalid")
-		}
-	}
-
-	// Reserved paths collision check.
-	firstSegment := segments[0]
-	for _, reserved := range []string{"entry", "admin", "img", "category", "archive", "tag", "profile", "feed", "rss.xml", "atom.xml", "llms.txt", "llms-full.txt", "rsd.xml", "style.css", "template", "sb.cgi", "mcp"} {
-		if firstSegment == reserved {
-			return base, tr(r, "pages.form.error.slugReserved")
-		}
+	if errMsg != "" {
+		return base, errMsg
 	}
 
 	if fmtRaw := strings.TrimSpace(r.PostFormValue("format")); fmtRaw != "" {
@@ -264,17 +240,92 @@ func parsePageForm(r *http.Request, base domain.Page) (domain.Page, string) {
 	// the weblog-level field; empty = inherit the site default.
 	base.OGBGImagePath = strings.TrimSpace(r.PostFormValue("og_bg_image_path"))
 
-	statusRaw := r.PostFormValue("status")
-	switch statusRaw {
-	case "0":
-		base.Status = domain.PageDraft
-	case "1":
-		base.Status = domain.PagePublished
-	default:
-		return base, tr(r, "pages.form.error.statusInvalid")
+	status, errMsg := parsePageStatus(r, r.PostFormValue("status"))
+	if errMsg != "" {
+		return base, errMsg
 	}
+	base.Status = status
 
 	return base, ""
+}
+
+// reservedPagePathPrefixes are the first-segment slugs an admin can't
+// claim for a /pages/ entry because the public router already owns
+// them. Kept narrow on purpose — the admin namespace check is the
+// last defence, not the first (chi route order would mostly catch
+// these too).
+var reservedPagePathPrefixes = []string{
+	"entry", "admin", "img", "category", "archive", "tag", "profile",
+	"feed", "rss.xml", "atom.xml", "llms.txt", "llms-full.txt",
+	"rsd.xml", "style.css", "template", "sb.cgi", "mcp",
+}
+
+// normalisePageSlug trims, normalises and validates the submitted
+// slug. Returns the cleaned slug plus a translated error message on
+// validation failure (callers feed that straight back into the form
+// flash). Empty slug is treated as a required-field error.
+func normalisePageSlug(r *http.Request, raw string) (slug, errMsg string) {
+	slug = strings.TrimSpace(raw)
+	if slug == "" {
+		return "", tr(r, "pages.form.error.slugRequired")
+	}
+	if slug[0] != '/' {
+		slug = "/" + slug
+	}
+	// Normalize: no trailing slash except root (which we already reject
+	// via the segment validation below).
+	slug = strings.TrimRight(slug, "/")
+	if slug == "" {
+		slug = "/"
+	}
+
+	segments := strings.Split(slug[1:], "/")
+	for _, seg := range segments {
+		if !isValidPageSlugSegment(seg) {
+			return slug, tr(r, "pages.form.error.slugInvalid")
+		}
+	}
+	if isReservedPagePathPrefix(segments[0]) {
+		return slug, tr(r, "pages.form.error.slugReserved")
+	}
+	return slug, ""
+}
+
+// isValidPageSlugSegment enforces lowercase alphanumerics, hyphens
+// only — the same character set as entry slugs.
+func isValidPageSlugSegment(seg string) bool {
+	if seg == "" {
+		return false
+	}
+	for _, c := range seg {
+		switch {
+		case c >= 'a' && c <= 'z':
+		case c >= '0' && c <= '9':
+		case c == '-':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func isReservedPagePathPrefix(seg string) bool {
+	for _, reserved := range reservedPagePathPrefixes {
+		if seg == reserved {
+			return true
+		}
+	}
+	return false
+}
+
+func parsePageStatus(r *http.Request, raw string) (domain.PageStatus, string) {
+	switch raw {
+	case "0":
+		return domain.PageDraft, ""
+	case "1":
+		return domain.PagePublished, ""
+	}
+	return 0, tr(r, "pages.form.error.statusInvalid")
 }
 
 func (h *Handler) pageCreate(w http.ResponseWriter, r *http.Request) {
