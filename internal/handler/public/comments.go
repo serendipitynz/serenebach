@@ -170,14 +170,10 @@ func (h *Handler) screenCommentSubmission(w http.ResponseWriter, r *http.Request
 	}
 	// IP blacklist — silent drop of any client matching a configured
 	// block range. Runs before any other anti-spam layer so blocked
-	// ranges never touch the DB or the Turnstile API. Empty /
-	// misconfigured lists are no-ops.
-	if blocklist := spam.ParseIPBlocklist(weblog.IPBlacklist); len(blocklist) > 0 {
-		if ipAddr := h.clientIP(r); ipAddr != "" && blocklist.Contains(ipAddr) {
-			log.Printf("public.commentSubmit: ip-blacklist hit from %s", ipAddr)
-			redirectBack("")
-			return commentFields{}, false
-		}
+	// ranges never touch the DB or the Turnstile API.
+	if h.screenCommentBlocklist(weblog, r) {
+		redirectBack("")
+		return commentFields{}, false
 	}
 	// Time check — reject submissions that arrive suspiciously soon after
 	// the form was rendered.
@@ -195,20 +191,8 @@ func (h *Handler) screenCommentSubmission(w http.ResponseWriter, r *http.Request
 		body:      strings.TrimSpace(r.PostFormValue("description")),
 		setCookie: r.PostFormValue("set_cookie") == "1",
 	}
-	if fields.name == "" || fields.body == "" {
-		redirectBack(tr(weblog, r, "comment.error.required"))
-		return commentFields{}, false
-	}
-	const maxBodyLen = 5000
-	if len(fields.body) > maxBodyLen {
-		redirectBack(tr(weblog, r, "comment.error.tooLong"))
-		return commentFields{}, false
-	}
-	// URL allow-list: http / https / mailto only. Rejects
-	// javascript:, data:, vbscript:, etc. so a stored URL can never
-	// ride an anchor into a browser-executed script.
-	if fields.url != "" && !isAllowedCommentURLScheme(fields.url) {
-		redirectBack(tr(weblog, r, "comment.error.badScheme"))
+	if reason, ok := validateCommentFields(weblog, r, fields); !ok {
+		redirectBack(reason)
 		return commentFields{}, false
 	}
 	// Spam-word check: silent rejection, same UX as honeypot trip.
@@ -218,20 +202,67 @@ func (h *Handler) screenCommentSubmission(w http.ResponseWriter, r *http.Request
 		return commentFields{}, false
 	}
 	// Turnstile verification. Skipped entirely when not configured.
-	if h.Turnstile != nil && h.Turnstile.Enabled() {
-		token := r.PostFormValue("cf-turnstile-response")
-		passed, err := h.Turnstile.Verify(r.Context(), token, h.clientIP(r))
-		if err != nil {
-			log.Printf("public.commentSubmit: turnstile error: %v", err)
-			redirectBack(tr(weblog, r, "comment.error.turnstileVerify"))
-			return commentFields{}, false
-		}
-		if !passed {
-			redirectBack(tr(weblog, r, "comment.error.turnstileFail"))
-			return commentFields{}, false
-		}
+	if reason, ok := h.screenCommentTurnstile(weblog, r); !ok {
+		redirectBack(reason)
+		return commentFields{}, false
 	}
 	return fields, true
+}
+
+// screenCommentBlocklist returns true when the request's client IP
+// matches a configured blacklist range so the caller can silently drop
+// the submission. Empty / misconfigured lists are no-ops.
+func (h *Handler) screenCommentBlocklist(weblog *domain.Weblog, r *http.Request) bool {
+	blocklist := spam.ParseIPBlocklist(weblog.IPBlacklist)
+	if len(blocklist) == 0 {
+		return false
+	}
+	ipAddr := h.clientIP(r)
+	if ipAddr == "" || !blocklist.Contains(ipAddr) {
+		return false
+	}
+	log.Printf("public.commentSubmit: ip-blacklist hit from %s", ipAddr)
+	return true
+}
+
+// validateCommentFields enforces the required / length / URL-scheme
+// checks on the parsed form values. Returns the localised error reason
+// the caller should pass to redirectBack when ok=false.
+func validateCommentFields(weblog *domain.Weblog, r *http.Request, fields commentFields) (reason string, ok bool) {
+	if fields.name == "" || fields.body == "" {
+		return tr(weblog, r, "comment.error.required"), false
+	}
+	const maxBodyLen = 5000
+	if len(fields.body) > maxBodyLen {
+		return tr(weblog, r, "comment.error.tooLong"), false
+	}
+	// URL allow-list: http / https / mailto only. Rejects
+	// javascript:, data:, vbscript:, etc. so a stored URL can never
+	// ride an anchor into a browser-executed script.
+	if fields.url != "" && !isAllowedCommentURLScheme(fields.url) {
+		return tr(weblog, r, "comment.error.badScheme"), false
+	}
+	return "", true
+}
+
+// screenCommentTurnstile runs the Cloudflare Turnstile challenge when
+// configured and returns the localised reason + ok=false on either a
+// server-side verify error or a failed challenge. When Turnstile is
+// not configured it short-circuits to ok=true.
+func (h *Handler) screenCommentTurnstile(weblog *domain.Weblog, r *http.Request) (reason string, ok bool) {
+	if h.Turnstile == nil || !h.Turnstile.Enabled() {
+		return "", true
+	}
+	token := r.PostFormValue("cf-turnstile-response")
+	passed, err := h.Turnstile.Verify(r.Context(), token, h.clientIP(r))
+	if err != nil {
+		log.Printf("public.commentSubmit: turnstile error: %v", err)
+		return tr(weblog, r, "comment.error.turnstileVerify"), false
+	}
+	if !passed {
+		return tr(weblog, r, "comment.error.turnstileFail"), false
+	}
+	return "", true
 }
 
 // applyCommenterCookies persists the visitor's name / email / url so
