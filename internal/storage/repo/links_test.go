@@ -13,7 +13,14 @@ func TestLinkCRUD(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
 
-	// CreateLink
+	id := linkCRUDCreate(t, ctx, s)
+	l := linkCRUDReadByID(t, ctx, s, id)
+	linkCRUDUpdate(t, ctx, s, id, l)
+	linkCRUDDelete(t, ctx, s, id)
+}
+
+func linkCRUDCreate(t *testing.T, ctx context.Context, s *Store) int64 {
+	t.Helper()
 	id, err := s.CreateLink(ctx, domain.Link{
 		WID:       1,
 		Name:      "Example",
@@ -28,12 +35,21 @@ func TestLinkCRUD(t *testing.T) {
 	if id == 0 {
 		t.Fatal("expected non-zero id")
 	}
+	return id
+}
 
-	// LinkByID
+func linkCRUDReadByID(t *testing.T, ctx context.Context, s *Store, id int64) *domain.Link {
+	t.Helper()
 	l, err := s.LinkByID(ctx, 1, id)
 	if err != nil {
 		t.Fatalf("LinkByID: %v", err)
 	}
+	assertLinkFields(t, l)
+	return l
+}
+
+func assertLinkFields(t *testing.T, l *domain.Link) {
+	t.Helper()
 	if l.Name != "Example" {
 		t.Errorf("name = %q, want Example", l.Name)
 	}
@@ -49,8 +65,10 @@ func TestLinkCRUD(t *testing.T) {
 	if l.Disp != 0 {
 		t.Errorf("disp = %d, want 0", l.Disp)
 	}
+}
 
-	// UpdateLink
+func linkCRUDUpdate(t *testing.T, ctx context.Context, s *Store, id int64, l *domain.Link) {
+	t.Helper()
 	l.Name = "Example Updated"
 	l.URL = "https://example.com/updated"
 	l.Disp = 1
@@ -62,6 +80,11 @@ func TestLinkCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LinkByID after update: %v", err)
 	}
+	assertLinkUpdated(t, updated)
+}
+
+func assertLinkUpdated(t *testing.T, updated *domain.Link) {
+	t.Helper()
 	if updated.Name != "Example Updated" {
 		t.Errorf("name after update = %q, want Example Updated", updated.Name)
 	}
@@ -74,13 +97,14 @@ func TestLinkCRUD(t *testing.T) {
 	if updated.SortOrder != 20 {
 		t.Errorf("sort_order after update = %d, want 20", updated.SortOrder)
 	}
+}
 
-	// DeleteLink
+func linkCRUDDelete(t *testing.T, ctx context.Context, s *Store, id int64) {
+	t.Helper()
 	if err := s.DeleteLink(ctx, 1, id); err != nil {
 		t.Fatalf("DeleteLink: %v", err)
 	}
-	_, err = s.LinkByID(ctx, 1, id)
-	if !errors.Is(err, ErrNotFound) {
+	if _, err := s.LinkByID(ctx, 1, id); !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound after delete, got %v", err)
 	}
 }

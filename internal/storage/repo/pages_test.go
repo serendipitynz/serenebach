@@ -12,7 +12,17 @@ func TestPageCRUD(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
 
-	// Create
+	id := pageCRUDCreate(t, ctx, s)
+	p := pageCRUDReadByID(t, ctx, s, id)
+	pageCRUDReadBySlug(t, ctx, s, id)
+	pageCRUDListAdminIncludesDrafts(t, ctx, s)
+	pageCRUDListPublishedFiltersDrafts(t, ctx, s)
+	pageCRUDUpdate(t, ctx, s, id, p)
+	pageCRUDDelete(t, ctx, s, id)
+}
+
+func pageCRUDCreate(t *testing.T, ctx context.Context, s *Store) int64 {
+	t.Helper()
 	id, err := s.CreatePage(ctx, domain.Page{
 		WID:           1,
 		AuthorID:      1,
@@ -31,8 +41,11 @@ func TestPageCRUD(t *testing.T) {
 	if id == 0 {
 		t.Fatal("expected non-zero id")
 	}
+	return id
+}
 
-	// PageByID
+func pageCRUDReadByID(t *testing.T, ctx context.Context, s *Store, id int64) *domain.Page {
+	t.Helper()
 	p, err := s.PageByID(ctx, 1, id)
 	if err != nil {
 		t.Fatalf("PageByID: %v", err)
@@ -43,22 +56,26 @@ func TestPageCRUD(t *testing.T) {
 	if p.Slug != "/about" {
 		t.Errorf("slug = %q, want /about", p.Slug)
 	}
+	return p
+}
 
-	// PageBySlug
+func pageCRUDReadBySlug(t *testing.T, ctx context.Context, s *Store, wantID int64) {
+	t.Helper()
 	p2, err := s.PageBySlug(ctx, 1, "/about")
 	if err != nil {
 		t.Fatalf("PageBySlug: %v", err)
 	}
-	if p2.ID != id {
-		t.Errorf("PageBySlug id = %d, want %d", p2.ID, id)
+	if p2.ID != wantID {
+		t.Errorf("PageBySlug id = %d, want %d", p2.ID, wantID)
 	}
+}
 
-	// ListPagesForAdmin returns both statuses
-	_, err = s.CreatePage(ctx, domain.Page{
+func pageCRUDListAdminIncludesDrafts(t *testing.T, ctx context.Context, s *Store) {
+	t.Helper()
+	if _, err := s.CreatePage(ctx, domain.Page{
 		WID: 1, AuthorID: 1, Title: "Draft", Body: "d",
 		Format: "html", Slug: "/draft", Status: domain.PageDraft,
-	})
-	if err != nil {
+	}); err != nil {
 		t.Fatalf("CreatePage draft: %v", err)
 	}
 	all, err := s.ListPagesForAdmin(ctx, 1)
@@ -68,8 +85,10 @@ func TestPageCRUD(t *testing.T) {
 	if len(all) != 2 {
 		t.Errorf("admin list len = %d, want 2", len(all))
 	}
+}
 
-	// PublishedPages returns published only
+func pageCRUDListPublishedFiltersDrafts(t *testing.T, ctx context.Context, s *Store) {
+	t.Helper()
 	pub, err := s.PublishedPages(ctx, 1)
 	if err != nil {
 		t.Fatalf("PublishedPages: %v", err)
@@ -80,8 +99,10 @@ func TestPageCRUD(t *testing.T) {
 	if pub[0].Title != "About" {
 		t.Errorf("published title = %q, want About", pub[0].Title)
 	}
+}
 
-	// UpdatePage
+func pageCRUDUpdate(t *testing.T, ctx context.Context, s *Store, id int64, p *domain.Page) {
+	t.Helper()
 	p.Title = "About Us"
 	p.Body = "<p>updated</p>"
 	p.Slug = "/about-us"
@@ -95,6 +116,23 @@ func TestPageCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PageByID after update: %v", err)
 	}
+	assertPageUpdated(t, updated)
+}
+
+func pageCRUDDelete(t *testing.T, ctx context.Context, s *Store, id int64) {
+	t.Helper()
+	if err := s.DeletePage(ctx, 1, id); err != nil {
+		t.Fatalf("DeletePage: %v", err)
+	}
+	if _, err := s.PageByID(ctx, 1, id); !errors.Is(err, ErrNotFound) {
+		t.Errorf("expected ErrNotFound after delete, got %v", err)
+	}
+}
+
+// assertPageUpdated bundles the post-update field checks so the parent
+// helper stays under the gocyclo threshold.
+func assertPageUpdated(t *testing.T, updated *domain.Page) {
+	t.Helper()
 	if updated.Title != "About Us" {
 		t.Errorf("title after update = %q, want About Us", updated.Title)
 	}
@@ -112,15 +150,6 @@ func TestPageCRUD(t *testing.T) {
 	}
 	if updated.OGBGImagePath != "bg.png" {
 		t.Errorf("og_bg after update = %q, want bg.png", updated.OGBGImagePath)
-	}
-
-	// DeletePage
-	if err := s.DeletePage(ctx, 1, id); err != nil {
-		t.Fatalf("DeletePage: %v", err)
-	}
-	_, err = s.PageByID(ctx, 1, id)
-	if !errors.Is(err, ErrNotFound) {
-		t.Errorf("expected ErrNotFound after delete, got %v", err)
 	}
 }
 
