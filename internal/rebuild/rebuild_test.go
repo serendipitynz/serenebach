@@ -318,7 +318,19 @@ func TestBuildPreservesExistingOutputOnFailure(t *testing.T) {
 	a := newSeededApp(t)
 	out := filepath.Join(t.TempDir(), "public")
 
-	// First build succeeds and populates the live snapshot.
+	preservesRunInitialBuild(t, a, out)
+	wantHome, wantEntry := preservesSnapshotLive(t, out)
+	preservesForceFailure(t, a, out)
+	preservesAssertLiveByteMatch(t, out, wantHome, wantEntry)
+	preservesAssertOtherPagesIntact(t, out)
+	preservesAssertNoStagingLeak(t, out)
+}
+
+// preservesRunInitialBuild builds once and confirms the four core
+// outputs landed. Failure here aborts the whole test because every
+// later step assumes the live snapshot exists.
+func preservesRunInitialBuild(t *testing.T, a *app.App, out string) {
+	t.Helper()
 	if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
 		t.Fatalf("initial Build: %v", err)
 	}
@@ -327,31 +339,41 @@ func TestBuildPreservesExistingOutputOnFailure(t *testing.T) {
 			t.Fatalf("first build: missing %s: %v", p, err)
 		}
 	}
-	// Snapshot the bytes so we can prove the live files are untouched
-	// after the failed second build.
-	wantHome, err := os.ReadFile(filepath.Join(out, "index.html"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	wantEntry, err := os.ReadFile(filepath.Join(out, "entry/1/index.html"))
-	if err != nil {
-		t.Fatal(err)
-	}
+}
 
-	// Force the next Build to fail by removing the active template
-	// — same trick TestBuildSurfacesMissingTemplate uses. This breaks
-	// rendering after the staging dir is created, exercising the
-	// "fail mid-flight" path the staging swap is designed to survive.
+// preservesSnapshotLive captures the bytes of index.html and the first
+// entry page so the later assertion can prove the failed rebuild left
+// them untouched.
+func preservesSnapshotLive(t *testing.T, out string) (home, entry []byte) {
+	t.Helper()
+	home, err := os.ReadFile(filepath.Join(out, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry, err = os.ReadFile(filepath.Join(out, "entry/1/index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return home, entry
+}
+
+// preservesForceFailure removes the active template and runs Build
+// again. Same trick TestBuildSurfacesMissingTemplate uses — breaks
+// rendering after the staging dir is created, exercising the
+// "fail mid-flight" path the staging swap is designed to survive.
+func preservesForceFailure(t *testing.T, a *app.App, out string) {
+	t.Helper()
 	if _, err := a.DB.ExecContext(context.Background(),
 		`DELETE FROM templates WHERE is_active = 1`); err != nil {
 		t.Fatal(err)
 	}
-
 	if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{OutDir: out, WID: 1}); err == nil {
 		t.Fatal("expected Build to fail without an active template")
 	}
+}
 
-	// Live snapshot must still match the first build byte-for-byte.
+func preservesAssertLiveByteMatch(t *testing.T, out string, wantHome, wantEntry []byte) {
+	t.Helper()
 	if got, err := os.ReadFile(filepath.Join(out, "index.html")); err != nil {
 		t.Errorf("home page disappeared after failed rebuild: %v", err)
 	} else if string(got) != string(wantHome) {
@@ -362,13 +384,19 @@ func TestBuildPreservesExistingOutputOnFailure(t *testing.T) {
 	} else if string(got) != string(wantEntry) {
 		t.Errorf("entry/1 mutated by failed rebuild")
 	}
+}
+
+func preservesAssertOtherPagesIntact(t *testing.T, out string) {
+	t.Helper()
 	for _, p := range []string{"entry/2/index.html", "category/1/index.html"} {
 		if _, err := os.Stat(filepath.Join(out, p)); err != nil {
 			t.Errorf("%s disappeared after failed rebuild: %v", p, err)
 		}
 	}
+}
 
-	// Staging dir must not leak into the output tree.
+func preservesAssertNoStagingLeak(t *testing.T, out string) {
+	t.Helper()
 	dirEntries, err := os.ReadDir(out)
 	if err != nil {
 		t.Fatal(err)

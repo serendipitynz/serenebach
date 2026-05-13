@@ -2,6 +2,7 @@ package importer_test
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"strings"
@@ -190,6 +191,15 @@ func TestImportSB2BasicRoundTrip(t *testing.T) {
 		t.Fatalf("Import: %v", err)
 	}
 
+	sb2BasicAssertReportCounts(t, report)
+	sb2BasicAssertWeblogMeta(t, a.DB)
+	sb2BasicAssertBasePathFallback(t, a.DB)
+	sb2BasicAssertCategoryParentRemap(t, a.DB)
+	sb2BasicAssertCommentsOnPublishedOnly(t, a.DB)
+}
+
+func sb2BasicAssertReportCounts(t *testing.T, report *importer.Report) {
+	t.Helper()
 	if !report.WeblogUpdated {
 		t.Errorf("weblog not updated")
 	}
@@ -202,44 +212,57 @@ func TestImportSB2BasicRoundTrip(t *testing.T) {
 	if report.Templates != 1 {
 		t.Errorf("templates = %d, want 1", report.Templates)
 	}
+}
 
-	var weblogTitle, weblogDesc string
-	if err := a.DB.QueryRow(`SELECT title, description FROM weblogs WHERE id = 1`).Scan(&weblogTitle, &weblogDesc); err != nil {
+func sb2BasicAssertWeblogMeta(t *testing.T, db *sql.DB) {
+	t.Helper()
+	var title, desc string
+	if err := db.QueryRow(`SELECT title, description FROM weblogs WHERE id = 1`).Scan(&title, &desc); err != nil {
 		t.Fatal(err)
 	}
-	if weblogTitle != "Synthetic Blog" {
-		t.Errorf("weblog title = %q, want Synthetic Blog", weblogTitle)
+	if title != "Synthetic Blog" {
+		t.Errorf("weblog title = %q, want Synthetic Blog", title)
 	}
-	if !strings.Contains(weblogDesc, "synthetic SB2 fixture") {
-		t.Errorf("weblog description = %q", weblogDesc)
+	if !strings.Contains(desc, "synthetic SB2 fixture") {
+		t.Errorf("weblog description = %q", desc)
 	}
+}
 
-	// configure.cgi has only conf_srv_cgi (SB2 style); the importer
-	// must fall through to it for legacy_base_path.
+// sb2BasicAssertBasePathFallback exercises the SB2-only path: the
+// fixture's configure.cgi has only conf_srv_cgi, so the importer must
+// fall back to it when filling in legacy_base_path.
+func sb2BasicAssertBasePathFallback(t *testing.T, db *sql.DB) {
+	t.Helper()
 	var basePath string
-	if err := a.DB.QueryRow(`SELECT legacy_base_path FROM weblogs WHERE id = 1`).Scan(&basePath); err != nil {
+	if err := db.QueryRow(`SELECT legacy_base_path FROM weblogs WHERE id = 1`).Scan(&basePath); err != nil {
 		t.Fatal(err)
 	}
 	if basePath != "/myblog/" {
 		t.Errorf("legacy_base_path = %q, want /myblog/ (conf_srv_cgi fallback)", basePath)
 	}
+}
 
-	// Categories preserve parent/child.
+func sb2BasicAssertCategoryParentRemap(t *testing.T, db *sql.DB) {
+	t.Helper()
 	var parentRemapped, childParent int64
-	if err := a.DB.QueryRow(`SELECT id FROM categories WHERE name = 'Tech'`).Scan(&parentRemapped); err != nil {
+	if err := db.QueryRow(`SELECT id FROM categories WHERE name = 'Tech'`).Scan(&parentRemapped); err != nil {
 		t.Fatal(err)
 	}
-	if err := a.DB.QueryRow(`SELECT parent_id FROM categories WHERE name = 'Sub-tech'`).Scan(&childParent); err != nil {
+	if err := db.QueryRow(`SELECT parent_id FROM categories WHERE name = 'Sub-tech'`).Scan(&childParent); err != nil {
 		t.Fatal(err)
 	}
 	if childParent != parentRemapped {
 		t.Errorf("child parent_id = %d, want %d", childParent, parentRemapped)
 	}
+}
 
-	// One comment was attached to a published entry; the other was on
-	// the draft and must have been silently dropped.
+// sb2BasicAssertCommentsOnPublishedOnly checks that comments attached
+// to the skipped draft were dropped silently; only the comment on the
+// published entry should land in messages.
+func sb2BasicAssertCommentsOnPublishedOnly(t *testing.T, db *sql.DB) {
+	t.Helper()
 	var msgCount int
-	if err := a.DB.QueryRow(`SELECT COUNT(*) FROM messages WHERE wid = 1`).Scan(&msgCount); err != nil {
+	if err := db.QueryRow(`SELECT COUNT(*) FROM messages WHERE wid = 1`).Scan(&msgCount); err != nil {
 		t.Fatal(err)
 	}
 	if msgCount != 1 {
