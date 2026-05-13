@@ -293,70 +293,47 @@ func TestPublishedEntriesByTagFiltering(t *testing.T) {
 		t.Fatalf("CreateTag: %v", err)
 	}
 
-	// Create published entries for WID 1 tagged "test"
-	pub1, err := s.CreateEntry(ctx, domain.Entry{
-		WID: 1, AuthorID: 1, Title: "Published 1", Body: "body",
-		Format: "markdown", Status: domain.EntryPublished,
-	})
-	if err != nil {
-		t.Fatalf("CreateEntry pub1: %v", err)
-	}
-	pub2, err := s.CreateEntry(ctx, domain.Entry{
-		WID: 1, AuthorID: 1, Title: "Published 2", Body: "body",
-		Format: "markdown", Status: domain.EntryPublished,
-	})
-	if err != nil {
-		t.Fatalf("CreateEntry pub2: %v", err)
-	}
+	pubFilteringSeedEntries(t, ctx, s, tagID)
+	pubFilteringAssertWIDIsolation(t, ctx, s, tagID)
+	pubFilteringAssertCount(t, ctx, s, tagID)
+	pubFilteringAssertPagination(t, ctx, s, tagID)
+}
 
-	// Create draft and closed entries for WID 1 tagged "test"
-	draftID, err := s.CreateEntry(ctx, domain.Entry{
-		WID: 1, AuthorID: 1, Title: "Draft", Body: "body",
-		Format: "markdown", Status: domain.EntryDraft,
-	})
-	if err != nil {
-		t.Fatalf("CreateEntry draft: %v", err)
-	}
-	closedID, err := s.CreateEntry(ctx, domain.Entry{
-		WID: 1, AuthorID: 1, Title: "Closed", Body: "body",
-		Format: "markdown", Status: domain.EntryClosed,
-	})
-	if err != nil {
-		t.Fatalf("CreateEntry closed: %v", err)
-	}
-
-	// Create an entry on WID 2, but deliberately attach it to WID 1's
-	// tagID so the test can verify that the WID predicate excludes it.
-	otherEntryID, err := s.CreateEntry(ctx, domain.Entry{
-		WID: 2, AuthorID: 1, Title: "Other WID", Body: "body",
-		Format: "markdown", Status: domain.EntryPublished,
-	})
-	if err != nil {
-		t.Fatalf("CreateEntry wid=2: %v", err)
-	}
-
-	// Assign tag to all WID 1 entries
-	if err := s.SetEntryTags(ctx, pub1, []int64{tagID}); err != nil {
-		t.Fatalf("SetEntryTags pub1: %v", err)
-	}
-	if err := s.SetEntryTags(ctx, pub2, []int64{tagID}); err != nil {
-		t.Fatalf("SetEntryTags pub2: %v", err)
-	}
-	if err := s.SetEntryTags(ctx, draftID, []int64{tagID}); err != nil {
-		t.Fatalf("SetEntryTags draft: %v", err)
-	}
-	if err := s.SetEntryTags(ctx, closedID, []int64{tagID}); err != nil {
-		t.Fatalf("SetEntryTags closed: %v", err)
-	}
+// pubFilteringSeedEntries creates two published, one draft, one closed
+// entry under WID 1 plus one published entry under WID 2, and attaches
+// the same tagID to all five. The WID 2 row is deliberately tagged so
+// the WID predicate has something to exclude.
+func pubFilteringSeedEntries(t *testing.T, ctx context.Context, s *Store, tagID int64) {
+	t.Helper()
+	createTaggedEntry(t, ctx, s, 1, "Published 1", domain.EntryPublished, tagID)
+	createTaggedEntry(t, ctx, s, 1, "Published 2", domain.EntryPublished, tagID)
+	createTaggedEntry(t, ctx, s, 1, "Draft", domain.EntryDraft, tagID)
+	createTaggedEntry(t, ctx, s, 1, "Closed", domain.EntryClosed, tagID)
 	// WID 2 entry also carries WID 1's tagID — must be excluded by the
 	// e.wid = ? predicate in PublishedEntriesByTag.
-	if err := s.SetEntryTags(ctx, otherEntryID, []int64{tagID}); err != nil {
-		t.Fatalf("SetEntryTags other: %v", err)
-	}
+	createTaggedEntry(t, ctx, s, 2, "Other WID", domain.EntryPublished, tagID)
+}
 
-	// PublishedEntriesByTag should return only published entries from WID 1.
-	// The WID 2 entry was deliberately attached to the same tagID but must
-	// not appear here — the e.wid = ? predicate bars cross-weblog leakage.
+// createTaggedEntry inserts a single entry and attaches tagID to it.
+func createTaggedEntry(t *testing.T, ctx context.Context, s *Store, wid int64, title string, status domain.EntryStatus, tagID int64) {
+	t.Helper()
+	id, err := s.CreateEntry(ctx, domain.Entry{
+		WID: wid, AuthorID: 1, Title: title, Body: "body",
+		Format: "markdown", Status: status,
+	})
+	if err != nil {
+		t.Fatalf("CreateEntry %s: %v", title, err)
+	}
+	if err := s.SetEntryTags(ctx, id, []int64{tagID}); err != nil {
+		t.Fatalf("SetEntryTags %s: %v", title, err)
+	}
+}
+
+// pubFilteringAssertWIDIsolation checks that PublishedEntriesByTag
+// returns only published entries from the requested WID — the draft,
+// the closed entry, and the cross-WID entry must all be filtered out.
+func pubFilteringAssertWIDIsolation(t *testing.T, ctx context.Context, s *Store, tagID int64) {
+	t.Helper()
 	entries, err := s.PublishedEntriesByTag(ctx, 1, tagID, 100)
 	if err != nil {
 		t.Fatalf("PublishedEntriesByTag: %v", err)
@@ -372,8 +349,10 @@ func TestPublishedEntriesByTagFiltering(t *testing.T) {
 			t.Errorf("unexpected wid %d for entry %q (cross-wid leak)", e.WID, e.Title)
 		}
 	}
+}
 
-	// CountPublishedEntriesByTag should count only published from this WID
+func pubFilteringAssertCount(t *testing.T, ctx context.Context, s *Store, tagID int64) {
+	t.Helper()
 	count, err := s.CountPublishedEntriesByTag(ctx, 1, tagID)
 	if err != nil {
 		t.Fatalf("CountPublishedEntriesByTag: %v", err)
@@ -381,8 +360,10 @@ func TestPublishedEntriesByTagFiltering(t *testing.T) {
 	if count != 2 {
 		t.Errorf("CountPublishedEntriesByTag = %d, want 2", count)
 	}
+}
 
-	// PublishedEntriesByTagPage with limit=1 offset=0
+func pubFilteringAssertPagination(t *testing.T, ctx context.Context, s *Store, tagID int64) {
+	t.Helper()
 	page, err := s.PublishedEntriesByTagPage(ctx, 1, tagID, 1, 0)
 	if err != nil {
 		t.Fatalf("PublishedEntriesByTagPage page 1: %v", err)
@@ -390,7 +371,6 @@ func TestPublishedEntriesByTagFiltering(t *testing.T) {
 	if len(page) != 1 {
 		t.Fatalf("page 1 len = %d, want 1", len(page))
 	}
-	// Second page
 	page2, err := s.PublishedEntriesByTagPage(ctx, 1, tagID, 1, 1)
 	if err != nil {
 		t.Fatalf("PublishedEntriesByTagPage page 2: %v", err)
