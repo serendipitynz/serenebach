@@ -80,31 +80,31 @@ type chatResponse struct {
 }
 
 func (p *openAICompatProvider) Complete(ctx context.Context, req Request) (Response, error) {
-	messages := make([]chatMessage, 0, 2)
-	if strings.TrimSpace(req.System) != "" {
-		messages = append(messages, chatMessage{Role: "system", Content: req.System})
+	payload, err := buildOpenAICompatPayload(p.model, req)
+	if err != nil {
+		return Response{}, err
 	}
-
-	if len(req.Image) > 0 {
-		if strings.TrimSpace(req.ImageMIME) == "" {
-			return Response{}, errors.New("ai: ImageMIME required when Image is set")
-		}
-		// Vision call: encode as a data URL in the image_url field.
-		// OpenAI, LM Studio, and Ollama (compat) all accept this
-		// shape; it's cheaper to bundle than force the caller to
-		// host images for one-shot alt-text generation.
-		dataURL := "data:" + req.ImageMIME + ";base64," + base64.StdEncoding.EncodeToString(req.Image)
-		parts := []contentPart{
-			{Type: "text", Text: req.Prompt},
-			{Type: "image_url", ImageURL: &imageURLPart{URL: dataURL}},
-		}
-		messages = append(messages, chatMessage{Role: "user", Content: parts})
-	} else {
-		messages = append(messages, chatMessage{Role: "user", Content: req.Prompt})
+	httpReq, err := p.newHTTPRequest(ctx, payload)
+	if err != nil {
+		return Response{}, err
 	}
+	raw, status, err := doProviderRequest(ctx, p.client, httpReq)
+	if err != nil {
+		return Response{}, err
+	}
+	return parseOpenAICompatResponse(raw, status)
+}
 
+// buildOpenAICompatPayload assembles the JSON body for a single sync
+// chat completion. The vision/text split lives here so Complete only
+// has to thread the bytes through HTTP.
+func buildOpenAICompatPayload(model string, req Request) ([]byte, error) {
+	messages, err := buildOpenAICompatMessages(req)
+	if err != nil {
+		return nil, err
+	}
 	body := chatRequest{
-		Model:       p.model,
+		Model:       model,
 		Messages:    messages,
 		MaxTokens:   req.MaxTokens,
 		Temperature: req.Temperature,
@@ -112,57 +112,79 @@ func (p *openAICompatProvider) Complete(ctx context.Context, req Request) (Respo
 	}
 	payload, err := json.Marshal(body)
 	if err != nil {
-		return Response{}, fmt.Errorf("ai: marshal request: %w", err)
+		return nil, fmt.Errorf("ai: marshal request: %w", err)
 	}
+	return payload, nil
+}
 
+func buildOpenAICompatMessages(req Request) ([]chatMessage, error) {
+	messages := make([]chatMessage, 0, 2)
+	if strings.TrimSpace(req.System) != "" {
+		messages = append(messages, chatMessage{Role: "system", Content: req.System})
+	}
+	if len(req.Image) == 0 {
+		messages = append(messages, chatMessage{Role: "user", Content: req.Prompt})
+		return messages, nil
+	}
+	if strings.TrimSpace(req.ImageMIME) == "" {
+		return nil, errors.New("ai: ImageMIME required when Image is set")
+	}
+	// Vision call: encode as a data URL in the image_url field.
+	// OpenAI, LM Studio, and Ollama (compat) all accept this shape;
+	// it's cheaper to bundle than force the caller to host images
+	// for one-shot alt-text generation.
+	dataURL := "data:" + req.ImageMIME + ";base64," + base64.StdEncoding.EncodeToString(req.Image)
+	parts := []contentPart{
+		{Type: "text", Text: req.Prompt},
+		{Type: "image_url", ImageURL: &imageURLPart{URL: dataURL}},
+	}
+	messages = append(messages, chatMessage{Role: "user", Content: parts})
+	return messages, nil
+}
+
+func (p *openAICompatProvider) newHTTPRequest(ctx context.Context, payload []byte) (*http.Request, error) {
 	url := p.baseURL + "/chat/completions"
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
-		return Response{}, fmt.Errorf("ai: new request: %w", err)
+		return nil, fmt.Errorf("ai: new request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	if p.apiKey != "" {
 		httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
 	}
+	return httpReq, nil
+}
 
-	resp, err := p.client.Do(httpReq)
-	if err != nil {
-		if ctxErr := ctx.Err(); ctxErr != nil {
-			return Response{}, ErrTimeout
-		}
-		return Response{}, fmt.Errorf("ai: %w", err)
-	}
-	defer resp.Body.Close()
-
-	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1 MiB cap on response body
-	switch resp.StatusCode {
-	case http.StatusUnauthorized, http.StatusForbidden:
-		return Response{}, ErrUnauthorized
-	case http.StatusTooManyRequests:
-		return Response{}, ErrRateLimited
-	}
-
+func parseOpenAICompatResponse(raw []byte, status int) (Response, error) {
 	var parsed chatResponse
 	if err := json.Unmarshal(raw, &parsed); err != nil {
-		return Response{}, fmt.Errorf("ai: decode response (status %d): %w", resp.StatusCode, err)
+		return Response{}, fmt.Errorf("ai: decode response (status %d): %w", status, err)
 	}
 	if parsed.Error != nil && parsed.Error.Message != "" {
-		// Vision-mismatch 400s from LM Studio / Ollama come through
-		// here; surface as ErrVisionUnsupported if the message hints
-		// at it so the admin UI can show an actionable toast.
-		msg := strings.ToLower(parsed.Error.Message)
-		if strings.Contains(msg, "image") || strings.Contains(msg, "vision") || strings.Contains(msg, "multimodal") {
-			return Response{}, fmt.Errorf("%w: %s", ErrVisionUnsupported, parsed.Error.Message)
-		}
-		return Response{}, fmt.Errorf("ai: %s", parsed.Error.Message)
+		return Response{}, mapOpenAICompatErrorMessage(parsed.Error.Message)
 	}
-	if resp.StatusCode >= 400 {
-		return Response{}, fmt.Errorf("ai: provider returned %d: %s", resp.StatusCode, firstLine(string(raw)))
+	if status >= 400 {
+		return Response{}, fmt.Errorf("ai: provider returned %d: %s", status, firstLine(string(raw)))
 	}
-
 	if len(parsed.Choices) == 0 {
 		return Response{}, ErrEmptyResponse
 	}
+	return finalizeOpenAICompatChoice(parsed)
+}
+
+// mapOpenAICompatErrorMessage classifies a provider-supplied error
+// message. Vision-mismatch 400s from LM Studio / Ollama come through
+// here; surface them as ErrVisionUnsupported so the admin UI can show
+// an actionable toast.
+func mapOpenAICompatErrorMessage(msg string) error {
+	lower := strings.ToLower(msg)
+	if strings.Contains(lower, "image") || strings.Contains(lower, "vision") || strings.Contains(lower, "multimodal") {
+		return fmt.Errorf("%w: %s", ErrVisionUnsupported, msg)
+	}
+	return fmt.Errorf("ai: %s", msg)
+}
+
+func finalizeOpenAICompatChoice(parsed chatResponse) (Response, error) {
 	choice := parsed.Choices[0]
 	usage := Usage{
 		PromptTokens:     parsed.Usage.PromptTokens,
@@ -170,29 +192,51 @@ func (p *openAICompatProvider) Complete(ctx context.Context, req Request) (Respo
 		TotalTokens:      parsed.Usage.TotalTokens,
 	}
 	clean, info := sanitizeAssistantText(choice.Message.Content)
-	if clean == "" {
-		// Empty content + non-empty reasoning_content + length-cut
-		// is the canonical "the reasoning model used the whole token
-		// budget on thinking" failure (qwen3-thinking on a small
-		// max_tokens, etc.). Surface a distinct error so the toast
-		// can advise raising max_tokens rather than blaming the model.
-		err := ErrEmptyResponse
-		if choice.FinishReason == "length" && strings.TrimSpace(choice.Message.ReasoningContent) != "" {
-			err = ErrReasoningExhausted
-		}
+	if clean != "" {
 		return Response{
+			Text:         clean,
 			Usage:        usage,
 			FinishReason: choice.FinishReason,
 			Sanitized:    info,
-		}, err
+		}, nil
 	}
-
+	// Empty content + non-empty reasoning_content + length-cut is
+	// the canonical "the reasoning model used the whole token budget
+	// on thinking" failure (qwen3-thinking on a small max_tokens,
+	// etc.). Surface a distinct error so the toast can advise raising
+	// max_tokens rather than blaming the model.
+	err := ErrEmptyResponse
+	if choice.FinishReason == "length" && strings.TrimSpace(choice.Message.ReasoningContent) != "" {
+		err = ErrReasoningExhausted
+	}
 	return Response{
-		Text:         clean,
 		Usage:        usage,
 		FinishReason: choice.FinishReason,
 		Sanitized:    info,
-	}, nil
+	}, err
+}
+
+// doProviderRequest executes the HTTP round-trip shared by all
+// providers: client.Do, context-timeout coalescing, top-level status
+// triage, and capped body read.
+func doProviderRequest(ctx context.Context, client *http.Client, httpReq *http.Request) ([]byte, int, error) {
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, 0, ErrTimeout
+		}
+		return nil, 0, fmt.Errorf("ai: %w", err)
+	}
+	defer resp.Body.Close()
+
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1 MiB cap on response body
+	switch resp.StatusCode {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return nil, resp.StatusCode, ErrUnauthorized
+	case http.StatusTooManyRequests:
+		return nil, resp.StatusCode, ErrRateLimited
+	}
+	return raw, resp.StatusCode, nil
 }
 
 // firstLine trims a response body to its first line + an ellipsis —
