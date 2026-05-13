@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -271,42 +272,17 @@ func (h *Handler) userUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	updated.Name = name
-	updated.DisplayName = strings.TrimSpace(r.PostFormValue("display_name"))
-	if updated.DisplayName == "" {
-		updated.DisplayName = updated.Name
-	}
-	updated.Email = strings.TrimSpace(r.PostFormValue("email"))
-	updated.Description = r.PostFormValue("description")
-	updated.DescriptionFormat = normaliseDescriptionFormat(r.PostFormValue("description_format"))
-	updated.ListVisible = r.PostFormValue("list_visible") == "on"
+	applyUserProfileFields(&updated, r)
 
 	role, ok := parseRole(r.PostFormValue("role"))
 	if !ok {
 		h.renderUserForm(w, r, updated, tr(r, "users.form.error.roleInvalid"), "")
 		return
 	}
-	// Admins can't change their own role — a self-demotion would
-	// kick them out of /admin/users mid-flow, and the only recovery
-	// would be another admin promoting them back (or DB surgery
-	// when they're the lone admin). Silently pin to RoleAdmin so a
-	// tampered form submit can't slip a new value through.
-	actor := session.UserFrom(r.Context())
-	if actor != nil && actor.ID == existing.ID && existing.Role == domain.RoleAdmin {
-		role = domain.RoleAdmin
-	}
-	// Belt-and-braces: also prevent demoting the last admin via
-	// any path (e.g. a second admin editing the lone admin). With
-	// the self-demote block above this rarely triggers, but it
-	// keeps the invariant explicit.
-	if existing.Role == domain.RoleAdmin && role != domain.RoleAdmin {
-		count, err := h.Store.CountAdmins(r.Context(), h.wid())
-		if err != nil {
-			log.Printf("admin.userUpdate: count admins: %v", err)
-		}
-		if count <= 1 {
-			h.renderUserForm(w, r, updated, tr(r, "users.form.error.lastAdmin"), "")
-			return
-		}
+	role, roleErrKey := h.resolveUserRoleUpdate(r.Context(), existing, role, session.UserFrom(r.Context()))
+	if roleErrKey != "" {
+		h.renderUserForm(w, r, updated, tr(r, roleErrKey), "")
+		return
 	}
 	updated.Role = role
 
@@ -320,29 +296,83 @@ func (h *Handler) userUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Password change: only persist when both fields are filled and
-	// match. Blank fields mean "keep the existing password" — this
-	// matches SB3's UX for the profile / admin-edit form.
-	newPW := r.PostFormValue("password")
-	if newPW != "" {
-		if newPW != r.PostFormValue("password_confirm") {
-			h.renderUserForm(w, r, updated, tr(r, "users.form.error.passwordMismatchKept"), "")
-			return
-		}
-		hash, err := auth.HashPassword(newPW)
-		if err != nil {
-			log.Printf("admin.userUpdate: hash: %v", err)
-			http.Error(w, "failed to hash password", http.StatusInternalServerError)
-			return
-		}
-		if err := h.Store.UpdateUserPassword(r.Context(), id, hash); err != nil {
-			log.Printf("admin.userUpdate: password: %v", err)
-			http.Error(w, "failed to update password", http.StatusInternalServerError)
-			return
-		}
+	if !h.updateUserPasswordIfChanged(w, r, id, updated) {
+		return
 	}
 
 	http.Redirect(w, r, root(r)+"/admin/users/"+strconv.FormatInt(id, 10)+"/edit?ok=saved", http.StatusFound)
+}
+
+// applyUserProfileFields copies the non-credential profile fields from
+// the form onto updated. Name validation happens in the caller because
+// the empty-name path needs a tailored flash; everything here is "take
+// whatever the form gave us" with light normalisation.
+func applyUserProfileFields(updated *domain.User, r *http.Request) {
+	updated.DisplayName = strings.TrimSpace(r.PostFormValue("display_name"))
+	if updated.DisplayName == "" {
+		updated.DisplayName = updated.Name
+	}
+	updated.Email = strings.TrimSpace(r.PostFormValue("email"))
+	updated.Description = r.PostFormValue("description")
+	updated.DescriptionFormat = normaliseDescriptionFormat(r.PostFormValue("description_format"))
+	updated.ListVisible = r.PostFormValue("list_visible") == "on"
+}
+
+// resolveUserRoleUpdate enforces the two role-change invariants and
+// returns the effective role plus an i18n error key (empty when the
+// update is allowed):
+//
+//  1. Admins editing themselves can never demote. A tampered form is
+//     silently pinned back to RoleAdmin rather than rejected so a
+//     hostile submit can't slip through.
+//  2. The lone-admin guard rejects any path that would leave zero
+//     admins (e.g. a second admin demoting the only other one).
+func (h *Handler) resolveUserRoleUpdate(ctx context.Context, existing *domain.User, submitted int, actor *domain.User) (int, string) {
+	role := submitted
+	if actor != nil && actor.ID == existing.ID && existing.Role == domain.RoleAdmin {
+		role = domain.RoleAdmin
+	}
+	if existing.Role == domain.RoleAdmin && role != domain.RoleAdmin {
+		count, err := h.Store.CountAdmins(ctx, h.wid())
+		if err != nil {
+			log.Printf("admin.userUpdate: count admins: %v", err)
+		}
+		if count <= 1 {
+			return role, "users.form.error.lastAdmin"
+		}
+	}
+	return role, ""
+}
+
+// updateUserPasswordIfChanged persists a new password when both the
+// `password` and `password_confirm` fields are filled and match. Blank
+// fields are a no-op — matches SB3's profile / admin-edit UX where
+// leaving the password field empty means "keep the existing hash".
+//
+// Returns false when the handler has already written the response (a
+// flash on mismatch, or a 500 on hash / persist failure); callers must
+// stop on a false return.
+func (h *Handler) updateUserPasswordIfChanged(w http.ResponseWriter, r *http.Request, id int64, updated domain.User) bool {
+	newPW := r.PostFormValue("password")
+	if newPW == "" {
+		return true
+	}
+	if newPW != r.PostFormValue("password_confirm") {
+		h.renderUserForm(w, r, updated, tr(r, "users.form.error.passwordMismatchKept"), "")
+		return false
+	}
+	hash, err := auth.HashPassword(newPW)
+	if err != nil {
+		log.Printf("admin.userUpdate: hash: %v", err)
+		http.Error(w, "failed to hash password", http.StatusInternalServerError)
+		return false
+	}
+	if err := h.Store.UpdateUserPassword(r.Context(), id, hash); err != nil {
+		log.Printf("admin.userUpdate: password: %v", err)
+		http.Error(w, "failed to update password", http.StatusInternalServerError)
+		return false
+	}
+	return true
 }
 
 // ---- delete -------------------------------------------------------------
