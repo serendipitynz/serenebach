@@ -453,34 +453,49 @@ func TestParsePostedAtErrorOnInvalidTimestamp(t *testing.T) {
 }
 
 func TestToolUploadImageSuccessAndAudit(t *testing.T) {
+	mainDB, srv := uploadImageNewServer(t)
+	ctx := WithAuth(context.Background(), domain.MCPScopeWrite, 7, 13)
+
+	imageID := uploadImageCallToolReturnsID(t, ctx, srv)
+	uploadImageAssertAuditRow(t, ctx, mainDB, imageID)
+}
+
+// uploadImageNewServer wires a single-row weblog, an on-disk image
+// store, and an mcpaudit wrapper around an in-memory main DB. The
+// caller owns mainDB via t.Cleanup-style defer in the parent.
+func uploadImageNewServer(t *testing.T) (*sql.DB, *Server) {
+	t.Helper()
 	mainDB, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("open main db: %v", err)
 	}
-	defer mainDB.Close()
+	t.Cleanup(func() { _ = mainDB.Close() })
 	if err := storage.Up(mainDB); err != nil {
 		t.Fatalf("migrate main: %v", err)
 	}
 
-	// Seed weblog.
 	now := time.Now().Unix()
-	mainDB.ExecContext(context.Background(), `
+	if _, err := mainDB.ExecContext(context.Background(), `
 		INSERT INTO weblogs (id, title, description, base_url, lang, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO NOTHING`,
-		1, "Test", "test", "", "en", now, now)
+		1, "Test", "test", "", "en", now, now); err != nil {
+		t.Fatalf("seed weblog: %v", err)
+	}
 
-	imgDir := t.TempDir()
 	srv := &Server{
 		Store:      repo.New(mainDB),
 		Audit:      mcpaudit.WrapMain(mainDB),
-		ImageStore: images.NewStore(imgDir),
+		ImageStore: images.NewStore(t.TempDir()),
 		WID:        1,
 	}
+	return mainDB, srv
+}
 
-	ctx := WithAuth(context.Background(), domain.MCPScopeWrite, 7, 13)
-
-	// Build a minimal valid PNG.
+// uploadImageCallToolReturnsID encodes a tiny PNG, calls toolUploadImage,
+// and returns the new image id parsed from the JSON response.
+func uploadImageCallToolReturnsID(t *testing.T, ctx context.Context, srv *Server) int64 {
+	t.Helper()
 	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
 	for x := 0; x < 2; x++ {
 		for y := 0; y < 2; y++ {
@@ -506,10 +521,18 @@ func TestToolUploadImageSuccessAndAudit(t *testing.T) {
 	if imageID == 0 {
 		t.Fatal("expected non-zero image id")
 	}
+	return imageID
+}
 
-	// Verify audit row for upload_image.
+// uploadImageAssertAuditRow confirms a single upload_image audit row
+// exists and that its fields carry the token/author/target the call
+// was authorised with.
+func uploadImageAssertAuditRow(t *testing.T, ctx context.Context, mainDB *sql.DB, imageID int64) {
+	t.Helper()
 	var auditCount int
-	if err := mainDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM mcp_audit_log WHERE tool = 'upload_image' AND target_id = ?`, imageID).Scan(&auditCount); err != nil {
+	if err := mainDB.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM mcp_audit_log WHERE tool = 'upload_image' AND target_id = ?`, imageID,
+	).Scan(&auditCount); err != nil {
 		t.Fatalf("count audit: %v", err)
 	}
 	if auditCount != 1 {
