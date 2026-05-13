@@ -213,10 +213,18 @@ func parsePageForm(r *http.Request, base domain.Page) (domain.Page, string) {
 	}
 
 	slug, errMsg := normalisePageSlug(r, r.PostFormValue("slug"))
+	// Mirror the pre-refactor behaviour: when the input was non-empty
+	// but failed segment / reserved-prefix validation, surface the
+	// normalised slug back through base so the re-rendered form shows
+	// the user what was rejected. Empty input (= slug-required error)
+	// leaves base.Slug at the caller-supplied default — "/" for create,
+	// the saved value for edit — same as before.
+	if slug != "" {
+		base.Slug = slug
+	}
 	if errMsg != "" {
 		return base, errMsg
 	}
-	base.Slug = slug
 
 	if fmtRaw := strings.TrimSpace(r.PostFormValue("format")); fmtRaw != "" {
 		base.Format = string(format.Normalize(fmtRaw))
