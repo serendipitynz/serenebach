@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/serendipitynz/serenebach/internal/app"
 	"github.com/serendipitynz/serenebach/internal/auth"
 )
 
@@ -25,7 +26,20 @@ func TestAdminPageCreateUpdateDelete(t *testing.T) {
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
-	// Create a published page
+	pageID := adminPageCreatePublished(t, a, cookies)
+	adminPageAssertEditForm(t, a, cookies, pageID)
+	adminPageAssertPublicVisible(t, a)
+	adminPageUpdateToDraft(t, a, cookies, pageID)
+	adminPageAssertSlugRotated(t, a)
+	adminPageDelete(t, a, cookies, pageID)
+	adminPageAssertRemovedFromList(t, a, cookies)
+}
+
+// adminPageCreatePublished POSTs the published "About Us" page and
+// returns the redirect-derived page id. Failure to extract the id is
+// fatal because every later step keys off it.
+func adminPageCreatePublished(t *testing.T, a *app.App, cookies []*http.Cookie) string {
+	t.Helper()
 	form := url.Values{
 		"title":       {"About Us"},
 		"body":        {"<p>hello</p>"},
@@ -42,8 +56,6 @@ func TestAdminPageCreateUpdateDelete(t *testing.T) {
 	if !strings.Contains(loc, "ok=saved") {
 		t.Errorf("expected ok=saved in Location, got %q", loc)
 	}
-
-	// Extract page ID from redirect
 	var pageID string
 	for _, part := range strings.Split(loc, "/") {
 		if part != "" && part != "admin" && part != "pages" && part != "edit" {
@@ -54,8 +66,11 @@ func TestAdminPageCreateUpdateDelete(t *testing.T) {
 	if pageID == "" {
 		t.Fatal("could not extract page id from redirect")
 	}
+	return pageID
+}
 
-	// Edit form shows the values
+func adminPageAssertEditForm(t *testing.T, a *app.App, cookies []*http.Cookie, pageID string) {
+	t.Helper()
 	edit := authedGET(t, a.Handler(), "/admin/pages/"+pageID+"/edit", cookies)
 	if edit.Code != 200 {
 		t.Fatalf("edit form status = %d", edit.Code)
@@ -66,8 +81,10 @@ func TestAdminPageCreateUpdateDelete(t *testing.T) {
 			t.Errorf("edit form missing %q", want)
 		}
 	}
+}
 
-	// Public URL returns 200 for published page
+func adminPageAssertPublicVisible(t *testing.T, a *app.App) {
+	t.Helper()
 	pub := authedGET(t, a.Handler(), "/about", nil)
 	if pub.Code != 200 {
 		t.Errorf("public page status = %d, want 200", pub.Code)
@@ -75,8 +92,10 @@ func TestAdminPageCreateUpdateDelete(t *testing.T) {
 	if !strings.Contains(pub.Body.String(), "<p>hello</p>") {
 		t.Errorf("public page missing body")
 	}
+}
 
-	// Update to draft
+func adminPageUpdateToDraft(t *testing.T, a *app.App, cookies []*http.Cookie, pageID string) {
+	t.Helper()
 	up := url.Values{
 		"title":       {"About Us Updated"},
 		"body":        {"<p>updated</p>"},
@@ -85,30 +104,35 @@ func TestAdminPageCreateUpdateDelete(t *testing.T) {
 		"format":      {"html"},
 		"template_id": {"0"},
 	}
-	w2 := authedPOSTForm(t, a.Handler(), "/admin/pages/"+pageID+"/edit", up, cookies)
-	if w2.Code != http.StatusFound {
-		t.Fatalf("update status = %d; body:\n%s", w2.Code, w2.Body.String())
+	w := authedPOSTForm(t, a.Handler(), "/admin/pages/"+pageID+"/edit", up, cookies)
+	if w.Code != http.StatusFound {
+		t.Fatalf("update status = %d; body:\n%s", w.Code, w.Body.String())
 	}
+}
 
-	// Old public URL 404s after slug change
-	old := authedGET(t, a.Handler(), "/about", nil)
-	if old.Code != 404 {
+// adminPageAssertSlugRotated confirms both the previous and the new
+// slug 404 after the draft update — the old slug because it no longer
+// resolves, the new one because the page status flipped to draft.
+func adminPageAssertSlugRotated(t *testing.T, a *app.App) {
+	t.Helper()
+	if old := authedGET(t, a.Handler(), "/about", nil); old.Code != 404 {
 		t.Errorf("old slug status = %d, want 404", old.Code)
 	}
-
-	// New public URL 404s because status is draft
-	newURL := authedGET(t, a.Handler(), "/about-updated", nil)
-	if newURL.Code != 404 {
+	if newURL := authedGET(t, a.Handler(), "/about-updated", nil); newURL.Code != 404 {
 		t.Errorf("draft page status = %d, want 404", newURL.Code)
 	}
+}
 
-	// Delete
+func adminPageDelete(t *testing.T, a *app.App, cookies []*http.Cookie, pageID string) {
+	t.Helper()
 	del := authedPOSTForm(t, a.Handler(), "/admin/pages/"+pageID+"/delete", url.Values{}, cookies)
 	if del.Code != http.StatusFound {
 		t.Fatalf("delete status = %d; body:\n%s", del.Code, del.Body.String())
 	}
+}
 
-	// Admin list no longer shows it
+func adminPageAssertRemovedFromList(t *testing.T, a *app.App, cookies []*http.Cookie) {
+	t.Helper()
 	list := authedGET(t, a.Handler(), "/admin/pages", cookies)
 	if strings.Contains(list.Body.String(), "About Us Updated") {
 		t.Errorf("deleted page still on admin list")
