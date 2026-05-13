@@ -139,44 +139,43 @@ func (s *Server) Serve(ctx context.Context) error {
 			return nil
 		default:
 		}
-		line, err := reader.ReadBytes('\n')
-		if len(line) == 0 && err == io.EOF {
-			return nil //nolint:nilerr // empty line + EOF is the normal end-of-input termination.
+		line, readErr := reader.ReadBytes('\n')
+		if readErr != nil && readErr != io.EOF {
+			return fmt.Errorf("mcp: read: %w", readErr)
 		}
-		if err != nil && err != io.EOF {
-			return fmt.Errorf("mcp: read: %w", err)
+		if writeErr := s.handleServeLine(ctx, line, enc); writeErr != nil {
+			return writeErr
 		}
-		trimmed := trimWhitespace(line)
-		if len(trimmed) == 0 {
-			if err == io.EOF {
-				return nil
-			}
-			continue
-		}
-		var msg message
-		if jerr := json.Unmarshal(trimmed, &msg); jerr != nil {
-			s.logf("mcp: parse error: %v", jerr)
-			if err == io.EOF {
-				return nil
-			}
-			continue
-		}
-		// Notifications carry no id and expect no reply.
-		if len(msg.ID) == 0 {
-			s.handleNotification(&msg)
-			if err == io.EOF {
-				return nil
-			}
-			continue
-		}
-		resp := s.dispatch(ctx, &msg)
-		if jerr := enc.Encode(resp); jerr != nil {
-			return fmt.Errorf("mcp: write: %w", jerr)
-		}
-		if err == io.EOF {
+		if readErr == io.EOF {
 			return nil
 		}
 	}
+}
+
+// handleServeLine processes one transport line. Empty, malformed, and
+// notification lines are absorbed (a nil return tells Serve to keep
+// looping); only an encode failure on the response is fatal enough to
+// propagate, since the client is no longer being heard at that point.
+func (s *Server) handleServeLine(ctx context.Context, line []byte, enc *json.Encoder) error {
+	trimmed := trimWhitespace(line)
+	if len(trimmed) == 0 {
+		return nil
+	}
+	var msg message
+	if jerr := json.Unmarshal(trimmed, &msg); jerr != nil {
+		s.logf("mcp: parse error: %v", jerr)
+		return nil
+	}
+	// Notifications carry no id and expect no reply.
+	if len(msg.ID) == 0 {
+		s.handleNotification(&msg)
+		return nil
+	}
+	resp := s.dispatch(ctx, &msg)
+	if jerr := enc.Encode(resp); jerr != nil {
+		return fmt.Errorf("mcp: write: %w", jerr)
+	}
+	return nil
 }
 
 func (s *Server) handleNotification(msg *message) {
