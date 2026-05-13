@@ -72,7 +72,7 @@ docker run -d -p 8080:8080 -v serenebach-data:/home/nonroot/data ghcr.io/serendi
 
 CI でも push / PR ごとに同じコマンドが走ります:
 
-- `task lint` — `go.mod` の tool directive 経由で `staticcheck` を実行
+- `task lint` — `.golangci.yml` を使って `golangci-lint` を実行 (`staticcheck` に加えて gocyclo (しきい値 15、goreportcard と同値) などのプロジェクト lint セットを含む)
 - `task test` — `go test ./...` を実行
 
 ## 付属ツール

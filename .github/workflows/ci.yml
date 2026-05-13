@@ -31,8 +31,15 @@ jobs:
       - name: go vet
         run: go vet ./...
 
-      - name: staticcheck
-        run: go tool staticcheck ./...
+      # golangci-lint covers the standard set (errcheck / govet /
+      # ineffassign / staticcheck / unused) plus the project linters
+      # enabled in .golangci.yml — notably gocyclo at min-complexity 15.
+      # Without this step the config file would not be read and the
+      # gocyclo guard would silently no-op.
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.12.2
 
       - name: go build
         run: go build ./...
