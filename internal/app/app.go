@@ -59,106 +59,30 @@ type App struct {
 // New opens the database, applies migrations, and builds the HTTP handler
 // shared by both server and CGI modes.
 func New(cfg *config.Config) (*App, error) {
-	db, err := sqlite.Open(cfg.DBPath)
+	db, err := openAndMigrate(cfg)
 	if err != nil {
 		return nil, err
-	}
-	if err := storage.Up(db); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("app: migrate: %w", err)
 	}
 
 	store := repo.New(db)
 	sessions := session.NewManager(store)
-	cfVerifier := turnstile.New(cfg.TurnstileSiteKey, cfg.TurnstileSecret)
 
 	analyticsStore, err := openAnalyticsStore(cfg, db)
 	if err != nil {
 		_ = db.Close()
 		return nil, err
 	}
-
-	// Open Graph renderer pre-parses its fonts + default background at
-	// startup. A failure here (missing embedded asset, bad font) logs
-	// and skips the feature rather than refusing to boot — the card
-	// generation is nice-to-have, not load-bearing.
-	// Renderer is built in every mode (cost is small: font parse + one
-	// PNG decode, ~1 ms). Auto-regeneration on save is gated separately
-	// by Handler.AutoOG so CGI mode avoids the OOM risk while still
-	// allowing explicit manual generation via POST /admin/entries/{id}/og.
-	ogRenderer, err := og.New()
-	if err != nil {
-		log.Printf("app: OG renderer disabled: %v", err)
-	}
-
-	rebuilder := admin.NewRebuilderWithImages(cfg.RebuildOutDir, cfg.ImageDir, cfg.TemplateDir, cfg.BasePath)
-	rebuilder.TZ = cfg.TZ
-	if cfg.DevMode {
-		admintpl.DevRoot = "web/templates/admin"
-		admin.DevMode = true
-	} else {
-		admintpl.DevRoot = ""
-		admin.DevMode = false
-	}
-	adminH := &admin.Handler{
-		Store:               store,
-		Sessions:            sessions,
-		Analytics:           analyticsStore,
-		Rebuilder:           rebuilder,
-		TrustedProxies:      cfg.TrustedProxies,
-		WID:                 DefaultWID,
-		ImageDir:            cfg.ImageDir,
-		TemplateDir:         cfg.TemplateDir,
-		UploadMaxBytes:      cfg.UploadMaxBytes,
-		TurnstileConfigured: cfg.TurnstileSiteKey != "" && cfg.TurnstileSecret != "",
-		AnalyticsDBPath:     cfg.AnalyticsDBPath,
-		MCPAuditDBPath:      cfg.MCPAuditDBPath,
-		OG:                  ogRenderer,
-		AutoOG:              cfg.Mode != config.ModeCGI,
-		TZ:                  cfg.TZ,
-	}
-	publicH := &public.Handler{Store: store, WID: DefaultWID, Turnstile: cfVerifier, TrustedProxies: cfg.TrustedProxies, TZ: cfg.TZ}
-	// Load SB3 legacy URL inputs once at startup. A weblog never
-	// touched by the importer leaves all fields empty, which the
-	// redirect middleware reads as "off". Errors are non-fatal: a
-	// missing weblog row means the seed hasn't run yet, and the
-	// public surface still wants to come up.
-	if l, err := store.WeblogLegacyURLByID(context.Background(), DefaultWID); err == nil {
-		publicH.LegacyURL = l
-	}
-
-	// Build the same-origin allow-list for reader POSTs (comment /
-	// like / stamp). Combine SB_PUBLIC_ALLOWED_ORIGINS (split-origin
-	// deployments) with the weblog's own BaseURL so the typical
-	// single-host deployment works without env config. BaseURL is
-	// read once here; admins who change it on /admin/settings need to
-	// restart for the guard to pick up the new origin.
-	allowedOrigins := append([]string{}, cfg.PublicAllowedOrigins...)
-	if w, err := store.WeblogByID(context.Background(), DefaultWID); err == nil && w != nil {
-		if w.BaseURL != "" {
-			allowedOrigins = append(allowedOrigins, w.BaseURL)
-		}
-	}
-	publicMutationGuard := public.NewSameOriginGuard(allowedOrigins)
-	var mcpImageStore *images.Store
-	if cfg.ImageDir != "" {
-		mcpImageStore = images.NewStore(cfg.ImageDir)
-	}
-
 	auditStore, err := openAuditStore(cfg, db)
 	if err != nil {
 		_ = db.Close()
 		return nil, err
 	}
-	adminH.Audit = auditStore
 
-	mcpSrv := &mcp.Server{
-		Store:      store,
-		Analytics:  analyticsStore,
-		ImageStore: mcpImageStore,
-		Audit:      auditStore,
-		WID:        DefaultWID,
-	}
+	applyDevMode(cfg.DevMode)
+	adminH := buildAdminHandler(cfg, store, sessions, analyticsStore, auditStore)
+	publicH := buildPublicHandler(cfg, store)
+	publicMutationGuard := buildPublicMutationGuard(cfg, store)
+	mcpSrv := buildMCPServer(cfg, store, analyticsStore, auditStore)
 
 	// Construct the App shell up front so the first-run install
 	// callback can close over it. The handler field is filled in once
@@ -172,17 +96,134 @@ func New(cfg *config.Config) (*App, error) {
 		Audit:     auditStore,
 		Public:    publicH,
 	}
-	// Wire the setup callback before mounting routes so MountSetup
-	// actually registers /setup. The mutex serialises concurrent
-	// POSTs to /setup so a second request can't slip past the
-	// HasAdminUser check while the first is still mid-Seed —
-	// without it, two POSTs with different admin names would each
-	// pass the check and each insert a row, leaving the install
-	// with two administrators. setupMu is process-local; safe
-	// because /setup is a one-shot endpoint the gate disables for
-	// the rest of the lifetime once an admin exists.
+	adminH.Setup = a.makeSetupCallback(store, adminH)
+
+	imgFS, tmplFS, err := buildAssetFS(cfg)
+	if err != nil {
+		return nil, err
+	}
+	a.handler = buildRouter(cfg, store, sessions, analyticsStore, publicMutationGuard, mcpSrv, adminH, publicH, imgFS, tmplFS)
+	return a, nil
+}
+
+// openAndMigrate opens the configured SQLite file and brings the
+// schema up to date. A migration failure closes the connection so
+// caller doesn't have to.
+func openAndMigrate(cfg *config.Config) (*sql.DB, error) {
+	db, err := sqlite.Open(cfg.DBPath)
+	if err != nil {
+		return nil, err
+	}
+	if err := storage.Up(db); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("app: migrate: %w", err)
+	}
+	return db, nil
+}
+
+// applyDevMode toggles the package-level dev knobs that the admin
+// templates and the admin handler read.
+func applyDevMode(devMode bool) {
+	if devMode {
+		admintpl.DevRoot = "web/templates/admin"
+		admin.DevMode = true
+		return
+	}
+	admintpl.DevRoot = ""
+	admin.DevMode = false
+}
+
+func buildAdminHandler(cfg *config.Config, store *repo.Store, sessions *session.Manager, analyticsStore *analytics.Store, auditStore *mcpaudit.Store) *admin.Handler {
+	rebuilder := admin.NewRebuilderWithImages(cfg.RebuildOutDir, cfg.ImageDir, cfg.TemplateDir, cfg.BasePath)
+	rebuilder.TZ = cfg.TZ
+	// Open Graph renderer pre-parses its fonts + default background at
+	// startup. A failure here (missing embedded asset, bad font) logs
+	// and skips the feature rather than refusing to boot — the card
+	// generation is nice-to-have, not load-bearing.
+	// Renderer is built in every mode (cost is small: font parse + one
+	// PNG decode, ~1 ms). Auto-regeneration on save is gated separately
+	// by Handler.AutoOG so CGI mode avoids the OOM risk while still
+	// allowing explicit manual generation via POST /admin/entries/{id}/og.
+	ogRenderer, err := og.New()
+	if err != nil {
+		log.Printf("app: OG renderer disabled: %v", err)
+	}
+	return &admin.Handler{
+		Store:               store,
+		Sessions:            sessions,
+		Analytics:           analyticsStore,
+		Audit:               auditStore,
+		Rebuilder:           rebuilder,
+		TrustedProxies:      cfg.TrustedProxies,
+		WID:                 DefaultWID,
+		ImageDir:            cfg.ImageDir,
+		TemplateDir:         cfg.TemplateDir,
+		UploadMaxBytes:      cfg.UploadMaxBytes,
+		TurnstileConfigured: cfg.TurnstileSiteKey != "" && cfg.TurnstileSecret != "",
+		AnalyticsDBPath:     cfg.AnalyticsDBPath,
+		MCPAuditDBPath:      cfg.MCPAuditDBPath,
+		OG:                  ogRenderer,
+		AutoOG:              cfg.Mode != config.ModeCGI,
+		TZ:                  cfg.TZ,
+	}
+}
+
+func buildPublicHandler(cfg *config.Config, store *repo.Store) *public.Handler {
+	cfVerifier := turnstile.New(cfg.TurnstileSiteKey, cfg.TurnstileSecret)
+	publicH := &public.Handler{Store: store, WID: DefaultWID, Turnstile: cfVerifier, TrustedProxies: cfg.TrustedProxies, TZ: cfg.TZ}
+	// Load SB3 legacy URL inputs once at startup. A weblog never
+	// touched by the importer leaves all fields empty, which the
+	// redirect middleware reads as "off". Errors are non-fatal: a
+	// missing weblog row means the seed hasn't run yet, and the
+	// public surface still wants to come up.
+	if l, err := store.WeblogLegacyURLByID(context.Background(), DefaultWID); err == nil {
+		publicH.LegacyURL = l
+	}
+	return publicH
+}
+
+// buildPublicMutationGuard assembles the same-origin allow-list for
+// reader POSTs (comment / like / stamp). Combines
+// SB_PUBLIC_ALLOWED_ORIGINS (split-origin deployments) with the
+// weblog's own BaseURL so the typical single-host deployment works
+// without env config. BaseURL is read once here; admins who change it
+// on /admin/settings need to restart for the guard to pick up the new
+// origin.
+func buildPublicMutationGuard(cfg *config.Config, store *repo.Store) public.SameOriginGuard {
+	allowedOrigins := append([]string{}, cfg.PublicAllowedOrigins...)
+	if w, err := store.WeblogByID(context.Background(), DefaultWID); err == nil && w != nil {
+		if w.BaseURL != "" {
+			allowedOrigins = append(allowedOrigins, w.BaseURL)
+		}
+	}
+	return public.NewSameOriginGuard(allowedOrigins)
+}
+
+func buildMCPServer(cfg *config.Config, store *repo.Store, analyticsStore *analytics.Store, auditStore *mcpaudit.Store) *mcp.Server {
+	var mcpImageStore *images.Store
+	if cfg.ImageDir != "" {
+		mcpImageStore = images.NewStore(cfg.ImageDir)
+	}
+	return &mcp.Server{
+		Store:      store,
+		Analytics:  analyticsStore,
+		ImageStore: mcpImageStore,
+		Audit:      auditStore,
+		WID:        DefaultWID,
+	}
+}
+
+// makeSetupCallback wires the first-run install callback. The mutex
+// serialises concurrent POSTs to /setup so a second request can't slip
+// past the HasAdminUser check while the first is still mid-Seed —
+// without it, two POSTs with different admin names would each pass the
+// check and each insert a row, leaving the install with two
+// administrators. setupMu is process-local; safe because /setup is a
+// one-shot endpoint the gate disables for the rest of the lifetime
+// once an admin exists.
+func (a *App) makeSetupCallback(store *repo.Store, _ *admin.Handler) func(context.Context, admin.SetupRequest) error {
 	var setupMu sync.Mutex
-	adminH.Setup = func(ctx context.Context, req admin.SetupRequest) error {
+	return func(ctx context.Context, req admin.SetupRequest) error {
 		setupMu.Lock()
 		defer setupMu.Unlock()
 		if done, err := store.HasAdminUser(ctx); err != nil {
@@ -211,12 +252,23 @@ func New(cfg *config.Config) (*App, error) {
 		}
 		return err
 	}
+}
 
-	imgFS, tmplFS, err := buildAssetFS(cfg)
-	if err != nil {
-		return nil, err
-	}
-
+// buildRouter assembles the chi router with all middleware groups and
+// mount points. Kept separate so app.New only needs to orchestrate the
+// pieces rather than wire each route inline.
+func buildRouter(
+	cfg *config.Config,
+	store *repo.Store,
+	sessions *session.Manager,
+	analyticsStore *analytics.Store,
+	publicMutationGuard public.SameOriginGuard,
+	mcpSrv *mcp.Server,
+	adminH *admin.Handler,
+	publicH *public.Handler,
+	imgFS http.Handler,
+	tmplFS http.Handler,
+) http.Handler {
 	r := chi.NewRouter()
 	// Inject the deployment base path into every request context so
 	// handlers and templates can generate correct URLs without knowing
@@ -317,9 +369,7 @@ func New(cfg *config.Config) (*App, error) {
 			r.Head("/template/*", tmplFS.ServeHTTP)
 		}
 	})
-
-	a.handler = r
-	return a, nil
+	return r
 }
 
 func (a *App) Handler() http.Handler { return a.handler }
