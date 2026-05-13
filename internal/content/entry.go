@@ -68,6 +68,33 @@ func (v EntryView) Render() (string, error) {
 	}
 	c := tmpl.New()
 
+	v.applyHeader(c, tmpl)
+	v.applyEntryBody(c)
+	v.applyCategoryTags(c)
+	v.applyAuthorTags(c)
+	v.applyCommentNum(c)
+	c.Block("entry", 1)
+
+	// sb_entry_marking is a scroll anchor emitted by SB3 on list pages
+	// so permalinks can jump straight to the entry. On the permalink
+	// page the anchor is pointless so we emit a no-op anchor (the
+	// DefaultCallback already injected the placeholder). The list
+	// renderer (ListView) emits the real anchor per iteration.
+	c.Tag("sb_entry_marking", "")
+
+	v.applySequelNav(c, tmpl)
+	v.applyComments(c, tmpl)
+
+	applyProfileBlock(v.Site, c, tmpl, v.ProfileUsers)
+	applySidebarBlocks(v.Site, c, tmpl, v.Sidebar)
+	stripUnusedEntryBlocks(c, tmpl)
+
+	return c.Render(), nil
+}
+
+// applyHeader sets up the site-level tags + the permalink-page block
+// gates (`title` shown, `toppage` stripped, `option` enabled).
+func (v EntryView) applyHeader(c *sbtemplate.Context, tmpl *sbtemplate.Template) {
 	v.Site.
 		WithTemplate(v.Template).
 		WithMode("ent", strconv.FormatInt(v.Entry.ID, 10)).
@@ -83,7 +110,12 @@ func (v EntryView) Render() (string, error) {
 	if tmpl.HasBlock("option") {
 		c.Block("option", 1)
 	}
+}
 
+// applyEntryBody populates the per-entry tags that live inside the
+// `entry` block — title / permalink / time / body / stamps / OG /
+// keywords / tags / pinned.
+func (v EntryView) applyEntryBody(c *sbtemplate.Context) {
 	c.Num(0)
 	c.Tag("entry_id", strconv.FormatInt(v.Entry.ID, 10))
 	c.Tag("entry_permalink", v.Site.EntryPermalink(v.Entry))
@@ -111,15 +143,7 @@ func (v EntryView) Render() (string, error) {
 	for k, n := range v.StampCounts {
 		c.Tag("entry_stamps_"+string(k), strconv.FormatInt(n, 10))
 	}
-	c.Tag("entry_og_image", v.Site.OGImageURL(v.Entry.ID))
-	// Dimensions exposed so themes can emit the full
-	// <meta property="og:image:width"> / <...:height> pair that
-	// Facebook / Slack / Discord use to lay out the card instantly
-	// instead of waiting for a HEAD fetch. Values match og.CardWidth
-	// / CardHeight — kept as literal strings so the content package
-	// doesn't take a dependency on the og renderer.
-	c.Tag("entry_og_image_width", "1200")
-	c.Tag("entry_og_image_height", "630")
+	v.applyOG(c)
 	// SEO keywords land in the template as a comma-separated string so
 	// authors can drop `<meta name="keywords" content="{entry_keywords}">`
 	// into the <head>. Empty when the author left the field blank.
@@ -132,107 +156,119 @@ func (v EntryView) Render() (string, error) {
 	c.Tag("permalink", v.Site.EntryPermalink(v.Entry))
 	c.TagHTML("entry_tags", renderTagsFragment(v.Site, v.Tags))
 	c.Tag("csrf_token", v.CSRFToken)
-	// {entry_pinned} / pinned_entry block: expose pin state on individual
-	// entry pages too so templates can apply consistent styling.
+	v.applyPinned(c)
+}
+
+// applyOG emits the OG image URL + literal 1200×630 dimensions so
+// themes can render the full <meta property="og:image:*"> set without
+// the content package depending on the og renderer for the constants.
+func (v EntryView) applyOG(c *sbtemplate.Context) {
+	c.Tag("entry_og_image", v.Site.OGImageURL(v.Entry.ID))
+	c.Tag("entry_og_image_width", "1200")
+	c.Tag("entry_og_image_height", "630")
+}
+
+// applyPinned exposes the pin state both as {entry_pinned} tag and as
+// the pinned_entry sub-block, so templates can style permalink pages
+// consistently with list-page CSS classes.
+func (v EntryView) applyPinned(c *sbtemplate.Context) {
 	if v.Entry.Pinned {
 		c.Tag("entry_pinned", "pinned")
 		c.Block("pinned_entry", 1)
-	} else {
-		c.Tag("entry_pinned", "")
-		c.Block("pinned_entry", 0)
+		return
 	}
+	c.Tag("entry_pinned", "")
+	c.Block("pinned_entry", 0)
+}
 
-	if v.Category != nil {
-		catLink := html.EscapeString(v.Site.CategoryPermalink(*v.Category))
-		catName := html.EscapeString(v.Category.Name)
-		c.TagHTML("category_name", `<a href="`+catLink+`">`+catName+`</a>`)
-		c.Tag("category_id", strconv.FormatInt(v.Category.ID, 10))
-		c.Tag("category_disp_name", v.Category.Name)
+func (v EntryView) applyCategoryTags(c *sbtemplate.Context) {
+	if v.Category == nil {
+		return
 	}
-	if v.Author != nil {
-		// SB3 semantics (since the 2026-04 compat pass):
-		//   {user_name}      = login name (SB3's authlink text)
-		//   {user_disp_name} = display name (SB3's authname)
-		//   {user_login}     = Go-port alias for the login name
-		//   {user_id}        = numeric id
-		// Tag auto-escapes both fields on emission so a self-edited
-		// display name can't inject HTML into the rendered page.
-		disp := displayName(*v.Author)
-		c.Tag("user_name", v.Author.Name)
-		c.Tag("user_disp_name", disp)
-		c.Tag("user_login", v.Author.Name)
-		c.Tag("user_id", strconv.FormatInt(v.Author.ID, 10))
+	catLink := html.EscapeString(v.Site.CategoryPermalink(*v.Category))
+	catName := html.EscapeString(v.Category.Name)
+	c.TagHTML("category_name", `<a href="`+catLink+`">`+catName+`</a>`)
+	c.Tag("category_id", strconv.FormatInt(v.Category.ID, 10))
+	c.Tag("category_disp_name", v.Category.Name)
+}
+
+// applyAuthorTags fills the SB3 author surface (since the 2026-04
+// compat pass):
+//
+//	{user_name}      = login name (SB3's authlink text)
+//	{user_disp_name} = display name (SB3's authname)
+//	{user_login}     = Go-port alias for the login name
+//	{user_id}        = numeric id
+//
+// Tag auto-escapes both fields on emission so a self-edited display
+// name can't inject HTML into the rendered page.
+func (v EntryView) applyAuthorTags(c *sbtemplate.Context) {
+	if v.Author == nil {
+		return
 	}
-	// SB3's {comment_num} emits a link like <a href="…#comments">Comments(N)</a>
-	// when comments are open and a plain "-" when closed. {comment_count}
-	// is the raw number (empty string when closed). The link targets the
-	// entry permalink with a #comments anchor so readers jump straight to
-	// the comment section — matching SB3's mode=>'com' behaviour. The
-	// per-entry AcceptComments flag mirrors a closed weblog when the
-	// author has opted this entry out individually.
-	if v.commentsActive() {
-		label := commentNumLabel(v.Site.CommentNumLabel, v.Entry.CommentsCount)
-		href := html.EscapeString(v.Site.EntryPermalink(v.Entry) + "#comments")
-		c.TagHTML("comment_num", `<a href="`+href+`">`+html.EscapeString(label)+`</a>`)
-		c.Tag("comment_count", strconv.FormatInt(v.Entry.CommentsCount, 10))
-	} else {
+	c.Tag("user_name", v.Author.Name)
+	c.Tag("user_disp_name", displayName(*v.Author))
+	c.Tag("user_login", v.Author.Name)
+	c.Tag("user_id", strconv.FormatInt(v.Author.ID, 10))
+}
+
+// applyCommentNum mirrors SB3's {comment_num}: a link like
+// <a href="…#comments">Comments(N)</a> when comments are open, and a
+// plain "-" when closed. {comment_count} is the raw number (empty when
+// closed). AcceptComments=false collapses to the closed branch even
+// when the weblog as a whole still accepts comments.
+func (v EntryView) applyCommentNum(c *sbtemplate.Context) {
+	if !v.commentsActive() {
 		c.Tag("comment_num", "-")
 		c.Tag("comment_count", "")
+		return
 	}
-	c.Block("entry", 1)
+	label := commentNumLabel(v.Site.CommentNumLabel, v.Entry.CommentsCount)
+	href := html.EscapeString(v.Site.EntryPermalink(v.Entry) + "#comments")
+	c.TagHTML("comment_num", `<a href="`+href+`">`+html.EscapeString(label)+`</a>`)
+	c.Tag("comment_count", strconv.FormatInt(v.Entry.CommentsCount, 10))
+}
 
-	// sb_entry_marking is a scroll anchor emitted by SB3 on list pages so
-	// permalinks can jump straight to the entry. On the permalink page the
-	// anchor is pointless so we emit a no-op anchor (the DefaultCallback
-	// already injected the {sb_entry_marking} placeholder). The list
-	// renderer (ListView) emits the real anchor for each loop iteration;
-	// here we leave it empty since mode=="ent" means we're on the
-	// permalink page.
-	c.Tag("sb_entry_marking", "")
-
-	// Permalink-only block: nav links between adjacent entries. SB v3's
-	// sample uses `sequel` to wrap this kind of content so it doesn't show
-	// on list pages.
-	if tmpl.HasBlock("sequel") {
-		c.Num(0)
-		// SB3 _sequel emits per-direction triples so templates can
-		// roll their own nav markup. prev_entry / next_entry keep
-		// the ready-made anchor fragment for the existing shipped
-		// default template.
-		if v.Prev != nil {
-			c.Tag("prev_permalink", v.Site.EntryPermalink(*v.Prev))
-			c.Tag("prev_title", v.Prev.Title)
-		} else {
-			c.Tag("prev_permalink", "")
-			c.Tag("prev_title", "")
-		}
-		if v.Next != nil {
-			c.Tag("next_permalink", v.Site.EntryPermalink(*v.Next))
-			c.Tag("next_title", v.Next.Title)
-		} else {
-			c.Tag("next_permalink", "")
-			c.Tag("next_title", "")
-		}
-		c.TagHTML("prev_entry", v.navLink(v.Prev, "« "))
-		c.TagHTML("next_entry", v.navLink(v.Next, " »"))
-		c.Block("sequel", 1)
+// applySequelNav fills the permalink-only `sequel` block with prev/next
+// nav links. SB v3 wraps adjacent-entry markup in this block so list
+// pages don't render it. The block is left untouched when the template
+// has no `sequel` definition.
+func (v EntryView) applySequelNav(c *sbtemplate.Context, tmpl *sbtemplate.Template) {
+	if !tmpl.HasBlock("sequel") {
+		return
 	}
+	c.Num(0)
+	// SB3 _sequel emits per-direction triples so templates can roll
+	// their own nav markup. prev_entry / next_entry keep the
+	// ready-made anchor fragment for the existing shipped default
+	// template.
+	applyAdjacentEntryTags(c, "prev", v.Site, v.Prev)
+	applyAdjacentEntryTags(c, "next", v.Site, v.Next)
+	c.TagHTML("prev_entry", v.navLink(v.Prev, "« "))
+	c.TagHTML("next_entry", v.navLink(v.Next, " »"))
+	c.Block("sequel", 1)
+}
 
-	// ---- comments ---------------------------------------------------
-	v.applyComments(c, tmpl)
+func applyAdjacentEntryTags(c *sbtemplate.Context, side string, site Site, target *domain.Entry) {
+	if target == nil {
+		c.Tag(side+"_permalink", "")
+		c.Tag(side+"_title", "")
+		return
+	}
+	c.Tag(side+"_permalink", site.EntryPermalink(*target))
+	c.Tag(side+"_title", target.Title)
+}
 
-	applyProfileBlock(v.Site, c, tmpl, v.ProfileUsers)
-	applySidebarBlocks(v.Site, c, tmpl, v.Sidebar)
-
-	// Blocks deliberately left empty on permalink. profile_area fires
-	// only on /profile/{id}/; trackback_* are permanently unsupported.
+// stripUnusedEntryBlocks zeros out the blocks that never fire on a
+// permalink: profile_area is /profile/{id}/-only and trackback_* are
+// permanently unsupported. Leaves them untouched when missing so the
+// template parser doesn't error on a never-defined block.
+func stripUnusedEntryBlocks(c *sbtemplate.Context, tmpl *sbtemplate.Template) {
 	for _, blk := range []string{"trackback_area", "profile_area", "page", "recent_trackback", "dedicated_page"} {
 		if tmpl.HasBlock(blk) {
 			c.Block(blk, 0)
 		}
 	}
-
-	return c.Render(), nil
 }
 
 // commentsActive reports whether comments should appear for this entry.
