@@ -94,26 +94,25 @@ func TestImportCopiesFilteredContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Import: %v", err)
 	}
+
+	t.Run("report counts", func(t *testing.T) { assertReportCounts(t, report) })
+	t.Run("lint warnings include trackback and amazon", func(t *testing.T) { assertLintWarnings(t, report) })
+	t.Run("weblog title overwritten", func(t *testing.T) { assertWeblogTitleOverwritten(t, a.DB) })
+	t.Run("active template not stolen by import", func(t *testing.T) { assertActiveTemplateUnchanged(t, a.DB) })
+	t.Run("entries owned by author and category remapped", func(t *testing.T) { assertEntryOwnershipAndCategoryRemap(t, a.DB) })
+	t.Run("child category parent remap", func(t *testing.T) { assertChildCategoryParentRemap(t, a.DB) })
+	t.Run("entries carry legacy_* fields", func(t *testing.T) { assertEntriesLegacyFields(t, a.DB) })
+	t.Run("categories carry legacy_* fields", func(t *testing.T) { assertCategoriesLegacyFields(t, a.DB) })
+	t.Run("weblog legacy config defaults", func(t *testing.T) { assertWeblogLegacyDefaults(t, a.DB) })
+}
+
+func assertReportCounts(t *testing.T, report *importer.Report) {
+	t.Helper()
 	if !report.WeblogUpdated {
 		t.Errorf("expected weblog to be updated")
 	}
 	if report.Templates != 2 {
 		t.Errorf("templates = %d, want 2", report.Templates)
-	}
-	// The legacy template uses trackback + amazon — both flagged as
-	// unsupported by the lint pass. At least one warning for each
-	// must land in the report.
-	var sawTrackback, sawAmazon bool
-	for _, w := range report.Warnings {
-		if strings.Contains(w, "trackback_area") {
-			sawTrackback = true
-		}
-		if strings.Contains(w, "amazon_link") {
-			sawAmazon = true
-		}
-	}
-	if !sawTrackback || !sawAmazon {
-		t.Errorf("missing lint warnings: trackback=%v amazon=%v in %v", sawTrackback, sawAmazon, report.Warnings)
 	}
 	if report.Categories != 2 {
 		t.Errorf("categories = %d, want 2", report.Categories)
@@ -124,52 +123,58 @@ func TestImportCopiesFilteredContent(t *testing.T) {
 	if report.SkippedEntries != 1 {
 		t.Errorf("skipped = %d, want 1", report.SkippedEntries)
 	}
+}
 
-	// Weblog title/description overwritten
+// assertLintWarnings checks that the legacy fixture template surfaces lint
+// warnings for both trackback and amazon — they are flagged as unsupported
+// by the lint pass but must survive import as advisory.
+func assertLintWarnings(t *testing.T, report *importer.Report) {
+	t.Helper()
+	var sawTrackback, sawAmazon bool
+	for _, w := range report.Warnings {
+		if strings.Contains(w, "trackback_area") {
+			sawTrackback = true
+		}
+		if strings.Contains(w, "amazon_link") {
+			sawAmazon = true
+		}
+	}
+	if !sawTrackback || !sawAmazon {
+		t.Errorf("missing lint warnings: trackback=%v amazon=%v in %v",
+			sawTrackback, sawAmazon, report.Warnings)
+	}
+}
+
+func assertWeblogTitleOverwritten(t *testing.T, db *sql.DB) {
+	t.Helper()
 	var title string
-	if err := a.DB.QueryRow(`SELECT title FROM weblogs WHERE id = 1`).Scan(&title); err != nil {
+	if err := db.QueryRow(`SELECT title FROM weblogs WHERE id = 1`).Scan(&title); err != nil {
 		t.Fatal(err)
 	}
 	if title != "Imported Title" {
 		t.Errorf("title = %q, want Imported Title", title)
 	}
+}
 
-	// Imported templates must NOT steal the active slot (seed default remains active).
+// assertActiveTemplateUnchanged confirms that imported templates do NOT
+// steal the active slot — the seed default must still be active.
+func assertActiveTemplateUnchanged(t *testing.T, db *sql.DB) {
+	t.Helper()
 	var activeName string
-	if err := a.DB.QueryRow(`SELECT name FROM templates WHERE wid = 1 AND is_active = 1`).Scan(&activeName); err != nil {
+	if err := db.QueryRow(`SELECT name FROM templates WHERE wid = 1 AND is_active = 1`).Scan(&activeName); err != nil {
 		t.Fatal(err)
 	}
 	if activeName != "default" {
 		t.Errorf("active template after import = %q, want default", activeName)
 	}
+}
 
-	// Entries must all be owned by author 1 and mapped to remapped category ids.
-	rows, err := a.DB.Query(`SELECT title, body, author_id, category_id FROM entries ORDER BY posted_at`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer rows.Close()
-
-	titles := map[string]struct {
-		body     string
-		author   int64
-		category int64
-	}{}
-	for rows.Next() {
-		var title, body string
-		var author, cat int64
-		if err := rows.Scan(&title, &body, &author, &cat); err != nil {
-			t.Fatal(err)
-		}
-		titles[title] = struct {
-			body     string
-			author   int64
-			category int64
-		}{body: body, author: author, category: cat}
-	}
-	if err := rows.Err(); err != nil {
-		t.Fatal(err)
-	}
+// assertEntryOwnershipAndCategoryRemap verifies entries are owned by the
+// target author and that their category ids point at the remapped rows.
+// Also asserts the draft was skipped and bodies survived round-trip.
+func assertEntryOwnershipAndCategoryRemap(t *testing.T, db *sql.DB) {
+	t.Helper()
+	titles := loadImportedEntries(t, db)
 	pub1, ok := titles["Published One"]
 	if !ok {
 		t.Fatalf("Published One not imported; got %v", titles)
@@ -186,79 +191,45 @@ func TestImportCopiesFilteredContent(t *testing.T) {
 	if pub1.body != "<p>one</p>" || titles["Published Two"].body != "<p>two</p>" {
 		t.Errorf("entry bodies wrong: %v", titles)
 	}
+}
 
-	// Child category's parent_id should point at the new id of the parent.
+// assertChildCategoryParentRemap checks the child category's parent_id
+// points at the new id of the parent (i.e. the remap layer fired).
+func assertChildCategoryParentRemap(t *testing.T, db *sql.DB) {
+	t.Helper()
 	var parentRemapped, childRemapped int64
-	if err := a.DB.QueryRow(`SELECT id FROM categories WHERE name = 'parent'`).Scan(&parentRemapped); err != nil {
+	if err := db.QueryRow(`SELECT id FROM categories WHERE name = 'parent'`).Scan(&parentRemapped); err != nil {
 		t.Fatal(err)
 	}
-	if err := a.DB.QueryRow(`SELECT parent_id FROM categories WHERE name = 'child'`).Scan(&childRemapped); err != nil {
+	if err := db.QueryRow(`SELECT parent_id FROM categories WHERE name = 'child'`).Scan(&childRemapped); err != nil {
 		t.Fatal(err)
 	}
 	if childRemapped != parentRemapped {
 		t.Errorf("child.parent_id = %d, want %d (new id of 'parent')", childRemapped, parentRemapped)
 	}
+}
 
-	// Legacy URL inputs must round-trip into the destination so the
-	// redirect layer can find Perl URLs by their SB3 identity.
-	var pubOneLegacyID sql.NullInt64
-	var pubOneLegacyFile, pubOneKeywords string
-	if err := a.DB.QueryRow(
-		`SELECT legacy_id, legacy_file, keywords FROM entries WHERE title = 'Published One'`,
-	).Scan(&pubOneLegacyID, &pubOneLegacyFile, &pubOneKeywords); err != nil {
-		t.Fatal(err)
-	}
-	if !pubOneLegacyID.Valid || pubOneLegacyID.Int64 != 100 {
-		t.Errorf("Published One legacy_id = %v, want 100", pubOneLegacyID)
-	}
-	if pubOneLegacyFile != "pub-one" {
-		t.Errorf("Published One legacy_file = %q, want pub-one", pubOneLegacyFile)
-	}
-	if pubOneKeywords != "go,sb" {
-		t.Errorf("Published One keywords = %q, want go,sb", pubOneKeywords)
-	}
+// assertEntriesLegacyFields verifies the legacy_* round-trip on imported
+// entries; the redirect layer relies on this to resolve Perl URLs by SB3
+// identity.
+func assertEntriesLegacyFields(t *testing.T, db *sql.DB) {
+	t.Helper()
+	assertEntryLegacy(t, db, "Published One", 100, "pub-one", "go,sb")
+	assertEntryLegacyIDFile(t, db, "Published Two", 102, "")
+}
 
-	var pubTwoLegacyID sql.NullInt64
-	var pubTwoLegacyFile string
-	if err := a.DB.QueryRow(
-		`SELECT legacy_id, legacy_file FROM entries WHERE title = 'Published Two'`,
-	).Scan(&pubTwoLegacyID, &pubTwoLegacyFile); err != nil {
-		t.Fatal(err)
-	}
-	if !pubTwoLegacyID.Valid || pubTwoLegacyID.Int64 != 102 {
-		t.Errorf("Published Two legacy_id = %v, want 102", pubTwoLegacyID)
-	}
-	if pubTwoLegacyFile != "" {
-		t.Errorf("Published Two legacy_file = %q, want empty", pubTwoLegacyFile)
-	}
+func assertCategoriesLegacyFields(t *testing.T, db *sql.DB) {
+	t.Helper()
+	assertCategoryLegacy(t, db, "parent", 1, "log/")
+	assertCategoryLegacyDir(t, db, "child", "log/sub/")
+}
 
-	// Categories carry their SB3 id and configured dir.
-	var parentLegacyID sql.NullInt64
-	var parentLegacyDir string
-	if err := a.DB.QueryRow(
-		`SELECT legacy_id, legacy_dir FROM categories WHERE name = 'parent'`,
-	).Scan(&parentLegacyID, &parentLegacyDir); err != nil {
-		t.Fatal(err)
-	}
-	if !parentLegacyID.Valid || parentLegacyID.Int64 != 1 {
-		t.Errorf("parent legacy_id = %v, want 1", parentLegacyID)
-	}
-	if parentLegacyDir != "log/" {
-		t.Errorf("parent legacy_dir = %q, want log/", parentLegacyDir)
-	}
-	var childLegacyDir string
-	if err := a.DB.QueryRow(
-		`SELECT legacy_dir FROM categories WHERE name = 'child'`,
-	).Scan(&childLegacyDir); err != nil {
-		t.Fatal(err)
-	}
-	if childLegacyDir != "log/sub/" {
-		t.Errorf("child legacy_dir = %q, want log/sub/", childLegacyDir)
-	}
-
-	// Without sb_config rows the weblog inherits config.pl defaults.
+// assertWeblogLegacyDefaults confirms that without sb_config rows the
+// weblog inherits config.pl defaults.
+func assertWeblogLegacyDefaults(t *testing.T, db *sql.DB) {
+	t.Helper()
 	var arch, logPath, basePath, cgi, prefix, suffix string
-	if err := a.DB.QueryRow(
+	if err := db.QueryRow(
 		`SELECT legacy_archive_type, legacy_log_path, legacy_base_path,
 		        legacy_cgi_name, legacy_id_prefix, legacy_suffix
 		 FROM weblogs WHERE id = 1`,
@@ -269,6 +240,117 @@ func TestImportCopiesFilteredContent(t *testing.T) {
 		cgi != "sb.cgi" || prefix != "eid" || suffix != ".html" {
 		t.Errorf("legacy defaults wrong: arch=%q log=%q base=%q cgi=%q prefix=%q suffix=%q",
 			arch, logPath, basePath, cgi, prefix, suffix)
+	}
+}
+
+// importedEntry captures the four columns each sub-assertion in
+// TestImportCopiesFilteredContent needs to reason about an imported entry.
+type importedEntry struct {
+	body     string
+	author   int64
+	category int64
+}
+
+// loadImportedEntries reads every imported entry into a title-keyed map so
+// individual sub-tests can assert against specific titles without re-running
+// the query.
+func loadImportedEntries(t *testing.T, db *sql.DB) map[string]importedEntry {
+	t.Helper()
+	rows, err := db.Query(`SELECT title, body, author_id, category_id FROM entries ORDER BY posted_at`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	out := map[string]importedEntry{}
+	for rows.Next() {
+		var title, body string
+		var author, cat int64
+		if err := rows.Scan(&title, &body, &author, &cat); err != nil {
+			t.Fatal(err)
+		}
+		out[title] = importedEntry{body: body, author: author, category: cat}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// assertEntryLegacy verifies an entry's full legacy round-trip (id, file,
+// keywords) in one call.
+func assertEntryLegacy(t *testing.T, db *sql.DB, title string, wantID int64, wantFile, wantKeywords string) {
+	t.Helper()
+	var legacyID sql.NullInt64
+	var legacyFile, keywords string
+	if err := db.QueryRow(
+		`SELECT legacy_id, legacy_file, keywords FROM entries WHERE title = ?`,
+		title,
+	).Scan(&legacyID, &legacyFile, &keywords); err != nil {
+		t.Fatal(err)
+	}
+	if !legacyID.Valid || legacyID.Int64 != wantID {
+		t.Errorf("%s legacy_id = %v, want %d", title, legacyID, wantID)
+	}
+	if legacyFile != wantFile {
+		t.Errorf("%s legacy_file = %q, want %q", title, legacyFile, wantFile)
+	}
+	if keywords != wantKeywords {
+		t.Errorf("%s keywords = %q, want %q", title, keywords, wantKeywords)
+	}
+}
+
+// assertEntryLegacyIDFile checks only legacy_id and legacy_file — used for
+// fixtures whose keywords column is irrelevant to the assertion.
+func assertEntryLegacyIDFile(t *testing.T, db *sql.DB, title string, wantID int64, wantFile string) {
+	t.Helper()
+	var legacyID sql.NullInt64
+	var legacyFile string
+	if err := db.QueryRow(
+		`SELECT legacy_id, legacy_file FROM entries WHERE title = ?`,
+		title,
+	).Scan(&legacyID, &legacyFile); err != nil {
+		t.Fatal(err)
+	}
+	if !legacyID.Valid || legacyID.Int64 != wantID {
+		t.Errorf("%s legacy_id = %v, want %d", title, legacyID, wantID)
+	}
+	if legacyFile != wantFile {
+		t.Errorf("%s legacy_file = %q, want %q", title, legacyFile, wantFile)
+	}
+}
+
+// assertCategoryLegacy verifies legacy_id and legacy_dir for a category.
+func assertCategoryLegacy(t *testing.T, db *sql.DB, name string, wantID int64, wantDir string) {
+	t.Helper()
+	var legacyID sql.NullInt64
+	var legacyDir string
+	if err := db.QueryRow(
+		`SELECT legacy_id, legacy_dir FROM categories WHERE name = ?`,
+		name,
+	).Scan(&legacyID, &legacyDir); err != nil {
+		t.Fatal(err)
+	}
+	if !legacyID.Valid || legacyID.Int64 != wantID {
+		t.Errorf("%s legacy_id = %v, want %d", name, legacyID, wantID)
+	}
+	if legacyDir != wantDir {
+		t.Errorf("%s legacy_dir = %q, want %q", name, legacyDir, wantDir)
+	}
+}
+
+// assertCategoryLegacyDir checks only legacy_dir, for categories whose
+// legacy_id is asserted elsewhere or doesn't matter.
+func assertCategoryLegacyDir(t *testing.T, db *sql.DB, name, wantDir string) {
+	t.Helper()
+	var legacyDir string
+	if err := db.QueryRow(
+		`SELECT legacy_dir FROM categories WHERE name = ?`,
+		name,
+	).Scan(&legacyDir); err != nil {
+		t.Fatal(err)
+	}
+	if legacyDir != wantDir {
+		t.Errorf("%s legacy_dir = %q, want %q", name, legacyDir, wantDir)
 	}
 }
 
