@@ -174,6 +174,38 @@ func TestAIComposeTagsSuggestion(t *testing.T) {
 	}
 }
 
+func TestAIComposeFallsBackToAdminLocale(t *testing.T) {
+	t.Setenv("SB_AI_SECRET", "test-secret-compose-locale")
+
+	a := newTestApp(t)
+	cookies := login(t, a.Handler(), "admin", "changeme")
+
+	fake, captured := fakeComposeServer(t, "English summary.")
+	defer fake.Close()
+	configureAIForTest(t, a.Handler(), cookies, fake.URL, "fake-model")
+
+	// Cookie mirrors what 画面設定 > 表示言語 writes when the
+	// operator picks English. Server should resolve the admin
+	// locale off the cookie when the JSON body omits language.
+	cookies = append(cookies, &http.Cookie{Name: "sb_admin_lang", Value: "en"})
+
+	w := postJSON(t, a.Handler(), "/admin/ai/compose", map[string]any{
+		"action": "summarise",
+		"text":   "Some English content to summarise.",
+		// no language field — server must fall back to the
+		// admin display locale rather than the legacy hardcoded ja.
+	}, cookies)
+	if w.Code != 200 {
+		t.Fatalf("compose = %d; body=%s", w.Code, w.Body.String())
+	}
+	if !bytes.Contains(*captured, []byte("in English")) {
+		t.Errorf("provider body missing 'in English' system prompt; got:\n%s", *captured)
+	}
+	if bytes.Contains(*captured, []byte("in Japanese")) {
+		t.Errorf("provider body still requesting Japanese; got:\n%s", *captured)
+	}
+}
+
 func TestAIComposeUnconfiguredReturnsStableCode(t *testing.T) {
 	t.Setenv("SB_AI_SECRET", "test-secret-compose-unconfig")
 

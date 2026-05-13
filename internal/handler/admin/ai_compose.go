@@ -11,6 +11,7 @@ import (
 
 	"github.com/serendipitynz/serenebach/internal/ai"
 	"github.com/serendipitynz/serenebach/internal/domain"
+	"github.com/serendipitynz/serenebach/internal/i18n"
 	"github.com/serendipitynz/serenebach/internal/session"
 )
 
@@ -40,7 +41,7 @@ type composeRequest struct {
 	Text     string `json:"text,omitempty"`     // selection or the passage to work on
 	Context  string `json:"context,omitempty"`  // preceding/surrounding context for "continue"
 	Format   string `json:"format,omitempty"`   // "markdown" | "html" (prompt tuning)
-	Language string `json:"language,omitempty"` // "ja" | "en" — optional hint; defaults to weblog lang
+	Language string `json:"language,omitempty"` // "ja" | "en" — optional hint; defaults to the admin display language resolved off the request
 }
 
 // aiCompose dispatches one AI writing-assist action. Returns JSON:
@@ -82,7 +83,7 @@ func (h *Handler) aiCompose(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prompt, system, err := buildComposePrompt(action, req)
+	prompt, system, err := buildComposePrompt(action, req, resolveComposeLocale(r))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 		return
@@ -181,8 +182,16 @@ var composeActions = map[string]composeAction{
 // prompt pair the provider gets. Centralised so prompt tweaks don't
 // require touching the HTTP handler; also makes it trivial to unit
 // test the prompt contents.
-func buildComposePrompt(action string, req composeRequest) (prompt, system string, err error) {
+//
+// fallbackLang is the locale to use when the client did not send an
+// explicit language hint — wired to the admin's resolved display
+// language so a non-empty value always reaches the provider prompt
+// (never silently coerced to ja).
+func buildComposePrompt(action string, req composeRequest, fallbackLang string) (prompt, system string, err error) {
 	lang := strings.ToLower(strings.TrimSpace(req.Language))
+	if lang == "" {
+		lang = strings.ToLower(strings.TrimSpace(fallbackLang))
+	}
 	if lang == "" {
 		lang = "ja"
 	}
@@ -195,6 +204,18 @@ func buildComposePrompt(action string, req composeRequest) (prompt, system strin
 		return "", "", fmt.Errorf("unknown_action")
 	}
 	return handler(req, lang, format)
+}
+
+// resolveComposeLocale mirrors resolveHelpLocale: context first
+// (locale middleware path), then a fresh Resolve off the request so
+// admin POSTs that bypass the locale middleware still pick up the
+// operator's language choice (sb_admin_lang cookie → Accept-Language).
+func resolveComposeLocale(r *http.Request) string {
+	locale := i18n.LocaleFrom(r.Context())
+	if locale == "" {
+		locale = getI18nBundle().Resolve(r)
+	}
+	return locale
 }
 
 func composeRewriteAction(req composeRequest, lang, format string) (string, string, error) {
