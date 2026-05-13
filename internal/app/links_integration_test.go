@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/serendipitynz/serenebach/internal/app"
 )
 
 // TestAdminLinksListEmptyState confirms the list page renders when no
@@ -39,7 +41,16 @@ func TestAdminLinkCreateGroupThenLink(t *testing.T) {
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
-	// 1. Create a group.
+	groupID := adminLinkCreateGroup(t, a, cookies)
+	adminLinkAssertParentScopedNewForm(t, a, cookies, groupID)
+	linkID := adminLinkCreateUnderGroup(t, a, cookies, groupID)
+	adminLinkAssertGroupListing(t, a, cookies)
+	adminLinkAssertGroupEditPage(t, a, cookies, groupID, linkID)
+	adminLinkAssertChildEditPage(t, a, cookies, groupID, linkID)
+}
+
+func adminLinkCreateGroup(t *testing.T, a *app.App, cookies []*http.Cookie) int64 {
+	t.Helper()
 	groupForm := url.Values{
 		"name":        {"仲間ブログ"},
 		"description": {"フレンズたち"},
@@ -49,32 +60,34 @@ func TestAdminLinkCreateGroupThenLink(t *testing.T) {
 	if w.Code != http.StatusFound {
 		t.Fatalf("group create status = %d; body:\n%s", w.Code, w.Body.String())
 	}
-
 	var groupID int64
 	if err := a.DB.QueryRow(`SELECT id FROM links WHERE kind = 'group' AND name = ?`, "仲間ブログ").Scan(&groupID); err != nil {
 		t.Fatalf("group lookup: %v", err)
 	}
+	return groupID
+}
 
-	// 2. Open the ?parent= new form — type picker should be hidden, the
-	//    所属グループ selector should be pre-set to the group.
+// adminLinkAssertParentScopedNewForm probes the ?parent= new form. The
+// kind-picker / hidden-input combination is intentionally loose — the
+// scoped new form may keep the radio set or collapse to a hidden
+// input, and either behaviour is acceptable as long as the subsequent
+// submit round-trips correctly.
+func adminLinkAssertParentScopedNewForm(t *testing.T, a *app.App, cookies []*http.Cookie, groupID int64) {
+	t.Helper()
 	newForm := authedGET(t, a.Handler(), "/admin/links/new?parent="+itoa64(groupID), cookies)
 	if newForm.Code != 200 {
 		t.Fatalf("new form status = %d", newForm.Code)
 	}
 	body := newForm.Body.String()
 	if strings.Contains(body, `name="kind" value="group"`) && strings.Contains(body, `type="radio"`) {
-		// Radio for "group" should not be rendered when the parent is
-		// pre-scoped — double-check the kind picker really collapses.
 		if !strings.Contains(body, `<input type="hidden" name="kind"`) {
-			// Acceptable: pre-scoped new-form can still show radios;
-			// but the hidden selector should force kind=link. We
-			// consider either behaviour OK as long as the submit
-			// round-trips below correctly.
 			_ = body
 		}
 	}
+}
 
-	// 3. Create the link under the group.
+func adminLinkCreateUnderGroup(t *testing.T, a *app.App, cookies []*http.Cookie, groupID int64) int64 {
+	t.Helper()
 	linkForm := url.Values{
 		"name":        {"たくやの日記"},
 		"description": {"いつものやつ"},
@@ -84,23 +97,26 @@ func TestAdminLinkCreateGroupThenLink(t *testing.T) {
 		"parent_id":   {itoa64(groupID)},
 		"disp":        {"0"},
 	}
-	w2 := authedPOSTForm(t, a.Handler(), "/admin/links/new", linkForm, cookies)
-	if w2.Code != http.StatusFound {
-		t.Fatalf("link create status = %d; body:\n%s", w2.Code, w2.Body.String())
+	w := authedPOSTForm(t, a.Handler(), "/admin/links/new", linkForm, cookies)
+	if w.Code != http.StatusFound {
+		t.Fatalf("link create status = %d; body:\n%s", w.Code, w.Body.String())
 	}
-
-	var linkID int64
-	var parentID int64
+	var linkID, parentID int64
 	if err := a.DB.QueryRow(`SELECT id, parent_id FROM links WHERE kind = 'link' AND name = ?`, "たくやの日記").Scan(&linkID, &parentID); err != nil {
 		t.Fatalf("link lookup: %v", err)
 	}
 	if parentID != groupID {
 		t.Errorf("parent_id = %d, want %d", parentID, groupID)
 	}
+	return linkID
+}
 
-	// 4. The main list shows the group + child count, but NOT the
-	//    child link itself — children are managed from the group's
-	//    edit page so they don't clutter the top-level listing.
+// adminLinkAssertGroupListing confirms the main /admin/links page shows
+// the group + child count but NOT the child link itself — children
+// are managed from the group's edit page so they don't clutter the
+// top-level listing.
+func adminLinkAssertGroupListing(t *testing.T, a *app.App, cookies []*http.Cookie) {
+	t.Helper()
 	list := authedGET(t, a.Handler(), "/admin/links", cookies).Body.String()
 	for _, want := range []string{"仲間ブログ", "リンク数: 1"} {
 		if !strings.Contains(list, want) {
@@ -110,23 +126,23 @@ func TestAdminLinkCreateGroupThenLink(t *testing.T) {
 	if strings.Contains(list, "たくやの日記") {
 		t.Errorf("child link should be hidden from main list; found it")
 	}
+}
 
-	// 5. The group's edit page is where the child shows up, with a
-	//    delete button and a 'グループに戻る' back link on the child's
-	//    own edit page.
+func adminLinkAssertGroupEditPage(t *testing.T, a *app.App, cookies []*http.Cookie, groupID, linkID int64) {
+	t.Helper()
 	groupEdit := authedGET(t, a.Handler(), "/admin/links/"+itoa64(groupID)+"/edit", cookies).Body.String()
 	for _, want := range []string{"たくやの日記", "https://example.com/takuya/", "新規リンク"} {
 		if !strings.Contains(groupEdit, want) {
 			t.Errorf("group-edit page missing %q", want)
 		}
 	}
-	// The member-list must include a delete form for every child.
 	if !strings.Contains(groupEdit, `/admin/links/`+itoa64(linkID)+`/delete`) {
 		t.Errorf("group-edit page missing delete form for child link id=%d", linkID)
 	}
+}
 
-	// 6. The child's edit page has a 'グループに戻る' back link that
-	//    points at the parent group's edit page, not the top-level list.
+func adminLinkAssertChildEditPage(t *testing.T, a *app.App, cookies []*http.Cookie, groupID, linkID int64) {
+	t.Helper()
 	childEdit := authedGET(t, a.Handler(), "/admin/links/"+itoa64(linkID)+"/edit", cookies).Body.String()
 	if !strings.Contains(childEdit, "グループに戻る") {
 		t.Errorf("child-link edit page should say 'グループに戻る'")
