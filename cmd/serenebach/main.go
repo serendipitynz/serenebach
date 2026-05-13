@@ -60,6 +60,24 @@ func newApp(cfg *config.Config) (a *app.App, err error) {
 	return app.New(cfg)
 }
 
+// subcmdHandler is the post-newApp entry point for a subcommand.
+// extract-assets is the only command that runs before newApp and so
+// is dispatched separately in main().
+type subcmdHandler func(a *app.App, cfg *config.Config, args []string)
+
+// subcommands maps the leading CLI token to its handler. The empty
+// string maps to "serve" so a bare `serenebach` invocation still spins
+// up the HTTP server (matching pre-refactor behaviour).
+var subcommands = map[string]subcmdHandler{
+	"":        runServe,
+	"serve":   runServe,
+	"seed":    runSeed,
+	"migrate": runMigrate,
+	"import":  runImportCmd,
+	"build":   runBuildCmd,
+	"mcp":     runMCP,
+}
+
 func main() {
 	// CGI writes responses to stdout, so every log line must go to stderr.
 	log.SetOutput(os.Stderr)
@@ -77,6 +95,11 @@ func main() {
 		return
 	}
 
+	handler, ok := subcommands[subcmd]
+	if !ok {
+		log.Fatalf("unknown subcommand: %q (want: serve | seed | migrate | import | build | extract-assets)", subcmd)
+	}
+
 	a, err := newApp(cfg)
 	if err != nil {
 		fatal("app: %v", err)
@@ -87,54 +110,63 @@ func main() {
 		}
 	}()
 
-	switch subcmd {
-	case "", "serve":
-		if err := serve(a, cfg); err != nil {
-			fatal("serve: %v", err)
-		}
-	case "seed":
-		spec := app.DefaultSeed()
-		if name := os.Getenv("SB_ADMIN_NAME"); name != "" {
-			spec.AdminName = name
-		}
-		if pw := os.Getenv("SB_ADMIN_PASSWORD"); pw != "" {
-			spec.AdminPassword = pw
-		}
-		if email := os.Getenv("SB_ADMIN_EMAIL"); email != "" {
-			spec.AdminEmail = email
-		}
-		// SB_SEED_NO_SAMPLES=1 creates only the admin user + default template,
-		// skipping the demo entries. Useful right before `./serenebach import`.
-		if os.Getenv("SB_SEED_NO_SAMPLES") == "1" {
-			spec.SampleEntries = false
-		}
-		if err := a.Seed(context.Background(), spec); err != nil {
-			// An admin already existing is the expected outcome of
-			// re-running seed against a populated DB with a new admin
-			// name — surface it as informational, not fatal, so CLI
-			// re-runs stay ergonomic.
-			if errors.Is(err, app.ErrAdminAlreadyExists) {
-				fmt.Fprintln(os.Stderr, "seed: admin already exists, skipping")
-				return
-			}
-			log.Fatalf("seed: %v", err) //nolint:gocritic // intentional fail-fast; deferred a.Close is best-effort and the OS reclaims handles on exit.
-		}
-		fmt.Fprintln(os.Stderr, "seed: ok")
-	case "migrate":
-		// app.New already ran migrations — nothing else to do.
-		fmt.Fprintln(os.Stderr, "migrate: ok")
-	case "import":
-		runImport(a, subArgs)
-	case "build":
-		runBuild(a, subArgs)
-	case "mcp":
-		if len(subArgs) < 1 || subArgs[0] != "serve" {
-			log.Fatalf("mcp: usage: serenebach mcp serve")
-		}
-		runMCPServe(a)
-	default:
-		log.Fatalf("unknown subcommand: %q (want: serve | seed | migrate | import | build | extract-assets)", subcmd)
+	handler(a, cfg, subArgs)
+}
+
+func runServe(a *app.App, cfg *config.Config, _ []string) {
+	if err := serve(a, cfg); err != nil {
+		fatal("serve: %v", err)
 	}
+}
+
+func runSeed(a *app.App, _ *config.Config, _ []string) {
+	spec := app.DefaultSeed()
+	if name := os.Getenv("SB_ADMIN_NAME"); name != "" {
+		spec.AdminName = name
+	}
+	if pw := os.Getenv("SB_ADMIN_PASSWORD"); pw != "" {
+		spec.AdminPassword = pw
+	}
+	if email := os.Getenv("SB_ADMIN_EMAIL"); email != "" {
+		spec.AdminEmail = email
+	}
+	// SB_SEED_NO_SAMPLES=1 creates only the admin user + default template,
+	// skipping the demo entries. Useful right before `./serenebach import`.
+	if os.Getenv("SB_SEED_NO_SAMPLES") == "1" {
+		spec.SampleEntries = false
+	}
+	if err := a.Seed(context.Background(), spec); err != nil {
+		// An admin already existing is the expected outcome of
+		// re-running seed against a populated DB with a new admin
+		// name — surface it as informational, not fatal, so CLI
+		// re-runs stay ergonomic.
+		if errors.Is(err, app.ErrAdminAlreadyExists) {
+			fmt.Fprintln(os.Stderr, "seed: admin already exists, skipping")
+			return
+		}
+		log.Fatalf("seed: %v", err) //nolint:gocritic // intentional fail-fast; deferred a.Close is best-effort and the OS reclaims handles on exit.
+	}
+	fmt.Fprintln(os.Stderr, "seed: ok")
+}
+
+func runMigrate(_ *app.App, _ *config.Config, _ []string) {
+	// app.New already ran migrations — nothing else to do.
+	fmt.Fprintln(os.Stderr, "migrate: ok")
+}
+
+func runImportCmd(a *app.App, _ *config.Config, args []string) {
+	runImport(a, args)
+}
+
+func runBuildCmd(a *app.App, _ *config.Config, args []string) {
+	runBuild(a, args)
+}
+
+func runMCP(a *app.App, _ *config.Config, args []string) {
+	if len(args) < 1 || args[0] != "serve" {
+		log.Fatalf("mcp: usage: serenebach mcp serve")
+	}
+	runMCPServe(a)
 }
 
 func serve(a *app.App, cfg *config.Config) error {
