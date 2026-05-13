@@ -10,11 +10,15 @@ import (
 	"github.com/serendipitynz/serenebach/internal/domain"
 )
 
+// categoryColumns is the canonical column list for the categories table.
+// Order must match the inline Scan call sites.
+const categoryColumns = `id, wid, parent_id, name, slug, sort_order, description, description_format, template_id`
+
 // AllCategories returns every category row for the weblog, ordered by
 // sort_order then id.
 func (s *Store) AllCategories(ctx context.Context, wid int64) ([]domain.Category, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, parent_id, name, slug, sort_order, description, description_format, template_id
+		SELECT `+categoryColumns+`
 		FROM categories
 		WHERE wid = ?
 		ORDER BY sort_order, id`, wid)
@@ -37,7 +41,7 @@ func (s *Store) AllCategories(ctx context.Context, wid int64) ([]domain.Category
 func (s *Store) CategoryByID(ctx context.Context, wid, id int64) (*domain.Category, error) {
 	var c domain.Category
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, parent_id, name, slug, sort_order, description, description_format, template_id
+		SELECT `+categoryColumns+`
 		FROM categories WHERE wid = ? AND id = ?`, wid, id).Scan(
 		&c.ID, &c.WID, &c.ParentID, &c.Name, &c.Slug, &c.SortOrder, &c.Description, &c.DescriptionFormat, &c.TemplateID)
 	if err != nil {
@@ -66,7 +70,7 @@ func (s *Store) CategoriesByIDs(ctx context.Context, ids []int64) (map[int64]dom
 		placeholders = append(placeholders, '?')
 		args = append(args, id)
 	}
-	q := "SELECT id, wid, parent_id, name, slug, sort_order, description, description_format, template_id FROM categories WHERE id IN (" + string(placeholders) + ")"
+	q := "SELECT " + categoryColumns + " FROM categories WHERE id IN (" + string(placeholders) + ")"
 	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("repo: CategoriesByIDs: %w", err)
