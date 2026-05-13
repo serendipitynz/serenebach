@@ -11,12 +11,19 @@ import (
 	"github.com/serendipitynz/serenebach/internal/domain"
 )
 
+// entryColumns is the canonical column list for the entries table.
+// Kept in one place so a new column added to the schema only has to
+// be threaded through the corresponding Scan call sites, not every
+// query string in this file. Order must match the Scan argument
+// order in scanEntryOrNotFound / scanEntries and the inline Scans.
+const entryColumns = `id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned, accept_comments`
+
 // EntryByID returns one entry by id and weblog id. ErrNotFound when missing.
 // The caller decides how to treat the entry's status (e.g. 410 vs 200) —
 // this layer returns closed/draft rows exactly as stored.
 func (s *Store) EntryByID(ctx context.Context, wid, id int64) (*domain.Entry, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned, accept_comments
+		SELECT `+entryColumns+`
 		FROM entries WHERE wid = ? AND id = ?`, wid, id)
 	e := &domain.Entry{}
 	var postedAt, updatedAt int64
@@ -35,7 +42,7 @@ func (s *Store) EntryByID(ctx context.Context, wid, id int64) (*domain.Entry, er
 // than the anchor (by posted_at, tie-broken by id). ErrNotFound at the edge.
 func (s *Store) PrevPublishedEntry(ctx context.Context, wid int64, anchor domain.Entry) (*domain.Entry, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned, accept_comments
+		SELECT `+entryColumns+`
 		FROM entries
 		WHERE wid = ? AND status = ?
 		  AND (posted_at < ? OR (posted_at = ? AND id < ?))
@@ -49,7 +56,7 @@ func (s *Store) PrevPublishedEntry(ctx context.Context, wid int64, anchor domain
 // the anchor. ErrNotFound at the edge.
 func (s *Store) NextPublishedEntry(ctx context.Context, wid int64, anchor domain.Entry) (*domain.Entry, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned, accept_comments
+		SELECT `+entryColumns+`
 		FROM entries
 		WHERE wid = ? AND status = ?
 		  AND (posted_at > ? OR (posted_at = ? AND id > ?))
@@ -88,7 +95,7 @@ func (s *Store) CountEntriesByStatus(ctx context.Context, wid int64, status doma
 // for the admin entries table. Status filtering is handled client-side.
 func (s *Store) ListEntriesForAdmin(ctx context.Context, wid int64, limit int) ([]domain.Entry, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned, accept_comments
+		SELECT `+entryColumns+`
 		FROM entries
 		WHERE wid = ?
 		ORDER BY posted_at DESC
@@ -162,7 +169,7 @@ func (s *Store) EntryBySlug(ctx context.Context, wid int64, slug string) (*domai
 	// mentions it — otherwise it falls back to a range scan on
 	// `idx_entries_wid_posted`. Keep it for the planner hint.
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned, accept_comments
+		SELECT `+entryColumns+`
 		FROM entries WHERE wid = ? AND slug = ? AND slug != ''`, wid, slug)
 	e := &domain.Entry{}
 	var postedAt, updatedAt int64
@@ -195,7 +202,7 @@ func (s *Store) DeleteEntry(ctx context.Context, wid, id int64) error {
 // for full-site rebuilds rather than request-path rendering.
 func (s *Store) AllPublishedEntries(ctx context.Context, wid int64) ([]domain.Entry, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned, accept_comments
+		SELECT `+entryColumns+`
 		FROM entries
 		WHERE wid = ? AND status = ?
 		ORDER BY posted_at DESC`, wid, domain.EntryPublished)
@@ -217,7 +224,7 @@ func (s *Store) SearchPublishedEntries(ctx context.Context, wid int64, query str
 	}
 	needle := "%" + strings.ReplaceAll(strings.ReplaceAll(query, `\`, `\\`), "%", `\%`) + "%"
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned, accept_comments
+		SELECT `+entryColumns+`
 		FROM entries
 		WHERE wid = ? AND status = ?
 		  AND (title LIKE ? ESCAPE '\' OR body LIKE ? ESCAPE '\' OR more LIKE ? ESCAPE '\' OR keywords LIKE ? ESCAPE '\')
@@ -232,7 +239,7 @@ func (s *Store) SearchPublishedEntries(ctx context.Context, wid int64, query str
 
 func (s *Store) RecentPublishedEntries(ctx context.Context, wid int64, limit int) ([]domain.Entry, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned, accept_comments
+		SELECT `+entryColumns+`
 		FROM entries
 		WHERE wid = ? AND status = ?
 		ORDER BY posted_at DESC
@@ -249,7 +256,7 @@ func (s *Store) RecentPublishedEntries(ctx context.Context, wid int64, limit int
 // when that becomes relevant we can widen the filter here.
 func (s *Store) PublishedEntriesByCategory(ctx context.Context, wid, catID int64, limit int) ([]domain.Entry, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned, accept_comments
+		SELECT `+entryColumns+`
 		FROM entries
 		WHERE wid = ? AND status = ? AND category_id = ?
 		ORDER BY posted_at DESC
@@ -265,7 +272,7 @@ func (s *Store) PublishedEntriesByCategory(ctx context.Context, wid, catID int64
 // [from, to) (both in unix seconds), newest first. Used by archive handlers.
 func (s *Store) PublishedEntriesInRange(ctx context.Context, wid int64, from, to time.Time, limit int) ([]domain.Entry, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned, accept_comments
+		SELECT `+entryColumns+`
 		FROM entries
 		WHERE wid = ? AND status = ? AND posted_at >= ? AND posted_at < ?
 		ORDER BY posted_at DESC
@@ -360,7 +367,7 @@ func (s *Store) CountPublishedEntriesInRange(ctx context.Context, wid int64, fro
 // Caller computes offset = (page-1) * limit.
 func (s *Store) RecentPublishedEntriesPage(ctx context.Context, wid int64, limit, offset int) ([]domain.Entry, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned, accept_comments
+		SELECT `+entryColumns+`
 		FROM entries
 		WHERE wid = ? AND status = ?
 		ORDER BY pinned DESC, posted_at DESC
@@ -376,7 +383,7 @@ func (s *Store) RecentPublishedEntriesPage(ctx context.Context, wid int64, limit
 // PublishedEntriesByCategory.
 func (s *Store) PublishedEntriesByCategoryPage(ctx context.Context, wid, catID int64, limit, offset int) ([]domain.Entry, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned, accept_comments
+		SELECT `+entryColumns+`
 		FROM entries
 		WHERE wid = ? AND status = ? AND category_id = ?
 		ORDER BY pinned DESC, posted_at DESC
@@ -392,7 +399,7 @@ func (s *Store) PublishedEntriesByCategoryPage(ctx context.Context, wid, catID i
 // PublishedEntriesInRange. Used by year/month archive pagination.
 func (s *Store) PublishedEntriesInRangePage(ctx context.Context, wid int64, from, to time.Time, limit, offset int) ([]domain.Entry, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned, accept_comments
+		SELECT `+entryColumns+`
 		FROM entries
 		WHERE wid = ? AND status = ? AND posted_at >= ? AND posted_at < ?
 		ORDER BY posted_at DESC
