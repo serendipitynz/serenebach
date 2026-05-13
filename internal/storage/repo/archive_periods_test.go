@@ -31,7 +31,13 @@ func TestArchivePeriodsTZBucket(t *testing.T) {
 		t.Fatalf("CreateEntry: %v", err)
 	}
 
-	t.Run("ArchivePeriods", func(t *testing.T) {
+	t.Run("ArchivePeriods", assertArchivePeriodsTokyoBucket(ctx, s, tokyo))
+	t.Run("ArchivePeriodsWithCounts", assertArchivePeriodsWithCountsTokyoBucket(ctx, s, tokyo))
+	t.Run("UTCWouldDisagree", assertArchivePeriodsUTCBucket(ctx, s))
+}
+
+func assertArchivePeriodsTokyoBucket(ctx context.Context, s *Store, tokyo *time.Location) func(t *testing.T) {
+	return func(t *testing.T) {
 		got, err := s.ArchivePeriods(ctx, 1, tokyo)
 		if err != nil {
 			t.Fatalf("ArchivePeriods: %v", err)
@@ -39,9 +45,11 @@ func TestArchivePeriodsTZBucket(t *testing.T) {
 		if len(got) != 1 || got[0].Year != 2026 || got[0].Month != 1 {
 			t.Fatalf("ArchivePeriods = %+v, want one bucket for 2026/01", got)
 		}
-	})
+	}
+}
 
-	t.Run("ArchivePeriodsWithCounts", func(t *testing.T) {
+func assertArchivePeriodsWithCountsTokyoBucket(ctx context.Context, s *Store, tokyo *time.Location) func(t *testing.T) {
+	return func(t *testing.T) {
 		got, err := s.ArchivePeriodsWithCounts(ctx, 1, tokyo)
 		if err != nil {
 			t.Fatalf("ArchivePeriodsWithCounts: %v", err)
@@ -49,12 +57,15 @@ func TestArchivePeriodsTZBucket(t *testing.T) {
 		if len(got) != 1 || got[0].Year != 2026 || got[0].Month != 1 || got[0].Count != 1 {
 			t.Fatalf("ArchivePeriodsWithCounts = %+v, want one bucket 2026/01 count=1", got)
 		}
-	})
+	}
+}
 
-	t.Run("UTCWouldDisagree", func(t *testing.T) {
-		// Sanity: the same data bucketed in UTC ends up in 2025/12,
-		// confirming the fixture sits across the boundary the sidebar
-		// vs range-query divergence used to live on.
+// assertArchivePeriodsUTCBucket pins down the negative case: the same
+// fixture bucketed in UTC ends up in 2025/12, confirming the entry sits
+// across the boundary the sidebar vs range-query divergence used to
+// live on.
+func assertArchivePeriodsUTCBucket(ctx context.Context, s *Store) func(t *testing.T) {
+	return func(t *testing.T) {
 		got, err := s.ArchivePeriods(ctx, 1, time.UTC)
 		if err != nil {
 			t.Fatalf("ArchivePeriods UTC: %v", err)
@@ -62,7 +73,7 @@ func TestArchivePeriodsTZBucket(t *testing.T) {
 		if len(got) != 1 || got[0].Year != 2025 || got[0].Month != 12 {
 			t.Fatalf("UTC bucket = %+v, want 2025/12", got)
 		}
-	})
+	}
 }
 
 // TestArchivePeriodsOrdering covers the newest-first contract that the
