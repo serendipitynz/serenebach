@@ -73,36 +73,8 @@ type imagesListPageData struct {
 func (h *Handler) imagesList(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
-	// JSON variant powers the entry-form image picker. Keep the legacy
-	// high-limit, single-window shape — the picker does its own
-	// filtering client-side and doesn't page.
 	if q.Get("format") == "json" || acceptsJSON(r) {
-		items, err := h.Store.ListImagesForAdmin(r.Context(), h.wid(), adminImageListLimit, 0)
-		if err != nil {
-			log.Printf("admin.imagesList: %v", err)
-			http.Error(w, "failed to list images", http.StatusInternalServerError)
-			return
-		}
-		imgPrefix := root(r) + imagesPathPrefix
-		payload := make([]map[string]any, 0, len(items))
-		for _, img := range items {
-			entry := map[string]any{
-				"id":          img.ID,
-				"filename":    img.Filename,
-				"stored_path": img.StoredPath,
-				"url":         imgPrefix + img.StoredPath,
-				"width":       img.Width,
-				"height":      img.Height,
-				"alt":         img.AltText,
-			}
-			if img.ThumbPath != "" {
-				entry["thumb_url"] = imgPrefix + img.ThumbPath
-			} else {
-				entry["thumb_url"] = imgPrefix + img.StoredPath
-			}
-			payload = append(payload, entry)
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"images": payload})
+		h.imagesListJSON(w, r)
 		return
 	}
 
@@ -114,20 +86,7 @@ func (h *Handler) imagesList(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to count images", http.StatusInternalServerError)
 		return
 	}
-	page := 1
-	if raw := q.Get("page"); raw != "" {
-		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
-			page = v
-		}
-	}
-	totalPages := int((total + int64(adminImagePageSize) - 1) / int64(adminImagePageSize))
-	if totalPages == 0 {
-		totalPages = 1
-	}
-	if page > totalPages {
-		page = totalPages
-	}
-	offset := (page - 1) * adminImagePageSize
+	page, totalPages, offset := imagesListPagination(q.Get("page"), total)
 
 	items, err := h.Store.ListImagesForAdmin(r.Context(), h.wid(), adminImagePageSize, offset)
 	if err != nil {
@@ -141,14 +100,7 @@ func (h *Handler) imagesList(w http.ResponseWriter, r *http.Request) {
 		view = "grid"
 	}
 
-	prev := 0
-	if page > 1 {
-		prev = page - 1
-	}
-	next := 0
-	if page < totalPages {
-		next = page + 1
-	}
+	prev, next := imagesListNeighbours(page, totalPages)
 
 	renderMain(w, r, pageImages, imagesListPageData{
 		pageBase: pageBase{
@@ -169,6 +121,73 @@ func (h *Handler) imagesList(w http.ResponseWriter, r *http.Request) {
 		NextPage:     next,
 		ViewMode:     view,
 	})
+}
+
+// imagesListJSON powers the entry-form image picker. Single window of
+// adminImageListLimit rows — the picker does its own client-side
+// filtering and doesn't page.
+func (h *Handler) imagesListJSON(w http.ResponseWriter, r *http.Request) {
+	items, err := h.Store.ListImagesForAdmin(r.Context(), h.wid(), adminImageListLimit, 0)
+	if err != nil {
+		log.Printf("admin.imagesList: %v", err)
+		http.Error(w, "failed to list images", http.StatusInternalServerError)
+		return
+	}
+	imgPrefix := root(r) + imagesPathPrefix
+	payload := make([]map[string]any, 0, len(items))
+	for _, img := range items {
+		entry := map[string]any{
+			"id":          img.ID,
+			"filename":    img.Filename,
+			"stored_path": img.StoredPath,
+			"url":         imgPrefix + img.StoredPath,
+			"width":       img.Width,
+			"height":      img.Height,
+			"alt":         img.AltText,
+		}
+		if img.ThumbPath != "" {
+			entry["thumb_url"] = imgPrefix + img.ThumbPath
+		} else {
+			entry["thumb_url"] = imgPrefix + img.StoredPath
+		}
+		payload = append(payload, entry)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"images": payload})
+}
+
+// imagesListPagination turns the raw ?page= query value and the total
+// row count into a clamped (page, totalPages, offset) triple. Bad
+// input (non-numeric, < 1, past the last page) silently clamps so a
+// stale bookmark renders the closest valid page instead of 500-ing.
+func imagesListPagination(rawPage string, total int64) (page, totalPages, offset int) {
+	page = 1
+	if rawPage != "" {
+		if v, err := strconv.Atoi(rawPage); err == nil && v > 0 {
+			page = v
+		}
+	}
+	totalPages = int((total + int64(adminImagePageSize) - 1) / int64(adminImagePageSize))
+	if totalPages == 0 {
+		totalPages = 1
+	}
+	if page > totalPages {
+		page = totalPages
+	}
+	offset = (page - 1) * adminImagePageSize
+	return page, totalPages, offset
+}
+
+// imagesListNeighbours computes the pager's prev/next link targets.
+// Zero means "no link in this direction" — the template renders the
+// arrow as disabled.
+func imagesListNeighbours(page, totalPages int) (prev, next int) {
+	if page > 1 {
+		prev = page - 1
+	}
+	if page < totalPages {
+		next = page + 1
+	}
+	return prev, next
 }
 
 // ---- upload ------------------------------------------------------------

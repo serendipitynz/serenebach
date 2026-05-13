@@ -157,6 +157,26 @@ func classifyAIError(err error) string {
 	return "provider_error"
 }
 
+// composeAction is a single entry in the dispatch table — one function
+// per logical compose verb. Each handler receives the resolved lang +
+// format pair and returns the (prompt, system) tuple plus a
+// validation error like "text_required" / "selection_required" /
+// "context_required" when its input wasn't there.
+type composeAction func(req composeRequest, lang, format string) (prompt, system string, err error)
+
+// composeActions dispatches /admin/ai/compose by the form's action
+// keyword. Adding a new compose verb is a single map entry; the HTTP
+// handler doesn't need to grow.
+var composeActions = map[string]composeAction{
+	"rewrite":   composeRewriteAction,
+	"continue":  composeContinueAction,
+	"summarise": composeSummariseAction,
+	"summarize": composeSummariseAction,
+	"title":     composeTitleAction,
+	"tags":      composeTagsAction,
+	"keywords":  composeKeywordsAction,
+}
+
 // buildComposePrompt maps a logical action to the system + user
 // prompt pair the provider gets. Centralised so prompt tweaks don't
 // require touching the HTTP handler; also makes it trivial to unit
@@ -170,61 +190,63 @@ func buildComposePrompt(action string, req composeRequest) (prompt, system strin
 	if format == "" {
 		format = "html"
 	}
-
-	switch action {
-	case "rewrite":
-		if strings.TrimSpace(req.Text) == "" {
-			return "", "", fmt.Errorf("selection_required")
-		}
-		system = "You are a concise writing assistant. Rewrite the passage the user sends so it reads more naturally while preserving meaning, tone, and any " + format + " markup. Return only the rewritten passage — no preamble, no commentary, no quotation marks. Reply in " + langName(lang) + "."
-		prompt = req.Text
-		return prompt, system, nil
-
-	case "continue":
-		ctxText := strings.TrimSpace(req.Context)
-		if ctxText == "" {
-			ctxText = strings.TrimSpace(req.Text)
-		}
-		if ctxText == "" {
-			return "", "", fmt.Errorf("context_required")
-		}
-		system = "You are a concise writing assistant. Continue the passage the user sends with one or two additional paragraphs that match the existing voice and " + format + " markup. Return only the new text — do not repeat what was already written. Reply in " + langName(lang) + "."
-		prompt = ctxText
-		return prompt, system, nil
-
-	case "summarise", "summarize":
-		if strings.TrimSpace(req.Text) == "" {
-			return "", "", fmt.Errorf("text_required")
-		}
-		system = "Summarise the passage in one short paragraph (under 120 words) in " + langName(lang) + ". No preamble."
-		prompt = req.Text
-		return prompt, system, nil
-
-	case "title":
-		if strings.TrimSpace(req.Text) == "" {
-			return "", "", fmt.Errorf("text_required")
-		}
-		system = "Suggest a short, engaging title for the entry below. Reply with exactly one title, no quotation marks, no preamble, under 40 characters. Reply in " + langName(lang) + "."
-		prompt = req.Text
-		return prompt, system, nil
-
-	case "tags":
-		if strings.TrimSpace(req.Text) == "" {
-			return "", "", fmt.Errorf("text_required")
-		}
-		system = "Suggest 3-6 short tags (1-3 words each) for the entry below. Reply with a single line of comma-separated tags. No preamble, no numbering, no quotation marks. Tags should be in " + langName(lang) + "."
-		prompt = req.Text
-		return prompt, system, nil
-
-	case "keywords":
-		if strings.TrimSpace(req.Text) == "" {
-			return "", "", fmt.Errorf("text_required")
-		}
-		system = "Suggest SEO keywords for the entry below. Reply with a single line of comma-separated keywords (5-10 total). No preamble. Keywords should be in " + langName(lang) + "."
-		prompt = req.Text
-		return prompt, system, nil
+	handler, ok := composeActions[action]
+	if !ok {
+		return "", "", fmt.Errorf("unknown_action")
 	}
-	return "", "", fmt.Errorf("unknown_action")
+	return handler(req, lang, format)
+}
+
+func composeRewriteAction(req composeRequest, lang, format string) (string, string, error) {
+	if strings.TrimSpace(req.Text) == "" {
+		return "", "", fmt.Errorf("selection_required")
+	}
+	system := "You are a concise writing assistant. Rewrite the passage the user sends so it reads more naturally while preserving meaning, tone, and any " + format + " markup. Return only the rewritten passage — no preamble, no commentary, no quotation marks. Reply in " + langName(lang) + "."
+	return req.Text, system, nil
+}
+
+func composeContinueAction(req composeRequest, lang, format string) (string, string, error) {
+	ctxText := strings.TrimSpace(req.Context)
+	if ctxText == "" {
+		ctxText = strings.TrimSpace(req.Text)
+	}
+	if ctxText == "" {
+		return "", "", fmt.Errorf("context_required")
+	}
+	system := "You are a concise writing assistant. Continue the passage the user sends with one or two additional paragraphs that match the existing voice and " + format + " markup. Return only the new text — do not repeat what was already written. Reply in " + langName(lang) + "."
+	return ctxText, system, nil
+}
+
+func composeSummariseAction(req composeRequest, lang, _ string) (string, string, error) {
+	if strings.TrimSpace(req.Text) == "" {
+		return "", "", fmt.Errorf("text_required")
+	}
+	system := "Summarise the passage in one short paragraph (under 120 words) in " + langName(lang) + ". No preamble."
+	return req.Text, system, nil
+}
+
+func composeTitleAction(req composeRequest, lang, _ string) (string, string, error) {
+	if strings.TrimSpace(req.Text) == "" {
+		return "", "", fmt.Errorf("text_required")
+	}
+	system := "Suggest a short, engaging title for the entry below. Reply with exactly one title, no quotation marks, no preamble, under 40 characters. Reply in " + langName(lang) + "."
+	return req.Text, system, nil
+}
+
+func composeTagsAction(req composeRequest, lang, _ string) (string, string, error) {
+	if strings.TrimSpace(req.Text) == "" {
+		return "", "", fmt.Errorf("text_required")
+	}
+	system := "Suggest 3-6 short tags (1-3 words each) for the entry below. Reply with a single line of comma-separated tags. No preamble, no numbering, no quotation marks. Tags should be in " + langName(lang) + "."
+	return req.Text, system, nil
+}
+
+func composeKeywordsAction(req composeRequest, lang, _ string) (string, string, error) {
+	if strings.TrimSpace(req.Text) == "" {
+		return "", "", fmt.Errorf("text_required")
+	}
+	system := "Suggest SEO keywords for the entry below. Reply with a single line of comma-separated keywords (5-10 total). No preamble. Keywords should be in " + langName(lang) + "."
+	return req.Text, system, nil
 }
 
 // composeMaxTokens caps output per action. Title / tag suggestions

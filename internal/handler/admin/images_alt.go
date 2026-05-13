@@ -48,33 +48,13 @@ func (h *Handler) imagesGenerateAlt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.Store.UserByID(r.Context(), actor.ID)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "load user"})
-		return
-	}
-	provider, err := providerForUser(*user)
-	if err != nil {
-		if errors.Is(err, ai.ErrUnconfigured) {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "ai_unconfigured"})
-			return
-		}
-		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
-		return
-	}
-	if !provider.SupportsVision() {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "vision_unsupported"})
+	user, provider, ok := h.loadAltGenerationProvider(w, r, actor.ID)
+	if !ok {
 		return
 	}
 
-	img, err := h.Store.ImageByID(r.Context(), h.wid(), id)
-	if err != nil {
-		if errors.Is(err, repo.ErrNotFound) {
-			writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "not_found"})
-			return
-		}
-		log.Printf("admin.imagesGenerateAlt: load: %v", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "load_image"})
+	img, ok := h.loadAltGenerationImage(w, r, id)
+	if !ok {
 		return
 	}
 
@@ -106,18 +86,7 @@ func (h *Handler) imagesGenerateAlt(w http.ResponseWriter, r *http.Request) {
 	// but the comparison we care about is text-token vs text-bytes.
 	requestBytes := len(altTextSystemPrompt) + len(altPrompt)
 	if err != nil {
-		msg := err.Error()
-		status := http.StatusOK // tool-error shape — non-transport errors use 200 + ok:false
-		switch {
-		case errors.Is(err, ai.ErrVisionUnsupported):
-			msg = "vision_unsupported"
-		case errors.Is(err, ai.ErrTimeout):
-			msg = "timeout"
-		case errors.Is(err, ai.ErrRateLimited):
-			msg = "rate_limited"
-		case errors.Is(err, ai.ErrUnauthorized):
-			msg = "unauthorized"
-		}
+		msg := altGenerationErrorCode(err)
 		h.auditAI(r.Context(), *actor, "ai.alt_generate", id, aiCallRecord{
 			Status:       "err",
 			ErrCode:      msg,
@@ -128,7 +97,8 @@ func (h *Handler) imagesGenerateAlt(w http.ResponseWriter, r *http.Request) {
 			LatencyMS:    latencyMS,
 			RequestBytes: requestBytes,
 		})
-		writeJSON(w, status, map[string]any{"ok": false, "error": msg})
+		// tool-error shape — non-transport errors use 200 + ok:false.
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": msg})
 		return
 	}
 
@@ -158,6 +128,66 @@ func (h *Handler) imagesGenerateAlt(w http.ResponseWriter, r *http.Request) {
 			"total_tokens":      resp.Usage.TotalTokens,
 		},
 	})
+}
+
+// loadAltGenerationProvider resolves the signed-in user's saved AI
+// provider and validates that it supports vision. ok=false means the
+// JSON error response has already been written and the caller must
+// stop.
+func (h *Handler) loadAltGenerationProvider(w http.ResponseWriter, r *http.Request, userID int64) (*domain.User, ai.Provider, bool) {
+	user, err := h.Store.UserByID(r.Context(), userID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "load user"})
+		return nil, nil, false
+	}
+	provider, err := providerForUser(*user)
+	if err != nil {
+		if errors.Is(err, ai.ErrUnconfigured) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "ai_unconfigured"})
+			return nil, nil, false
+		}
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+		return nil, nil, false
+	}
+	if !provider.SupportsVision() {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "vision_unsupported"})
+		return nil, nil, false
+	}
+	return user, provider, true
+}
+
+// loadAltGenerationImage resolves the image row and maps the not-found
+// case to a 404 JSON response. Any other DB error falls back to a 500
+// JSON so the caller can stop on ok=false.
+func (h *Handler) loadAltGenerationImage(w http.ResponseWriter, r *http.Request, id int64) (*domain.Image, bool) {
+	img, err := h.Store.ImageByID(r.Context(), h.wid(), id)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "not_found"})
+			return nil, false
+		}
+		log.Printf("admin.imagesGenerateAlt: load: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "load_image"})
+		return nil, false
+	}
+	return img, true
+}
+
+// altGenerationErrorCode maps a provider Complete() failure to the
+// short code the JS toast keys off. Unknown errors fall through to
+// err.Error() so the operator still has the raw text to grep.
+func altGenerationErrorCode(err error) string {
+	switch {
+	case errors.Is(err, ai.ErrVisionUnsupported):
+		return "vision_unsupported"
+	case errors.Is(err, ai.ErrTimeout):
+		return "timeout"
+	case errors.Is(err, ai.ErrRateLimited):
+		return "rate_limited"
+	case errors.Is(err, ai.ErrUnauthorized):
+		return "unauthorized"
+	}
+	return err.Error()
 }
 
 // aiCallRecord captures everything we want surfaced in the audit log

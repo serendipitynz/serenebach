@@ -231,21 +231,8 @@ func (h *Handler) settingsAISave(w http.ResponseWriter, r *http.Request) {
 	}
 
 	kindRaw := strings.TrimSpace(r.PostFormValue("ai_kind"))
-	enabled := r.PostFormValue("ai_enabled") == "on"
-
-	updated := *existing
-	if !enabled || kindRaw == "" {
-		updated.AIKind = ""
-		updated.AIBaseURL = ""
-		updated.AIModel = ""
-		updated.AIAPIKeyEnc = ""
-		updated.AIAutoAlt = false
-		if err := h.Store.UpdateUserAIConfig(r.Context(), actor.ID, updated); err != nil {
-			log.Printf("admin.settingsAISave: disable: %v", err)
-			http.Error(w, "failed to save AI config", http.StatusInternalServerError)
-			return
-		}
-		aiFlashRedirect(w, r, "ok", "ai_disabled")
+	if !aiEnabledByForm(r, kindRaw) {
+		h.disableUserAIConfig(w, r, actor.ID, *existing)
 		return
 	}
 
@@ -254,45 +241,20 @@ func (h *Handler) settingsAISave(w http.ResponseWriter, r *http.Request) {
 		aiFlashRedirect(w, r, "err", "ai_invalid_kind")
 		return
 	}
+
+	updated := *existing
 	updated.AIKind = string(kind)
 	updated.AIBaseURL = strings.TrimSpace(r.PostFormValue("ai_base_url"))
 	updated.AIModel = strings.TrimSpace(r.PostFormValue("ai_model"))
 	updated.AIAutoAlt = r.PostFormValue("ai_auto_alt") == "on"
+	updated.AITimeoutSeconds = parseAITimeoutSeconds(r.PostFormValue("ai_timeout_seconds"))
 
-	// Timeout override: 0 (or empty) means "use code defaults"; any
-	// other value is clamped to [1, aiTimeoutMaxSeconds]. Out-of-range
-	// input falls back to 0 silently rather than rejecting the form —
-	// the field is a tuning knob, not a primary required input.
-	timeoutRaw := strings.TrimSpace(r.PostFormValue("ai_timeout_seconds"))
-	if timeoutRaw == "" {
-		updated.AITimeoutSeconds = 0
-	} else if v, perr := strconv.Atoi(timeoutRaw); perr == nil && v >= 1 && v <= aiTimeoutMaxSeconds {
-		updated.AITimeoutSeconds = v
-	} else {
-		updated.AITimeoutSeconds = 0
-	}
-
-	newKey := strings.TrimSpace(r.PostFormValue("ai_api_key"))
-	if newKey != "" {
-		enc, err := ai.Encrypt(newKey)
-		if err != nil {
-			log.Printf("admin.settingsAISave: encrypt: %v", err)
-			aiFlashRedirect(w, r, "err", "ai_encrypt")
-			return
-		}
-		updated.AIAPIKeyEnc = enc
-	}
-
-	if kind == ai.KindClaude && updated.AIAPIKeyEnc == "" {
-		aiFlashRedirect(w, r, "err", "ai_key_required")
+	if errKey := h.applyAIAPIKey(r, &updated); errKey != "" {
+		aiFlashRedirect(w, r, "err", errKey)
 		return
 	}
-	if kind == ai.KindOpenAICompat && updated.AIBaseURL == "" {
-		aiFlashRedirect(w, r, "err", "ai_base_url_required")
-		return
-	}
-	if updated.AIModel == "" {
-		aiFlashRedirect(w, r, "err", "ai_model_required")
+	if errKey := validateAIProviderConfig(kind, updated); errKey != "" {
+		aiFlashRedirect(w, r, "err", errKey)
 		return
 	}
 
@@ -302,6 +264,84 @@ func (h *Handler) settingsAISave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	aiFlashRedirect(w, r, "ok", "ai_saved")
+}
+
+// aiEnabledByForm reports whether the form submission represents an
+// enable request — both the explicit checkbox and a non-empty provider
+// kind must be set.
+func aiEnabledByForm(r *http.Request, kindRaw string) bool {
+	return r.PostFormValue("ai_enabled") == "on" && kindRaw != ""
+}
+
+// disableUserAIConfig clears every AI field on the user's row and
+// persists the result. The handler writes the flash + redirect (or a
+// 500) before returning so the caller just stops.
+func (h *Handler) disableUserAIConfig(w http.ResponseWriter, r *http.Request, userID int64, base domain.User) {
+	updated := base
+	updated.AIKind = ""
+	updated.AIBaseURL = ""
+	updated.AIModel = ""
+	updated.AIAPIKeyEnc = ""
+	updated.AIAutoAlt = false
+	if err := h.Store.UpdateUserAIConfig(r.Context(), userID, updated); err != nil {
+		log.Printf("admin.settingsAISave: disable: %v", err)
+		http.Error(w, "failed to save AI config", http.StatusInternalServerError)
+		return
+	}
+	aiFlashRedirect(w, r, "ok", "ai_disabled")
+}
+
+// parseAITimeoutSeconds interprets the optional timeout override. 0
+// (or empty / malformed / out-of-range input) signals "use code
+// defaults"; any other value is clamped to [1, aiTimeoutMaxSeconds].
+// The field is a tuning knob, not a primary required input, so bad
+// input falls back silently rather than rejecting the form.
+func parseAITimeoutSeconds(raw string) int {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil || v < 1 || v > aiTimeoutMaxSeconds {
+		return 0
+	}
+	return v
+}
+
+// applyAIAPIKey replaces the encrypted key on updated when the form
+// supplied a new one. Blank input leaves the saved value alone (the
+// "leave blank to keep" convention mirrors the password field).
+// Returns an i18n error key when encryption fails so the caller can
+// surface it as a flash.
+func (h *Handler) applyAIAPIKey(r *http.Request, updated *domain.User) string {
+	newKey := strings.TrimSpace(r.PostFormValue("ai_api_key"))
+	if newKey == "" {
+		return ""
+	}
+	enc, err := ai.Encrypt(newKey)
+	if err != nil {
+		log.Printf("admin.settingsAISave: encrypt: %v", err)
+		return "ai_encrypt"
+	}
+	updated.AIAPIKeyEnc = enc
+	return ""
+}
+
+// validateAIProviderConfig enforces the kind-specific requirements:
+// Claude needs an API key (no anonymous Anthropic), openai_compat
+// needs an explicit base URL (it covers self-hosted endpoints), and
+// every kind needs a model name. Returns "" when the config is valid.
+func validateAIProviderConfig(kind ai.Kind, updated domain.User) string {
+	if kind == ai.KindClaude && updated.AIAPIKeyEnc == "" {
+		return "ai_key_required"
+	}
+	if kind == ai.KindOpenAICompat && updated.AIBaseURL == "" {
+		return "ai_base_url_required"
+	}
+	if updated.AIModel == "" {
+		return "ai_model_required"
+	}
+	return ""
 }
 
 // settingsAITest sends a one-line prompt to the caller's configured
