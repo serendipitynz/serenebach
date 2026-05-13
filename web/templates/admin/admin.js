@@ -2050,7 +2050,11 @@
     if (!editor || !action) return;
     var selection = (editor.getSelectedText() || '').trim();
     var full = editor.getValue();
-    var req = { action: action, format: detectEditorFormat(editor) };
+    var req = {
+      action: action,
+      format: detectEditorFormat(editor),
+      language: document.documentElement.lang || 'ja',
+    };
 
     if (action === 'rewrite' || action === 'summarise') {
       if (!selection) {
