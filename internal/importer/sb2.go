@@ -19,7 +19,6 @@ import (
 	"bufio"
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,18 +36,92 @@ import (
 // imported (matching SB3 importer policy); user-authored content is
 // attributed to opts.AuthorID like SB3.
 func importSB2(ctx context.Context, dest *sql.DB, dataDir string, opts Options) (*Report, error) {
-	absDir, err := filepath.Abs(dataDir)
+	absDir, err := resolveSB2DataDir(dataDir)
 	if err != nil {
-		return nil, fmt.Errorf("importer: abs path: %w", err)
+		return nil, err
 	}
-	if st, err := os.Stat(absDir); err != nil || !st.IsDir() {
-		return nil, fmt.Errorf("importer: SB2 data directory not found: %s", absDir)
+	sources, err := readSB2Sources(absDir)
+	if err != nil {
+		return nil, err
 	}
 
-	// Read every source-side table up front. Each helper is read-only
-	// and returns an error only on truly unexpected failure (missing
-	// file is OK for tables that may legitimately be absent — e.g. a
-	// blog with no comments has no message/ directory).
+	tx, err := dest.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("importer: begin tx: %w", err)
+	}
+	defer func() {
+		if tx != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	report := &Report{}
+	if err := verifyDestinationAuthor(ctx, tx, opts.AuthorID); err != nil {
+		return nil, err
+	}
+
+	// configure.cgi → legacy_*. Reuse the SB3 path; SB2 uses the same
+	// InitParser format with the same key names. The sb_config table
+	// arg is unused (no SQLite source) so pass nil and a 0 wid.
+	cfg, err := loadLegacyConfig(ctx, nil, 0, absDir)
+	if err != nil {
+		return nil, err
+	}
+	if err := applySB2WeblogAndConfig(ctx, tx, sources.weblog, cfg, opts, report); err != nil {
+		return nil, err
+	}
+
+	if err := importSB2Templates(ctx, tx, sources.templates, opts, report); err != nil {
+		return nil, err
+	}
+	catMap, err := importSB2Categories(ctx, tx, sources.cats, opts, report)
+	if err != nil {
+		return nil, err
+	}
+	entryMap, err := importSB2Entries(ctx, tx, sources.entries, catMap, opts, report)
+	if err != nil {
+		return nil, err
+	}
+	if err := importSB2Messages(ctx, tx, sources.messages, entryMap, opts); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("importer: commit: %w", err)
+	}
+	tx = nil
+	return report, nil
+}
+
+// resolveSB2DataDir validates that dataDir points at a real directory
+// and returns its absolute path.
+func resolveSB2DataDir(dataDir string) (string, error) {
+	absDir, err := filepath.Abs(dataDir)
+	if err != nil {
+		return "", fmt.Errorf("importer: abs path: %w", err)
+	}
+	if st, err := os.Stat(absDir); err != nil || !st.IsDir() {
+		return "", fmt.Errorf("importer: SB2 data directory not found: %s", absDir)
+	}
+	return absDir, nil
+}
+
+// sb2Sources bundles every source-side table the importer reads up
+// front, so importSB2 doesn't have to thread five values through
+// per-stage error checks.
+type sb2Sources struct {
+	weblog    *sb2Weblog
+	cats      []sb2Category
+	entries   []sb2Entry
+	messages  []sb2Message
+	templates []sb2Template
+}
+
+// readSB2Sources reads every SB2 flat-file table. Each helper is
+// read-only and returns an error only on truly unexpected failure
+// (missing file is OK for tables that may legitimately be absent —
+// e.g. a blog with no comments has no message/ directory).
+func readSB2Sources(absDir string) (*sb2Sources, error) {
 	weblog, err := readSB2Weblog(absDir)
 	if err != nil {
 		return nil, err
@@ -69,70 +142,31 @@ func importSB2(ctx context.Context, dest *sql.DB, dataDir string, opts Options) 
 	if err != nil {
 		return nil, err
 	}
+	return &sb2Sources{
+		weblog:    weblog,
+		cats:      cats,
+		entries:   entries,
+		messages:  messages,
+		templates: templates,
+	}, nil
+}
 
-	tx, err := dest.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("importer: begin tx: %w", err)
-	}
-	defer func() {
-		if tx != nil {
-			_ = tx.Rollback()
-		}
-	}()
-
-	report := &Report{}
-
-	var authorName string
-	if err := tx.QueryRowContext(ctx, `SELECT name FROM users WHERE id = ?`, opts.AuthorID).Scan(&authorName); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("importer: AuthorID %d does not exist in destination — seed an admin user first", opts.AuthorID)
-		}
-		return nil, fmt.Errorf("importer: check author: %w", err)
-	}
-
-	// configure.cgi → legacy_*. Reuse the SB3 path; SB2 uses the same
-	// InitParser format with the same key names. The sb_config table
-	// arg is unused (no SQLite source) so pass nil and a 0 wid.
-	cfg, err := loadLegacyConfig(ctx, nil, 0, absDir)
-	if err != nil {
-		return nil, err
-	}
-
+// applySB2WeblogAndConfig writes the SB2 weblog row (if present) and
+// the resolved legacy URL config into the destination weblog. Missing
+// weblog.cgi surfaces as a report warning, not a hard failure.
+func applySB2WeblogAndConfig(ctx context.Context, tx *sql.Tx, weblog *sb2Weblog, cfg legacyURLConfig, opts Options, report *Report) error {
 	if weblog != nil {
 		now := time.Now().Unix()
 		if _, err := tx.ExecContext(ctx, `
 			UPDATE weblogs SET title = ?, description = ?, updated_at = ? WHERE id = ?`,
 			weblog.Title, weblog.Description, now, opts.TargetWID); err != nil {
-			return nil, fmt.Errorf("importer: update weblog: %w", err)
+			return fmt.Errorf("importer: update weblog: %w", err)
 		}
 		report.WeblogUpdated = true
 	} else {
 		report.Warnings = append(report.Warnings, "SB2 weblog.cgi missing or empty; leaving destination weblog untouched")
 	}
-	if err := applyLegacyConfig(ctx, tx, opts.TargetWID, cfg); err != nil {
-		return nil, err
-	}
-
-	if err := importSB2Templates(ctx, tx, templates, opts, report); err != nil {
-		return nil, err
-	}
-	catMap, err := importSB2Categories(ctx, tx, cats, opts, report)
-	if err != nil {
-		return nil, err
-	}
-	entryMap, err := importSB2Entries(ctx, tx, entries, catMap, opts, report)
-	if err != nil {
-		return nil, err
-	}
-	if err := importSB2Messages(ctx, tx, messages, entryMap, opts); err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("importer: commit: %w", err)
-	}
-	tx = nil
-	return report, nil
+	return applyLegacyConfig(ctx, tx, opts.TargetWID, cfg)
 }
 
 // =============================================================================
