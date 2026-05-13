@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"mime"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -48,18 +49,8 @@ var allowedTemplateAssetMIME = map[string]bool{
 // The CSRF header pattern mirrors the image upload flow so the admin JS
 // can stay on one FormData + X-CSRF-Token recipe.
 func (h *Handler) templateAssetUpload(w http.ResponseWriter, r *http.Request) {
-	tplID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || tplID <= 0 {
-		http.NotFound(w, r)
-		return
-	}
-	// Confirm the template exists + belongs to this weblog.
-	if _, err := h.Store.TemplateByID(r.Context(), h.wid(), tplID); err != nil {
-		if errors.Is(err, repo.ErrNotFound) {
-			http.NotFound(w, r)
-			return
-		}
-		http.Error(w, "failed to load template", http.StatusInternalServerError)
+	tplID, ok := h.loadTemplateForAssetUpload(w, r)
+	if !ok {
 		return
 	}
 
@@ -82,55 +73,17 @@ func (h *Handler) templateAssetUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Sniff the content — don't trust the client Content-Type.
-	head := make([]byte, 512)
-	n, _ := file.Read(head)
-	if _, err := file.Seek(0, 0); err != nil {
-		http.Error(w, tr(r, "common.error.fileReadFailed"), http.StatusInternalServerError)
+	mt, ok := detectTemplateAssetMIME(w, r, file, header)
+	if !ok {
 		return
 	}
-	mt := http.DetectContentType(head[:n])
-	if idx := strings.IndexByte(mt, ';'); idx >= 0 {
-		mt = strings.TrimSpace(mt[:idx])
-	}
-	// Fallback: DetectContentType is conservative (e.g. returns
-	// "text/plain" for a .css file). Try the filename extension when
-	// sniffing lands outside the allowlist.
-	if !allowedTemplateAssetMIME[mt] {
-		mt = templateAssetMIMEFromExt(mt, header.Filename)
-	}
-	if !allowedTemplateAssetMIME[mt] {
-		http.Error(w, trf(r, "common.error.unsupportedMime", mt), http.StatusUnsupportedMediaType)
+	filename, ok := sanitiseTemplateAssetFilename(w, r, header.Filename)
+	if !ok {
 		return
 	}
 
-	// Sanitise the filename — strip path components, drop control bytes.
-	filename := filepath.Base(header.Filename)
-	filename = strings.ReplaceAll(filename, "\x00", "")
-	if filename == "" || filename == "." || filename == ".." {
-		http.Error(w, tr(r, "common.error.invalidFilename"), http.StatusBadRequest)
-		return
-	}
-
-	absDir := filepath.Join(h.TemplateDir, strconv.FormatInt(tplID, 10))
-	if err := os.MkdirAll(absDir, 0o755); err != nil {
-		log.Printf("admin.templateAssetUpload: mkdir: %v", err)
-		http.Error(w, tr(r, "common.error.mkdirFailed"), http.StatusInternalServerError)
-		return
-	}
-	absPath := filepath.Join(absDir, filename)
-	out, err := os.Create(absPath)
-	if err != nil {
-		log.Printf("admin.templateAssetUpload: create: %v", err)
-		http.Error(w, tr(r, "common.error.fileSaveFailed"), http.StatusInternalServerError)
-		return
-	}
-	written, err := io.Copy(out, file)
-	_ = out.Close()
-	if err != nil {
-		_ = os.Remove(absPath)
-		log.Printf("admin.templateAssetUpload: copy: %v", err)
-		http.Error(w, tr(r, "common.error.fileSaveFailed"), http.StatusInternalServerError)
+	absPath, written, ok := h.persistTemplateAssetFile(w, r, tplID, filename, file)
+	if !ok {
 		return
 	}
 
@@ -156,6 +109,93 @@ func (h *Handler) templateAssetUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/templates/%d/edit?ok=asset-uploaded", tplID), http.StatusFound)
+}
+
+// loadTemplateForAssetUpload parses the {id} route param and confirms
+// the template row exists in this weblog. ok=false means the response
+// has already been written (404 or 500) and the caller must stop.
+func (h *Handler) loadTemplateForAssetUpload(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	tplID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || tplID <= 0 {
+		http.NotFound(w, r)
+		return 0, false
+	}
+	if _, err := h.Store.TemplateByID(r.Context(), h.wid(), tplID); err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			http.NotFound(w, r)
+			return 0, false
+		}
+		http.Error(w, "failed to load template", http.StatusInternalServerError)
+		return 0, false
+	}
+	return tplID, true
+}
+
+// detectTemplateAssetMIME sniffs the file's content and falls back to
+// the filename extension when DetectContentType lands outside the
+// allowlist (e.g. .css commonly sniffs as "text/plain"). Writes the
+// appropriate 4xx / 5xx response and returns ok=false on failure.
+func detectTemplateAssetMIME(w http.ResponseWriter, r *http.Request, file io.ReadSeeker, header *multipart.FileHeader) (string, bool) {
+	head := make([]byte, 512)
+	n, _ := file.Read(head)
+	if _, err := file.Seek(0, 0); err != nil {
+		http.Error(w, tr(r, "common.error.fileReadFailed"), http.StatusInternalServerError)
+		return "", false
+	}
+	mt := http.DetectContentType(head[:n])
+	if idx := strings.IndexByte(mt, ';'); idx >= 0 {
+		mt = strings.TrimSpace(mt[:idx])
+	}
+	if !allowedTemplateAssetMIME[mt] {
+		mt = templateAssetMIMEFromExt(mt, header.Filename)
+	}
+	if !allowedTemplateAssetMIME[mt] {
+		http.Error(w, trf(r, "common.error.unsupportedMime", mt), http.StatusUnsupportedMediaType)
+		return "", false
+	}
+	return mt, true
+}
+
+// sanitiseTemplateAssetFilename strips any path components, drops NUL
+// bytes, and rejects the special-case basenames ("", ".", "..") that
+// would resolve to a directory or its parent rather than a file.
+func sanitiseTemplateAssetFilename(w http.ResponseWriter, r *http.Request, raw string) (string, bool) {
+	filename := filepath.Base(raw)
+	filename = strings.ReplaceAll(filename, "\x00", "")
+	if filename == "" || filename == "." || filename == ".." {
+		http.Error(w, tr(r, "common.error.invalidFilename"), http.StatusBadRequest)
+		return "", false
+	}
+	return filename, true
+}
+
+// persistTemplateAssetFile creates the per-template asset directory
+// (idempotent), opens the destination, and copies the uploaded body
+// in. Cleans up a partial file on copy failure so a half-written
+// asset never appears on disk without a matching DB row.
+func (h *Handler) persistTemplateAssetFile(w http.ResponseWriter, r *http.Request, tplID int64, filename string, file io.Reader) (string, int64, bool) {
+	absDir := filepath.Join(h.TemplateDir, strconv.FormatInt(tplID, 10))
+	if err := os.MkdirAll(absDir, 0o755); err != nil {
+		log.Printf("admin.templateAssetUpload: mkdir: %v", err)
+		http.Error(w, tr(r, "common.error.mkdirFailed"), http.StatusInternalServerError)
+		return "", 0, false
+	}
+	absPath := filepath.Join(absDir, filename)
+	out, err := os.Create(absPath)
+	if err != nil {
+		log.Printf("admin.templateAssetUpload: create: %v", err)
+		http.Error(w, tr(r, "common.error.fileSaveFailed"), http.StatusInternalServerError)
+		return "", 0, false
+	}
+	written, err := io.Copy(out, file)
+	_ = out.Close()
+	if err != nil {
+		_ = os.Remove(absPath)
+		log.Printf("admin.templateAssetUpload: copy: %v", err)
+		http.Error(w, tr(r, "common.error.fileSaveFailed"), http.StatusInternalServerError)
+		return "", 0, false
+	}
+	return absPath, written, true
 }
 
 func (h *Handler) templateAssetDelete(w http.ResponseWriter, r *http.Request) {

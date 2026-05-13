@@ -135,13 +135,13 @@ func (h *Handler) templateImportSubmit(w http.ResponseWriter, r *http.Request) {
 
 	if r.MultipartForm == nil {
 		if err := r.ParseMultipartForm(h.uploadMaxBytes()); err != nil {
-			http.Redirect(w, r, root(r)+"/admin/templates/import?err="+urlEscape(tr(r, "templates.import.error.uploadParse")), http.StatusFound)
+			redirectTemplateImportError(w, r, "templates.import.error.uploadParse")
 			return
 		}
 	}
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		http.Redirect(w, r, root(r)+"/admin/templates/import?err="+urlEscape(tr(r, "templates.import.error.fileMissing")), http.StatusFound)
+		redirectTemplateImportError(w, r, "templates.import.error.fileMissing")
 		return
 	}
 	defer file.Close()
@@ -149,11 +149,11 @@ func (h *Handler) templateImportSubmit(w http.ResponseWriter, r *http.Request) {
 	pack, err := templatepack.Parse(file)
 	if err != nil {
 		log.Printf("admin.templateImport: parse: %v", err)
-		http.Redirect(w, r, root(r)+"/admin/templates/import?err="+urlEscape(tr(r, "templates.import.error.parseFailed")), http.StatusFound)
+		redirectTemplateImportError(w, r, "templates.import.error.parseFailed")
 		return
 	}
 	if pack.MainBody == "" {
-		http.Redirect(w, r, root(r)+"/admin/templates/import?err="+urlEscape(tr(r, "templates.import.error.baseRequired")), http.StatusFound)
+		redirectTemplateImportError(w, r, "templates.import.error.baseRequired")
 		return
 	}
 
@@ -171,39 +171,51 @@ func (h *Handler) templateImportSubmit(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Printf("admin.templateImport: create: %v", err)
-		http.Redirect(w, r, root(r)+"/admin/templates/import?err="+urlEscape(tr(r, "templates.import.error.saveFailed")), http.StatusFound)
+		redirectTemplateImportError(w, r, "templates.import.error.saveFailed")
 		return
 	}
 
-	// Write every asset to disk under the new template id, and record
-	// its metadata row. Failures here aren't fatal — the template itself
-	// is already saved; we log and continue so the admin can re-upload
-	// missing assets manually if something goes wrong.
-	absDir := filepath.Join(h.TemplateDir, strconv.FormatInt(newID, 10))
+	h.writeImportedTemplateAssets(r, newID, pack.Assets)
+	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/templates/%d/edit?ok=imported", newID), http.StatusFound)
+}
+
+// redirectTemplateImportError sends the form back to the import page
+// with the localised reason in `?err=`. Keeps the import flow's URL
+// shape in one place instead of repeating the verbose Redirect /
+// urlEscape / tr triple at every guard.
+func redirectTemplateImportError(w http.ResponseWriter, r *http.Request, key string) {
+	http.Redirect(w, r, root(r)+"/admin/templates/import?err="+urlEscape(tr(r, key)), http.StatusFound)
+}
+
+// writeImportedTemplateAssets writes every bundled asset to disk under
+// the new template id and records its metadata row. Failures here are
+// not fatal — the template itself is already saved; we log and
+// continue so the admin can re-upload missing assets manually if
+// something goes wrong with one of them.
+func (h *Handler) writeImportedTemplateAssets(r *http.Request, tplID int64, assets []templatepack.Asset) {
+	absDir := filepath.Join(h.TemplateDir, strconv.FormatInt(tplID, 10))
 	if err := os.MkdirAll(absDir, 0o755); err != nil {
 		log.Printf("admin.templateImport: mkdir: %v", err)
-	} else {
-		for _, a := range pack.Assets {
-			safe := filepath.Base(a.Filename)
-			if safe == "" || safe == "." || safe == ".." {
-				continue
-			}
-			if err := os.WriteFile(filepath.Join(absDir, safe), a.Data, 0o644); err != nil {
-				log.Printf("admin.templateImport: write asset %s: %v", safe, err)
-				continue
-			}
-			if _, err := h.Store.CreateOrReplaceTemplateAsset(r.Context(), domain.TemplateAsset{
-				TemplateID: newID,
-				Filename:   safe,
-				MimeType:   a.MimeType,
-				SizeBytes:  int64(len(a.Data)),
-			}); err != nil {
-				log.Printf("admin.templateImport: register asset %s: %v", safe, err)
-			}
+		return
+	}
+	for _, a := range assets {
+		safe := filepath.Base(a.Filename)
+		if safe == "" || safe == "." || safe == ".." {
+			continue
+		}
+		if err := os.WriteFile(filepath.Join(absDir, safe), a.Data, 0o644); err != nil {
+			log.Printf("admin.templateImport: write asset %s: %v", safe, err)
+			continue
+		}
+		if _, err := h.Store.CreateOrReplaceTemplateAsset(r.Context(), domain.TemplateAsset{
+			TemplateID: tplID,
+			Filename:   safe,
+			MimeType:   a.MimeType,
+			SizeBytes:  int64(len(a.Data)),
+		}); err != nil {
+			log.Printf("admin.templateImport: register asset %s: %v", safe, err)
 		}
 	}
-
-	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/templates/%d/edit?ok=imported", newID), http.StatusFound)
 }
 
 // safeFilenameFallback returns name when it's printable-ASCII-and-safe,
