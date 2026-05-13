@@ -343,10 +343,7 @@ func writeTokenError(w http.ResponseWriter, err, desc string) {
 
 func handleMCPProxy(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-		w.WriteHeader(http.StatusNoContent)
+		writeMCPProxyPreflight(w)
 		return
 	}
 	if r.Method != http.MethodPost {
@@ -354,51 +351,91 @@ func handleMCPProxy(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "only POST is supported", http.StatusMethodNotAllowed)
 		return
 	}
+	if !authenticateMCPProxy(w, r) {
+		return // response already written
+	}
+	body, ok := readMCPProxyBody(w, r)
+	if !ok {
+		return // response already written
+	}
+	req, err := buildMCPUpstreamRequest(r, body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	resp, err := upstreamClient.Do(req)
+	if err != nil {
+		log.Printf("proxy upstream error: %v", err)
+		http.Error(w, "upstream error", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+	forwardMCPUpstreamResponse(w, resp)
+}
 
-	// Extract and validate the OAuth access token from the Authorization header.
-	auth := r.Header.Get("Authorization")
+// writeMCPProxyPreflight responds to the CORS preflight that ChatGPT
+// (and other MCP clients) send before POSTing JSON-RPC payloads.
+func writeMCPProxyPreflight(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// authenticateMCPProxy validates the Bearer access token and writes the
+// appropriate 401 response when it doesn't check out. Returns true when
+// the request is authorised. A side effect: a probabilistic expired-
+// token sweep is kicked off when the store grows past 1000 entries.
+func authenticateMCPProxy(w http.ResponseWriter, r *http.Request) bool {
 	const prefix = "Bearer "
+	auth := r.Header.Get("Authorization")
 	if !strings.HasPrefix(auth, prefix) {
 		w.Header().Set("WWW-Authenticate", `Bearer realm="mcp-oauth-proxy"`)
 		http.Error(w, "authorization required", http.StatusUnauthorized)
-		return
+		return false
 	}
 	accessToken := strings.TrimSpace(auth[len(prefix):])
 	if accessToken == "" {
 		http.Error(w, "empty token", http.StatusUnauthorized)
-		return
+		return false
 	}
-
 	tokenMu.RLock()
 	tr, ok := tokenStore[accessToken]
 	tokenMu.RUnlock()
 	if !ok || time.Now().After(tr.ExpiresAt) {
 		http.Error(w, "invalid or expired token", http.StatusUnauthorized)
-		return
+		return false
 	}
-
 	// Best-effort cleanup of expired tokens (probabilistic sweep).
 	if len(tokenStore) > 1000 && randInt(10) == 0 {
 		go sweepExpiredTokens()
 	}
+	return true
+}
 
+// readMCPProxyBody pulls the JSON-RPC body up to the size cap. Returns
+// (nil, false) and writes a 400 when reading fails.
+func readMCPProxyBody(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
 	if err != nil {
 		http.Error(w, "read body", http.StatusBadRequest)
-		return
+		return nil, false
 	}
 	r.Body.Close()
+	return body, true
+}
 
+// buildMCPUpstreamRequest constructs the POST that forwards the
+// caller's JSON-RPC payload to the upstream Serene Bach /mcp endpoint
+// with the static bearer token attached.
+func buildMCPUpstreamRequest(r *http.Request, body []byte) (*http.Request, error) {
 	upstream, err := url.Parse(upstreamURL + "/mcp")
 	if err != nil {
-		http.Error(w, "upstream misconfiguration", http.StatusInternalServerError)
-		return
+		return nil, fmt.Errorf("upstream misconfiguration")
 	}
-
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, upstream.String(), bytes.NewReader(body))
 	if err != nil {
-		http.Error(w, "build upstream request", http.StatusInternalServerError)
-		return
+		return nil, fmt.Errorf("build upstream request")
 	}
 	req.Header.Set("Authorization", "Bearer "+bearerToken)
 	if ct := r.Header.Get("Content-Type"); ct != "" {
@@ -407,16 +444,14 @@ func handleMCPProxy(w http.ResponseWriter, r *http.Request) {
 	if ae := r.Header.Get("Accept"); ae != "" {
 		req.Header.Set("Accept", ae)
 	}
+	return req, nil
+}
 
-	resp, err := upstreamClient.Do(req)
-	if err != nil {
-		log.Printf("proxy upstream error: %v", err)
-		http.Error(w, "upstream error", http.StatusBadGateway)
-		return
-	}
-	defer resp.Body.Close()
-
-	// Forward headers.
+// forwardMCPUpstreamResponse copies the upstream status, body, and
+// headers (except WWW-Authenticate, which would leak upstream auth
+// hints) back to the caller, plus the CORS allow-origin header so the
+// browser-side MCP client can read it.
+func forwardMCPUpstreamResponse(w http.ResponseWriter, resp *http.Response) {
 	for k, vv := range resp.Header {
 		if k == "WWW-Authenticate" {
 			continue // never leak upstream auth hints
