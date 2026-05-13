@@ -12,9 +12,17 @@ import (
 func TestMCPTokenCRUD(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
-
-	// CreateMCPToken
 	rawToken := "sb_mcp_secret_token_123"
+
+	id := mcpTokenCRUDCreate(t, ctx, s, rawToken)
+	mcpTokenCRUDList(t, ctx, s)
+	mcpTokenCRUDByHash(t, ctx, s, rawToken, id)
+	mcpTokenCRUDTouch(t, ctx, s, id)
+	mcpTokenCRUDRevoke(t, ctx, s, rawToken, id)
+}
+
+func mcpTokenCRUDCreate(t *testing.T, ctx context.Context, s *Store, rawToken string) int64 {
+	t.Helper()
 	id, err := s.CreateMCPToken(ctx, 1, "Test Token", rawToken, domain.MCPScopeRead, 1)
 	if err != nil {
 		t.Fatalf("CreateMCPToken: %v", err)
@@ -22,8 +30,11 @@ func TestMCPTokenCRUD(t *testing.T) {
 	if id == 0 {
 		t.Fatal("expected non-zero id")
 	}
+	return id
+}
 
-	// ListMCPTokens
+func mcpTokenCRUDList(t *testing.T, ctx context.Context, s *Store) {
+	t.Helper()
 	tokens, err := s.ListMCPTokens(ctx, 1)
 	if err != nil {
 		t.Fatalf("ListMCPTokens: %v", err)
@@ -31,7 +42,11 @@ func TestMCPTokenCRUD(t *testing.T) {
 	if len(tokens) != 1 {
 		t.Fatalf("ListMCPTokens len = %d, want 1", len(tokens))
 	}
-	tok := tokens[0]
+	assertMCPTokenFields(t, tokens[0])
+}
+
+func assertMCPTokenFields(t *testing.T, tok domain.MCPToken) {
+	t.Helper()
 	if tok.Name != "Test Token" {
 		t.Errorf("name = %q, want Test Token", tok.Name)
 	}
@@ -44,45 +59,44 @@ func TestMCPTokenCRUD(t *testing.T) {
 	if tok.Prefix == "" || len(tok.Prefix) > 12 {
 		t.Errorf("prefix = %q, want 1-12 chars", tok.Prefix)
 	}
-	if tok.Active() != true {
+	if !tok.Active() {
 		t.Error("expected token to be Active()")
 	}
+}
 
-	// MCPTokenByHash
+func mcpTokenCRUDByHash(t *testing.T, ctx context.Context, s *Store, rawToken string, wantID int64) {
+	t.Helper()
 	hash := HashMCPToken(rawToken)
 	found, err := s.MCPTokenByHash(ctx, hash)
 	if err != nil {
 		t.Fatalf("MCPTokenByHash: %v", err)
 	}
-	if found.ID != id {
-		t.Errorf("MCPTokenByHash id = %d, want %d", found.ID, id)
+	if found.ID != wantID {
+		t.Errorf("MCPTokenByHash id = %d, want %d", found.ID, wantID)
 	}
+}
 
-	// TouchMCPToken
+func mcpTokenCRUDTouch(t *testing.T, ctx context.Context, s *Store, id int64) {
+	t.Helper()
 	if err := s.TouchMCPToken(ctx, id); err != nil {
 		t.Fatalf("TouchMCPToken: %v", err)
 	}
-
-	// Verify TouchMCPToken updated last_used_at
-	tokens2, _ := s.ListMCPTokens(ctx, 1)
-	if tokens2[0].LastUsedAt == 0 {
+	tokens, _ := s.ListMCPTokens(ctx, 1)
+	if tokens[0].LastUsedAt == 0 {
 		t.Error("expected LastUsedAt > 0 after TouchMCPToken")
 	}
+}
 
-	// RevokeMCPToken
+func mcpTokenCRUDRevoke(t *testing.T, ctx context.Context, s *Store, rawToken string, id int64) {
+	t.Helper()
 	if err := s.RevokeMCPToken(ctx, 1, id); err != nil {
 		t.Fatalf("RevokeMCPToken: %v", err)
 	}
-
-	// After revoke: Active() should be false
-	tokens3, _ := s.ListMCPTokens(ctx, 1)
-	if tokens3[0].Active() {
+	tokens, _ := s.ListMCPTokens(ctx, 1)
+	if tokens[0].Active() {
 		t.Error("expected token to be inactive after revoke")
 	}
-
-	// MCPTokenByHash should return ErrNotFound for revoked token
-	_, err = s.MCPTokenByHash(ctx, hash)
-	if !errors.Is(err, ErrNotFound) {
+	if _, err := s.MCPTokenByHash(ctx, HashMCPToken(rawToken)); !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for revoked token, got %v", err)
 	}
 }
