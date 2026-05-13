@@ -129,14 +129,11 @@ func importSB3(ctx context.Context, dest *sql.DB, sourcePath string, opts Option
 	if err != nil {
 		return nil, fmt.Errorf("importer: abs path: %w", err)
 	}
-	src, err := sql.Open("sqlite", "file:"+absPath+"?mode=ro&_pragma=query_only(true)")
+	src, err := openSB3Source(ctx, absPath)
 	if err != nil {
-		return nil, fmt.Errorf("importer: open source: %w", err)
+		return nil, err
 	}
 	defer src.Close()
-	if err := src.PingContext(ctx); err != nil {
-		return nil, fmt.Errorf("importer: ping source: %w", err)
-	}
 
 	tx, err := dest.BeginTx(ctx, nil)
 	if err != nil {
@@ -149,25 +146,15 @@ func importSB3(ctx context.Context, dest *sql.DB, sourcePath string, opts Option
 	}()
 
 	report := &Report{}
-
-	// Fail fast if the target author doesn't exist.
-	var authorName string
-	if err := tx.QueryRowContext(ctx, `SELECT name FROM users WHERE id = ?`, opts.AuthorID).Scan(&authorName); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("importer: AuthorID %d does not exist in destination — seed an admin user first", opts.AuthorID)
-		}
-		return nil, fmt.Errorf("importer: check author: %w", err)
+	if err := verifyDestinationAuthor(ctx, tx, opts.AuthorID); err != nil {
+		return nil, err
 	}
 
 	sb3WID, err := importWeblog(ctx, src, tx, opts, report)
 	if err != nil {
 		return nil, err
 	}
-	dataDir := opts.DataDir
-	if dataDir == "" {
-		dataDir = detectDataDir(absPath)
-	}
-	cfg, err := loadLegacyConfig(ctx, src, sb3WID, dataDir)
+	cfg, err := loadLegacyConfig(ctx, src, sb3WID, resolveSB3DataDir(opts.DataDir, absPath))
 	if err != nil {
 		return nil, err
 	}
@@ -190,6 +177,43 @@ func importSB3(ctx context.Context, dest *sql.DB, sourcePath string, opts Option
 	}
 	tx = nil
 	return report, nil
+}
+
+// openSB3Source opens absPath as a read-only SB3 SQLite source and
+// pings it. Returned *sql.DB is the caller's responsibility to Close.
+func openSB3Source(ctx context.Context, absPath string) (*sql.DB, error) {
+	src, err := sql.Open("sqlite", "file:"+absPath+"?mode=ro&_pragma=query_only(true)")
+	if err != nil {
+		return nil, fmt.Errorf("importer: open source: %w", err)
+	}
+	if err := src.PingContext(ctx); err != nil {
+		_ = src.Close()
+		return nil, fmt.Errorf("importer: ping source: %w", err)
+	}
+	return src, nil
+}
+
+// resolveSB3DataDir returns the explicit override when non-empty, else
+// auto-detects from absPath. Encapsulates the empty-string branch so
+// callers don't have to.
+func resolveSB3DataDir(explicit, absPath string) string {
+	if explicit != "" {
+		return explicit
+	}
+	return detectDataDir(absPath)
+}
+
+// verifyDestinationAuthor fails fast when opts.AuthorID does not refer
+// to an existing user row. Shared by both SB2 and SB3 importers.
+func verifyDestinationAuthor(ctx context.Context, tx *sql.Tx, authorID int64) error {
+	var name string
+	if err := tx.QueryRowContext(ctx, `SELECT name FROM users WHERE id = ?`, authorID).Scan(&name); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("importer: AuthorID %d does not exist in destination — seed an admin user first", authorID)
+		}
+		return fmt.Errorf("importer: check author: %w", err)
+	}
+	return nil
 }
 
 // importWeblog copies the first source weblog's title/description and
