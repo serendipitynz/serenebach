@@ -227,8 +227,22 @@ func (s *Store) TopEntries(ctx context.Context, mainDB *sql.DB, since time.Time,
 	if s == nil || s.db == nil {
 		return nil, nil
 	}
-	// Step 1: views per entry in the window. Always computed — likes /
-	// stamps sort modes also display the current view count.
+	viewsByID, err := s.collectEntryViews(ctx, since)
+	if err != nil {
+		return nil, err
+	}
+	sort, orderClause := resolveTopEntrySort(sort, mainDB)
+	ids, likesByID, stampsByID, err := loadTopEntryIDs(ctx, mainDB, sort, orderClause, viewsByID, limit)
+	if err != nil {
+		return nil, err
+	}
+	return buildEntryHits(ids, viewsByID, likesByID, stampsByID), nil
+}
+
+// collectEntryViews counts page_views per entry in the window. Always
+// computed — likes / stamps sort modes also display the current view
+// count.
+func (s *Store) collectEntryViews(ctx context.Context, since time.Time) (map[int64]int64, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT entry_id, COUNT(*) AS c
 		FROM page_views
@@ -249,54 +263,67 @@ func (s *Store) TopEntries(ctx context.Context, mainDB *sql.DB, since time.Time,
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	return viewsByID, nil
+}
 
-	// Step 2: build the ordered list. For views-sort we just read from
-	// the map; for likes/stamps we need the full set of entries so an
-	// entry with zero views but many reactions still appears.
+// resolveTopEntrySort normalises sort and returns the matching ORDER BY
+// clause. Engagement sorts silently degrade to views when mainDB is
+// nil — without the main DB we cannot read likes_count / stamps_count,
+// but the caller still wants *something* useful back.
+func resolveTopEntrySort(sort TopEntrySort, mainDB *sql.DB) (TopEntrySort, string) {
 	if sort != SortByLikes && sort != SortByStamps {
 		sort = SortByViews
 	}
-
-	var orderClause string
+	if mainDB == nil && (sort == SortByLikes || sort == SortByStamps) {
+		sort = SortByViews
+	}
 	switch sort {
 	case SortByLikes:
-		orderClause = "likes_count DESC, id DESC"
+		return sort, "likes_count DESC, id DESC"
 	case SortByStamps:
-		orderClause = "stamps_count DESC, id DESC"
+		return sort, "stamps_count DESC, id DESC"
 	default:
-		orderClause = "id DESC" // views sort is applied client-side below
+		return SortByViews, "id DESC" // views sort is applied client-side
 	}
+}
 
-	// For likes/stamps sort, pull the candidate pool via the main DB.
-	// For views sort we only need entries present in viewsByID.
-	var ids []int64
+// loadTopEntryIDs returns the ordered entry id list plus likes/stamps
+// maps for the chosen sort mode. For likes/stamps sort we pull the
+// candidate pool via the main DB so an entry with zero views but many
+// reactions still appears; for views sort we only need entries present
+// in viewsByID.
+func loadTopEntryIDs(
+	ctx context.Context,
+	mainDB *sql.DB,
+	sort TopEntrySort,
+	orderClause string,
+	viewsByID map[int64]int64,
+	limit int,
+) ([]int64, map[int64]int64, map[int64]int64, error) {
 	likesByID := map[int64]int64{}
 	stampsByID := map[int64]int64{}
-
 	if sort == SortByLikes || sort == SortByStamps {
-		if mainDB == nil {
-			// Engagement sorts need the main DB to read likes_count /
-			// stamps_count. Without it, fall back to a views-only listing
-			// so the caller still sees something useful.
-			sort = SortByViews
-		}
-	}
-
-	if sort == SortByLikes || sort == SortByStamps {
+		var ids []int64
 		if err := loadEngagementByOrder(ctx, mainDB, orderClause, limit, &ids, likesByID, stampsByID); err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
-	} else {
-		var err error
-		ids, err = collectViewsSortedIDs(ctx, mainDB, viewsByID, limit, likesByID, stampsByID)
-		if err != nil {
-			return nil, err
-		}
-		if len(ids) == 0 {
-			return nil, nil
-		}
+		return ids, likesByID, stampsByID, nil
 	}
+	ids, err := collectViewsSortedIDs(ctx, mainDB, viewsByID, limit, likesByID, stampsByID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return ids, likesByID, stampsByID, nil
+}
 
+// buildEntryHits zips the id list together with the views / likes /
+// stamps maps. Returns nil (not an empty slice) on an empty id list so
+// the views-sort "no rows" caller keeps seeing the historical nil
+// return.
+func buildEntryHits(ids []int64, viewsByID, likesByID, stampsByID map[int64]int64) []EntryHit {
+	if len(ids) == 0 {
+		return nil
+	}
 	out := make([]EntryHit, 0, len(ids))
 	for _, id := range ids {
 		out = append(out, EntryHit{
@@ -306,7 +333,7 @@ func (s *Store) TopEntries(ctx context.Context, mainDB *sql.DB, since time.Time,
 			Stamps:  stampsByID[id],
 		})
 	}
-	return out, nil
+	return out
 }
 
 // sortByValueDesc sorts ids in place by descending values[id]; ties
