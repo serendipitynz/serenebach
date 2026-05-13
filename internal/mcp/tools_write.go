@@ -380,6 +380,18 @@ func (s *Server) entryPayload(ctx context.Context, id int64) (string, error) {
 // error so the caller can surface the validation message before the
 // repo write.
 func applyEntryUpdates(entry domain.Entry, args updateEntryArgs) (domain.Entry, error) {
+	applyEntrySimpleFields(&entry, args)
+	if err := applyEntryParsedFields(&entry, args); err != nil {
+		return entry, err
+	}
+	return entry, nil
+}
+
+// applyEntrySimpleFields copies every field where the contract is just
+// "non-nil pointer → use this value". Format is the one exception that
+// also rejects an empty string, to avoid wiping the format hint when a
+// caller passes "" by accident.
+func applyEntrySimpleFields(entry *domain.Entry, args updateEntryArgs) {
 	if args.Title != nil {
 		entry.Title = *args.Title
 	}
@@ -398,34 +410,41 @@ func applyEntryUpdates(entry domain.Entry, args updateEntryArgs) (domain.Entry, 
 	if args.CategoryID != nil {
 		entry.CategoryID = *args.CategoryID
 	}
-	if args.Slug != nil {
-		slug, err := normaliseSlug(args.Slug)
-		if err != nil {
-			return entry, err
-		}
-		entry.Slug = slug
-	}
-	if args.Status != nil {
-		status, err := parseEntryStatus(args.Status, entry.Status)
-		if err != nil {
-			return entry, err
-		}
-		entry.Status = status
-	}
-	if args.PostedAt != nil {
-		t, err := parsePostedAt(args.PostedAt, entry.PostedAt)
-		if err != nil {
-			return entry, err
-		}
-		entry.PostedAt = t
-	}
 	if args.Pinned != nil {
 		entry.Pinned = *args.Pinned
 	}
 	if args.AcceptComments != nil {
 		entry.AcceptComments = *args.AcceptComments
 	}
-	return entry, nil
+}
+
+// applyEntryParsedFields handles the three fields that need parsing /
+// validation before being assigned: slug, status, posted_at. Any
+// failure is surfaced verbatim so the caller can return it as a
+// validation error to the MCP client.
+func applyEntryParsedFields(entry *domain.Entry, args updateEntryArgs) error {
+	if args.Slug != nil {
+		slug, err := normaliseSlug(args.Slug)
+		if err != nil {
+			return err
+		}
+		entry.Slug = slug
+	}
+	if args.Status != nil {
+		status, err := parseEntryStatus(args.Status, entry.Status)
+		if err != nil {
+			return err
+		}
+		entry.Status = status
+	}
+	if args.PostedAt != nil {
+		t, err := parsePostedAt(args.PostedAt, entry.PostedAt)
+		if err != nil {
+			return err
+		}
+		entry.PostedAt = t
+	}
+	return nil
 }
 
 func parseEntryStatus(raw *string, fallback domain.EntryStatus) (domain.EntryStatus, error) {
