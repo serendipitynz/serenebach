@@ -10,12 +10,16 @@ import (
 	"github.com/serendipitynz/serenebach/internal/domain"
 )
 
+// customTagColumns is the canonical column list for the site_custom_tags
+// table. Order must match the inline Scan call sites.
+const customTagColumns = `id, wid, name, value, created_at, updated_at`
+
 // ---- custom tags ---------------------------------------------------------
 
 // ListCustomTags returns every custom tag for the weblog, ordered by name.
 func (s *Store) ListCustomTags(ctx context.Context, wid int64) ([]domain.CustomTag, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, name, value, created_at, updated_at
+		SELECT `+customTagColumns+`
 		FROM site_custom_tags
 		WHERE wid = ?
 		ORDER BY name`, wid)
@@ -41,7 +45,7 @@ func (s *Store) ListCustomTags(ctx context.Context, wid int64) ([]domain.CustomT
 // CustomTagByID fetches one custom tag row. ErrNotFound on miss.
 func (s *Store) CustomTagByID(ctx context.Context, wid, id int64) (*domain.CustomTag, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, name, value, created_at, updated_at
+		SELECT `+customTagColumns+`
 		FROM site_custom_tags
 		WHERE wid = ? AND id = ?`, wid, id)
 	var ct domain.CustomTag

@@ -12,6 +12,11 @@ import (
 	"github.com/serendipitynz/serenebach/internal/domain"
 )
 
+// mcpTokenColumns is the canonical column list for the mcp_tokens table.
+// Order must match the inline Scan call sites in ListMCPTokens and
+// MCPTokenByHash.
+const mcpTokenColumns = `id, wid, name, token_hash, prefix, scope, author_id, created_at, last_used_at, revoked_at`
+
 // HashMCPToken returns the canonical sha256 hex digest the repo uses to
 // look up an MCP token. Exposed so HTTP middleware can hash incoming
 // Authorization headers before querying.
@@ -59,7 +64,7 @@ func (s *Store) CreateMCPToken(ctx context.Context, wid int64, name, rawToken st
 // that a previously-revoked token is actually dead.
 func (s *Store) ListMCPTokens(ctx context.Context, wid int64) ([]domain.MCPToken, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, name, token_hash, prefix, scope, author_id, created_at, last_used_at, revoked_at
+		SELECT `+mcpTokenColumns+`
 		FROM mcp_tokens WHERE wid = ?
 		ORDER BY created_at DESC, id DESC`, wid)
 	if err != nil {
@@ -90,7 +95,7 @@ func (s *Store) MCPTokenByHash(ctx context.Context, hash string) (*domain.MCPTok
 	var t domain.MCPToken
 	var scope string
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, name, token_hash, prefix, scope, author_id, created_at, last_used_at, revoked_at
+		SELECT `+mcpTokenColumns+`
 		FROM mcp_tokens WHERE token_hash = ? AND revoked_at = 0`, hash).
 		Scan(&t.ID, &t.WID, &t.Name, &t.TokenHash, &t.Prefix, &scope, &t.AuthorID,
 			&t.CreatedAt, &t.LastUsedAt, &t.RevokedAt)

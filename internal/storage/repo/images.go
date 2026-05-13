@@ -10,6 +10,10 @@ import (
 	"github.com/serendipitynz/serenebach/internal/domain"
 )
 
+// imageColumns is the canonical column list for the images table.
+// Order must match scanImages and the inline Scan in ImageByID.
+const imageColumns = `id, wid, uploaded_by, filename, stored_path, thumb_path, mime_type, size_bytes, width, height, alt_text, created_at, updated_at`
+
 // CreateImage inserts a new image row and returns its id. Timestamps default
 // to now. Callers write the file + thumbnail to disk before calling this so
 // the DB row is a pointer to bytes that already exist.
@@ -40,7 +44,7 @@ func (s *Store) ListImagesForAdmin(ctx context.Context, wid int64, limit, offset
 		offset = 0
 	}
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, uploaded_by, filename, stored_path, thumb_path, mime_type, size_bytes, width, height, alt_text, created_at, updated_at
+		SELECT `+imageColumns+`
 		FROM images
 		WHERE wid = ?
 		ORDER BY created_at DESC, id DESC
@@ -66,7 +70,7 @@ func (s *Store) CountImages(ctx context.Context, wid int64) (int64, error) {
 // ImageByID returns one image row. ErrNotFound on miss.
 func (s *Store) ImageByID(ctx context.Context, wid, id int64) (*domain.Image, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, uploaded_by, filename, stored_path, thumb_path, mime_type, size_bytes, width, height, alt_text, created_at, updated_at
+		SELECT `+imageColumns+`
 		FROM images WHERE wid = ? AND id = ?`, wid, id)
 	var img domain.Image
 	var createdAt, updatedAt int64
