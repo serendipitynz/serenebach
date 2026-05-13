@@ -29,7 +29,16 @@ func TestCustomTagCRUD(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
 
-	// Create
+	id := customTagCRUDCreate(t, ctx, s)
+	customTagCRUDList(t, ctx, s)
+	customTagCRUDReadByID(t, ctx, s, id)
+	customTagCRUDUpdate(t, ctx, s, id)
+	customTagCRUDCount(t, ctx, s)
+	customTagCRUDDelete(t, ctx, s, id)
+}
+
+func customTagCRUDCreate(t *testing.T, ctx context.Context, s *Store) int64 {
+	t.Helper()
 	id, err := s.CreateCustomTag(ctx, domain.CustomTag{
 		WID:   1,
 		Name:  "custom_ga",
@@ -41,8 +50,11 @@ func TestCustomTagCRUD(t *testing.T) {
 	if id == 0 {
 		t.Fatal("expected non-zero id")
 	}
+	return id
+}
 
-	// List
+func customTagCRUDList(t *testing.T, ctx context.Context, s *Store) {
+	t.Helper()
 	tags, err := s.ListCustomTags(ctx, 1)
 	if err != nil {
 		t.Fatalf("ListCustomTags: %v", err)
@@ -53,8 +65,10 @@ func TestCustomTagCRUD(t *testing.T) {
 	if tags[0].Name != "custom_ga" || tags[0].Value != "<script>ga</script>" {
 		t.Errorf("unexpected tag: %+v", tags[0])
 	}
+}
 
-	// ByID
+func customTagCRUDReadByID(t *testing.T, ctx context.Context, s *Store, id int64) {
+	t.Helper()
 	got, err := s.CustomTagByID(ctx, 1, id)
 	if err != nil {
 		t.Fatalf("CustomTagByID: %v", err)
@@ -62,8 +76,10 @@ func TestCustomTagCRUD(t *testing.T) {
 	if got.Name != "custom_ga" {
 		t.Errorf("ByID name = %q, want custom_ga", got.Name)
 	}
+}
 
-	// Update
+func customTagCRUDUpdate(t *testing.T, ctx context.Context, s *Store, id int64) {
+	t.Helper()
 	if err := s.UpdateCustomTag(ctx, domain.CustomTag{
 		ID:    id,
 		WID:   1,
@@ -72,12 +88,14 @@ func TestCustomTagCRUD(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("UpdateCustomTag: %v", err)
 	}
-	got, _ = s.CustomTagByID(ctx, 1, id)
+	got, _ := s.CustomTagByID(ctx, 1, id)
 	if got.Name != "custom_ga4" || got.Value != "<script>ga4</script>" {
 		t.Errorf("after update: %+v", got)
 	}
+}
 
-	// Count
+func customTagCRUDCount(t *testing.T, ctx context.Context, s *Store) {
+	t.Helper()
 	c, err := s.CountCustomTags(ctx, 1)
 	if err != nil {
 		t.Fatalf("CountCustomTags: %v", err)
@@ -85,13 +103,14 @@ func TestCustomTagCRUD(t *testing.T) {
 	if c != 1 {
 		t.Errorf("count = %d, want 1", c)
 	}
+}
 
-	// Delete
+func customTagCRUDDelete(t *testing.T, ctx context.Context, s *Store, id int64) {
+	t.Helper()
 	if err := s.DeleteCustomTag(ctx, 1, id); err != nil {
 		t.Fatalf("DeleteCustomTag: %v", err)
 	}
-	_, err = s.CustomTagByID(ctx, 1, id)
-	if !errors.Is(err, ErrNotFound) {
+	if _, err := s.CustomTagByID(ctx, 1, id); !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound after delete, got %v", err)
 	}
 }
