@@ -32,6 +32,13 @@ linters:
     - nestif         # deeply-nested if blocks
     # Complexity batch.
     - gocognit       # cognitive complexity (nesting-weighted)
+    # gocyclo enforces goreportcard's fixed threshold of 15. The
+    # codebase was cleaned up to fit under it (see PRs #61–#74) so
+    # the goreportcard `gocyclo` section sits at 100%. //nolint:gocyclo
+    # is intentionally off-limits: raw gocyclo (= goreportcard) ignores
+    # nolint pragmas, so suppressing here would silently demote the
+    # score. If a function legitimately needs more branches, split it.
+    - gocyclo        # cyclomatic complexity (15-cap, matches goreportcard)
     # Dead-parameter batch.
     - unparam        # parameters / returns that are dead or always the same
     # revive is opted into with a single rule rather than its default
@@ -42,6 +49,11 @@ linters:
     # costs nothing and prevents the same shadowing from creeping back.
     - revive
   settings:
+    gocyclo:
+      # 15 matches the fixed threshold goreportcard.com uses. Anything
+      # higher would let the goreportcard score drift below 100% with
+      # no local signal.
+      min-complexity: 15
     revive:
       # `rules` overrides revive's default ruleset, so listing only
       # `redefines-builtin-id` keeps the other revive rules off.
@@ -84,6 +96,12 @@ linters:
         linters:
           - errcheck
           - gocognit
+          # gocyclo is also relaxed in tests: integration tests stack
+          # sequential setup + assertions that legitimately exceed 15
+          # branches. goreportcard still counts these toward its score,
+          # but the CI guard treats production code as the load-bearing
+          # surface.
+          - gocyclo
           # `unparam` is relaxed for test helpers: a fixture builder
           # whose `entryID` parameter currently always receives 1 is
           # signalling future flexibility, not dead code. The few real

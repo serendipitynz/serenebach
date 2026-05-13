@@ -133,9 +133,9 @@ tasks:
       - go run {{.PKG}} extract-assets --out=./admin-static
 
   lint:
-    desc: Run staticcheck across the module
+    desc: Run golangci-lint across the module (reads .golangci.yml)
     cmds:
-      - go tool staticcheck ./...
+      - golangci-lint run ./...
 
   test:
     desc: Run the Go test suite
