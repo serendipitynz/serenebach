@@ -12,6 +12,18 @@ import (
 	"github.com/serendipitynz/serenebach/internal/domain"
 )
 
+// userProfileColumns is the canonical profile column list for the users
+// table — the subset every reader of users needs, regardless of whether
+// it cares about AI config or auth. Order must match the inline Scan
+// arguments in ListUsers / VisibleProfileUsers / UsersByIDs as well as
+// the leading scan fields in UserByID / UserByName.
+const userProfileColumns = `id, wid, name, display_name, email, role, description, description_format, list_visible, sort_order`
+
+// userAIConfigColumns is the per-user AI provider configuration block,
+// appended to userProfileColumns by UserByID / UserByName so adding a
+// new AI column only has to touch one place.
+const userAIConfigColumns = `ai_kind, ai_base_url, ai_model, ai_api_key_enc, ai_auto_alt, ai_timeout_seconds`
+
 // ErrUserNameInUse is returned when a create / rename call would duplicate
 // an existing user's login name. Callers (the /admin/users form) catch
 // this and re-render with a validation message.
@@ -36,7 +48,7 @@ func IsValidUserName(s string) bool {
 // drag-reorder contract stays uniform.
 func (s *Store) ListUsers(ctx context.Context, wid int64) ([]domain.User, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, name, display_name, email, role, description, description_format, list_visible, sort_order
+		SELECT `+userProfileColumns+`
 		FROM users WHERE wid = ?
 		ORDER BY sort_order, id`, wid)
 	if err != nil {
@@ -252,7 +264,7 @@ func (s *Store) ReorderUsers(ctx context.Context, wid int64, orderedIDs []int64)
 // display order.
 func (s *Store) VisibleProfileUsers(ctx context.Context, wid int64) ([]domain.User, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, name, display_name, email, role, description, description_format, list_visible, sort_order
+		SELECT `+userProfileColumns+`
 		FROM users WHERE wid = ? AND list_visible = 1
 		ORDER BY sort_order, id`, wid)
 	if err != nil {
@@ -295,9 +307,7 @@ func (s *Store) UserByName(ctx context.Context, name string) (*domain.User, stri
 	var listVis int
 	var autoAlt int
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, name, display_name, email, role, description, description_format, list_visible, sort_order,
-		       ai_kind, ai_base_url, ai_model, ai_api_key_enc, ai_auto_alt, ai_timeout_seconds,
-		       password_hash
+		SELECT `+userProfileColumns+`, `+userAIConfigColumns+`, password_hash
 		FROM users WHERE name = ?`, name).Scan(
 		&u.ID, &u.WID, &u.Name, &u.DisplayName, &u.Email, &u.Role, &u.Description, &u.DescriptionFormat, &listVis, &u.SortOrder,
 		&u.AIKind, &u.AIBaseURL, &u.AIModel, &u.AIAPIKeyEnc, &autoAlt, &u.AITimeoutSeconds,
@@ -318,8 +328,7 @@ func (s *Store) UserByID(ctx context.Context, id int64) (*domain.User, error) {
 	var u domain.User
 	var listVis, autoAlt int
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, name, display_name, email, role, description, description_format, list_visible, sort_order,
-		       ai_kind, ai_base_url, ai_model, ai_api_key_enc, ai_auto_alt, ai_timeout_seconds
+		SELECT `+userProfileColumns+`, `+userAIConfigColumns+`
 		FROM users WHERE id = ?`, id).Scan(
 		&u.ID, &u.WID, &u.Name, &u.DisplayName, &u.Email, &u.Role, &u.Description, &u.DescriptionFormat, &listVis, &u.SortOrder,
 		&u.AIKind, &u.AIBaseURL, &u.AIModel, &u.AIAPIKeyEnc, &autoAlt, &u.AITimeoutSeconds)
@@ -348,7 +357,7 @@ func (s *Store) UsersByIDs(ctx context.Context, ids []int64) (map[int64]domain.U
 		placeholders = append(placeholders, '?')
 		args = append(args, id)
 	}
-	q := "SELECT id, wid, name, display_name, email, role, description, description_format, list_visible, sort_order FROM users WHERE id IN (" + string(placeholders) + ")"
+	q := "SELECT " + userProfileColumns + " FROM users WHERE id IN (" + string(placeholders) + ")"
 	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("repo: UsersByIDs: %w", err)
