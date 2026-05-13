@@ -10,6 +10,10 @@ import (
 	"github.com/serendipitynz/serenebach/internal/domain"
 )
 
+// messageColumns is the canonical column list for the messages table.
+// Order must match the Scan argument order in scanMessages.
+const messageColumns = `id, wid, entry_id, status, posted_at, author_name, author_email, author_url, body, ip_address, user_agent`
+
 // CountMessagesByStatus returns how many comments the weblog has at the
 // given status. Used to surface the moderation queue size on the dashboard.
 func (s *Store) CountMessagesByStatus(ctx context.Context, wid int64, status domain.MessageStatus) (int64, error) {
@@ -62,7 +66,7 @@ func (s *Store) CreateMessage(ctx context.Context, m domain.Message) (int64, err
 // posting order (oldest first — readers usually follow threads top-down).
 func (s *Store) ApprovedMessagesByEntry(ctx context.Context, wid, entryID int64) ([]domain.Message, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, entry_id, status, posted_at, author_name, author_email, author_url, body, ip_address, user_agent
+		SELECT `+messageColumns+`
 		FROM messages
 		WHERE wid = ? AND entry_id = ? AND status = ?
 		ORDER BY posted_at ASC, id ASC`,
@@ -84,14 +88,14 @@ func (s *Store) ListMessagesForAdmin(ctx context.Context, wid int64, filter doma
 	switch filter {
 	case domain.MessageWaiting, domain.MessageApproved, domain.MessageHidden:
 		rows, err = s.db.QueryContext(ctx, `
-			SELECT id, wid, entry_id, status, posted_at, author_name, author_email, author_url, body, ip_address, user_agent
+			SELECT `+messageColumns+`
 			FROM messages
 			WHERE wid = ? AND status = ?
 			ORDER BY posted_at DESC
 			LIMIT ?`, wid, filter, limit)
 	default:
 		rows, err = s.db.QueryContext(ctx, `
-			SELECT id, wid, entry_id, status, posted_at, author_name, author_email, author_url, body, ip_address, user_agent
+			SELECT `+messageColumns+`
 			FROM messages
 			WHERE wid = ?
 			ORDER BY posted_at DESC
