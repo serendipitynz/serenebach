@@ -296,21 +296,7 @@ func (h *Handler) parseEntryForm(r *http.Request, base domain.Entry) (domain.Ent
 		return base, tr(r, "entries.form.error.slugInvalid")
 	}
 
-	// Normalise keywords: trim each comma-separated item, drop empties,
-	// re-join with ", " so template output is consistent regardless of
-	// how the author spaced the input.
-	if raw := strings.TrimSpace(r.PostFormValue("keywords")); raw == "" {
-		base.Keywords = ""
-	} else {
-		parts := strings.Split(raw, ",")
-		cleaned := parts[:0]
-		for _, p := range parts {
-			if t := strings.TrimSpace(p); t != "" {
-				cleaned = append(cleaned, t)
-			}
-		}
-		base.Keywords = strings.Join(cleaned, ", ")
-	}
+	base.Keywords = normaliseEntryKeywords(r.PostFormValue("keywords"))
 
 	if fmtRaw := strings.TrimSpace(r.PostFormValue("format")); fmtRaw != "" {
 		base.Format = string(format.Normalize(fmtRaw))
@@ -333,37 +319,84 @@ func (h *Handler) parseEntryForm(r *http.Request, base domain.Entry) (domain.Ent
 		base.AcceptComments = r.PostFormValue("accept_comments") == "1"
 	}
 
-	catRaw := r.PostFormValue("category_id")
-	if catRaw != "" {
-		if v, err := strconv.ParseInt(catRaw, 10, 64); err == nil {
-			base.CategoryID = v
-		} else {
-			return base, tr(r, "entries.form.error.categoryInvalid")
-		}
+	catID, errMsg := parseEntryCategoryID(r, r.PostFormValue("category_id"), base.CategoryID)
+	if errMsg != "" {
+		return base, errMsg
 	}
+	base.CategoryID = catID
 
-	statusRaw := r.PostFormValue("status")
-	switch statusRaw {
-	case "0":
-		base.Status = domain.EntryDraft
-	case "1":
-		base.Status = domain.EntryPublished
-	case "-1":
-		base.Status = domain.EntryClosed
-	default:
-		return base, tr(r, "entries.form.error.statusInvalid")
+	status, errMsg := parseEntryStatus(r, r.PostFormValue("status"))
+	if errMsg != "" {
+		return base, errMsg
 	}
+	base.Status = status
 
-	postedRaw := r.PostFormValue("posted_at")
-	if postedRaw != "" {
-		if t, err := time.ParseInLocation("2006-01-02T15:04", postedRaw, h.tz()); err == nil {
-			base.PostedAt = t
-		} else {
-			return base, tr(r, "entries.form.error.postedAtInvalid")
-		}
+	postedAt, errMsg := h.parseEntryPostedAt(r, r.PostFormValue("posted_at"), base.PostedAt)
+	if errMsg != "" {
+		return base, errMsg
 	}
+	base.PostedAt = postedAt
 
 	return base, ""
+}
+
+// normaliseEntryKeywords trims each comma-separated item, drops empty
+// entries, and re-joins with ", " so template output stays consistent
+// regardless of how the author spaced the original input.
+func normaliseEntryKeywords(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	parts := strings.Split(raw, ",")
+	cleaned := parts[:0]
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			cleaned = append(cleaned, t)
+		}
+	}
+	return strings.Join(cleaned, ", ")
+}
+
+// parseEntryCategoryID accepts the raw category_id form value and
+// returns the parsed id (or the fallback when the input is empty).
+// Non-numeric input surfaces the localised "categoryInvalid" message
+// so the caller can flash it back.
+func parseEntryCategoryID(r *http.Request, raw string, fallback int64) (int64, string) {
+	if raw == "" {
+		return fallback, ""
+	}
+	v, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return fallback, tr(r, "entries.form.error.categoryInvalid")
+	}
+	return v, ""
+}
+
+func parseEntryStatus(r *http.Request, raw string) (domain.EntryStatus, string) {
+	switch raw {
+	case "0":
+		return domain.EntryDraft, ""
+	case "1":
+		return domain.EntryPublished, ""
+	case "-1":
+		return domain.EntryClosed, ""
+	}
+	return 0, tr(r, "entries.form.error.statusInvalid")
+}
+
+// parseEntryPostedAt accepts a "2006-01-02T15:04" datetime-local input
+// in the weblog's timezone. Empty input keeps the existing posted_at;
+// malformed input surfaces the localised "postedAtInvalid" message.
+func (h *Handler) parseEntryPostedAt(r *http.Request, raw string, fallback time.Time) (time.Time, string) {
+	if raw == "" {
+		return fallback, ""
+	}
+	t, err := time.ParseInLocation("2006-01-02T15:04", raw, h.tz())
+	if err != nil {
+		return fallback, tr(r, "entries.form.error.postedAtInvalid")
+	}
+	return t, ""
 }
 
 func (h *Handler) entryCreate(w http.ResponseWriter, r *http.Request) {
