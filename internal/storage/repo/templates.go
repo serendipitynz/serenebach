@@ -10,6 +10,18 @@ import (
 	"github.com/serendipitynz/serenebach/internal/domain"
 )
 
+// templateColumns is the canonical column list for the templates table
+// when callers need the full row (sort_order + timestamps included).
+// Used by TemplateByID and ListTemplatesForAdmin. ActiveTemplate runs
+// on every public render and intentionally pulls a narrower 8-column
+// subset, so it does not share this constant.
+const templateColumns = `id, wid, name, is_active, main_body, entry_body, css, info, sort_order, created_at, updated_at`
+
+// templateAssetColumns is the canonical column list for the
+// template_assets table. Order must match the inline Scan call sites
+// in ListTemplateAssets and TemplateAssetByID.
+const templateAssetColumns = `id, template_id, filename, mime_type, size_bytes, created_at, updated_at`
+
 // ErrTemplateActive is returned when DeleteTemplate is called on the row
 // currently flagged is_active. The site needs at least one active row to
 // render with, so callers must activate a different template first.
@@ -39,7 +51,7 @@ func (s *Store) ActiveTemplate(ctx context.Context, wid int64) (*domain.Template
 // TemplateByID fetches one template row by id. ErrNotFound on miss.
 func (s *Store) TemplateByID(ctx context.Context, wid, id int64) (*domain.Template, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, name, is_active, main_body, entry_body, css, info, sort_order, created_at, updated_at
+		SELECT `+templateColumns+`
 		FROM templates WHERE wid = ? AND id = ?`, wid, id)
 	t := &domain.Template{}
 	var active int
@@ -62,7 +74,7 @@ func (s *Store) TemplateByID(ctx context.Context, wid, id int64) (*domain.Templa
 // lets the admin activate / reorder / delete rows.
 func (s *Store) ListTemplatesForAdmin(ctx context.Context, wid int64) ([]domain.Template, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, name, is_active, main_body, entry_body, css, info, sort_order, created_at, updated_at
+		SELECT `+templateColumns+`
 		FROM templates
 		WHERE wid = ?
 		ORDER BY sort_order, id`, wid)
@@ -125,7 +137,7 @@ func (s *Store) CreateOrReplaceTemplateAsset(ctx context.Context, a domain.Templ
 // newest first so re-uploads surface at the top of the admin panel.
 func (s *Store) ListTemplateAssets(ctx context.Context, templateID int64) ([]domain.TemplateAsset, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, template_id, filename, mime_type, size_bytes, created_at, updated_at
+		SELECT `+templateAssetColumns+`
 		FROM template_assets
 		WHERE template_id = ?
 		ORDER BY created_at DESC, id DESC`, templateID)
@@ -152,7 +164,7 @@ func (s *Store) TemplateAssetByID(ctx context.Context, id int64) (*domain.Templa
 	var a domain.TemplateAsset
 	var createdAt, updatedAt int64
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, template_id, filename, mime_type, size_bytes, created_at, updated_at
+		SELECT `+templateAssetColumns+`
 		FROM template_assets WHERE id = ?`, id).
 		Scan(&a.ID, &a.TemplateID, &a.Filename, &a.MimeType, &a.SizeBytes, &createdAt, &updatedAt)
 	if err != nil {
