@@ -35,37 +35,11 @@ func (h *Handler) renderList(w http.ResponseWriter, r *http.Request, entries []d
 		return
 	}
 	preview := previewFromRequest(r)
-	// Per-category template pin beats the archive pin. Stale / missing
-	// id silently falls through to the normal resolver rather than
-	// breaking the page — operators see the fallback in admin anyway.
-	var tmpl *domain.Template
-	// Admin preview overrides every other pin (category / archive / use).
-	// Checked first so the operator's explicit request always wins.
-	if preview.TemplateID > 0 {
-		if t, err := h.Store.TemplateByID(ctx, h.WID, preview.TemplateID); err == nil {
-			tmpl = t
-		} else {
-			log.Printf("%s: preview template %d missing, falling back: %v", logTag, preview.TemplateID, err)
-		}
-	}
-	if tmpl == nil && cat != nil && cat.TemplateID != 0 {
-		if t, err := h.Store.TemplateByID(ctx, h.WID, cat.TemplateID); err == nil {
-			tmpl = t
-		} else {
-			log.Printf("%s: category template pin %d missing, falling back: %v", logTag, cat.TemplateID, err)
-		}
-	}
-	if tmpl == nil {
-		var pinID int64
-		if useArchiveTemplate {
-			pinID = weblog.ArchiveTemplateID
-		}
-		tmpl, err = h.pickTemplate(ctx, pinID)
-		if err != nil {
-			log.Printf("%s: load template: %v", logTag, err)
-			http.Error(w, "no active template", http.StatusInternalServerError)
-			return
-		}
+	tmpl, err := h.resolveListTemplate(ctx, logTag, preview, cat, useArchiveTemplate, weblog.ArchiveTemplateID)
+	if err != nil {
+		log.Printf("%s: load template: %v", logTag, err)
+		http.Error(w, "no active template", http.StatusInternalServerError)
+		return
 	}
 	if preview.Active() {
 		markPreviewResponse(w)
@@ -109,6 +83,34 @@ func (h *Handler) renderList(w http.ResponseWriter, r *http.Request, entries []d
 		return
 	}
 	writeHTML(w, body, logTag)
+}
+
+// resolveListTemplate picks the template the list page will render
+// with. Admin preview overrides every other pin (checked first so the
+// operator's explicit request always wins), then a per-category pin
+// (cat.TemplateID), then the archive or active template via
+// pickTemplate. Stale / missing pins log and fall through rather than
+// erroring out the page — operators see the fallback in admin anyway.
+func (h *Handler) resolveListTemplate(ctx context.Context, logTag string, preview previewOverride, cat *domain.Category, useArchiveTemplate bool, archiveTemplateID int64) (*domain.Template, error) {
+	if preview.TemplateID > 0 {
+		if t, err := h.Store.TemplateByID(ctx, h.WID, preview.TemplateID); err == nil {
+			return t, nil
+		} else {
+			log.Printf("%s: preview template %d missing, falling back: %v", logTag, preview.TemplateID, err)
+		}
+	}
+	if cat != nil && cat.TemplateID != 0 {
+		if t, err := h.Store.TemplateByID(ctx, h.WID, cat.TemplateID); err == nil {
+			return t, nil
+		} else {
+			log.Printf("%s: category template pin %d missing, falling back: %v", logTag, cat.TemplateID, err)
+		}
+	}
+	var pinID int64
+	if useArchiveTemplate {
+		pinID = archiveTemplateID
+	}
+	return h.pickTemplate(ctx, pinID)
 }
 
 // pickTemplate resolves the template to render with. When pinID is non-zero
