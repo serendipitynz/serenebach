@@ -62,58 +62,60 @@ func indexTokenEnd(s string, start int) int {
 	return j
 }
 
+// tokenHandler renders a single %Token% body. lang is forwarded for
+// locale-dependent tokens (month / weekday names, ordinals); tokens
+// that ignore it just accept the parameter.
+type tokenHandler func(t time.Time, lang string) string
+
+// tokenHandlers dispatches %Token% names to their renderers. Adding a
+// new SB3 token is a single map entry — no extra switch arm to grow.
+var tokenHandlers = map[string]tokenHandler{
+	"Year":      func(t time.Time, _ string) string { return fmt.Sprintf("%04d", t.Year()) },
+	"YearShort": func(t time.Time, _ string) string { return fmt.Sprintf("%02d", t.Year()%100) },
+	"Mon":       func(t time.Time, _ string) string { return fmt.Sprintf("%02d", int(t.Month())) },
+	"MonNum":    func(t time.Time, _ string) string { return fmt.Sprintf("%d", int(t.Month())) },
+	"MonShort":  func(t time.Time, lang string) string { return monthShort(t.Month(), lang) },
+	"MonLong":   func(t time.Time, lang string) string { return monthLong(t.Month(), lang) },
+	"Day":       func(t time.Time, _ string) string { return fmt.Sprintf("%02d", t.Day()) },
+	"DayShort":  func(t time.Time, _ string) string { return fmt.Sprintf("%d", t.Day()) },
+	"DayOrd":    func(t time.Time, lang string) string { return dayOrdinal(t.Day(), lang) },
+	"Week":      func(t time.Time, lang string) string { return weekShort(t.Weekday(), lang) },
+	"WeekLong":  func(t time.Time, lang string) string { return weekLong(t.Weekday(), lang) },
+	"Hour":      func(t time.Time, _ string) string { return fmt.Sprintf("%02d", t.Hour()) },
+	"Hour24":    func(t time.Time, _ string) string { return fmt.Sprintf("%d", t.Hour()) },
+	"Hour11":    func(t time.Time, _ string) string { return fmt.Sprintf("%02d", t.Hour()%12) },
+	"Hour12":    func(t time.Time, _ string) string { return fmt.Sprintf("%02d", hour12(t)) },
+	"HourAP":    func(t time.Time, _ string) string { return hourAMPM(t) },
+	"Min":       func(t time.Time, _ string) string { return fmt.Sprintf("%02d", t.Minute()) },
+	"Sec":       func(t time.Time, _ string) string { return fmt.Sprintf("%02d", t.Second()) },
+	// Go's %z equivalent: "-0700". time.Time.Format understands it directly.
+	"Zone": func(t time.Time, _ string) string { return t.Format("-0700") },
+}
+
 func token(name string, t time.Time, lang string) (string, bool) {
-	switch name {
-	case "Year":
-		return fmt.Sprintf("%04d", t.Year()), true
-	case "YearShort":
-		return fmt.Sprintf("%02d", t.Year()%100), true
-	case "Mon":
-		return fmt.Sprintf("%02d", int(t.Month())), true
-	case "MonNum":
-		return fmt.Sprintf("%d", int(t.Month())), true
-	case "MonShort":
-		return monthShort(t.Month(), lang), true
-	case "MonLong":
-		return monthLong(t.Month(), lang), true
-	case "Day":
-		return fmt.Sprintf("%02d", t.Day()), true
-	case "DayShort":
-		return fmt.Sprintf("%d", t.Day()), true
-	case "DayOrd":
-		return dayOrdinal(t.Day(), lang), true
-	case "Week":
-		return weekShort(t.Weekday(), lang), true
-	case "WeekLong":
-		return weekLong(t.Weekday(), lang), true
-	case "Hour":
-		return fmt.Sprintf("%02d", t.Hour()), true
-	case "Hour24":
-		return fmt.Sprintf("%d", t.Hour()), true
-	case "Hour11":
-		h := t.Hour() % 12
-		return fmt.Sprintf("%02d", h), true
-	case "Hour12":
-		h := t.Hour() % 12
-		if h == 0 {
-			h = 12
-		}
-		return fmt.Sprintf("%02d", h), true
-	case "HourAP":
-		if t.Hour() < 12 {
-			return "AM", true
-		}
-		return "PM", true
-	case "Min":
-		return fmt.Sprintf("%02d", t.Minute()), true
-	case "Sec":
-		return fmt.Sprintf("%02d", t.Second()), true
-	case "Zone":
-		// Go's %z equivalent: "-0700". time.Time.Format understands
-		// "-0700" directly.
-		return t.Format("-0700"), true
+	h, ok := tokenHandlers[name]
+	if !ok {
+		return "", false
 	}
-	return "", false
+	return h(t, lang), true
+}
+
+// hour12 maps a 24-hour clock to 12-hour form with the midnight/noon
+// "12" fallback that %Hour12% requires. Extracted so the dispatch entry
+// stays a one-liner.
+func hour12(t time.Time) int {
+	h := t.Hour() % 12
+	if h == 0 {
+		h = 12
+	}
+	return h
+}
+
+func hourAMPM(t time.Time) string {
+	if t.Hour() < 12 {
+		return "AM"
+	}
+	return "PM"
 }
 
 var (
