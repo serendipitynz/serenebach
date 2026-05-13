@@ -14,6 +14,17 @@ import (
 	"github.com/serendipitynz/serenebach/internal/domain"
 )
 
+// tagColumns is the canonical column list for the tags table, bare
+// (no table alias prefix). Used by SELECTs that pull from `tags` on
+// its own. Order must match scanTag / scanTags.
+const tagColumns = `id, wid, name, slug, created_at, updated_at`
+
+// tagColumnsQualified is the same column list prefixed with `t.`,
+// used by JOIN queries that alias `tags` as `t`. The entry_id-prefixed
+// variant used by TagsByEntries is left handwritten because it adds
+// a column from the join table.
+const tagColumnsQualified = `t.id, t.wid, t.name, t.slug, t.created_at, t.updated_at`
+
 // tagSlugPattern matches valid tag slug values. Same shape as entry
 // slug so URL rules stay uniform across the site.
 var tagSlugPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
@@ -57,7 +68,7 @@ func DeriveTagSlug(name string) string {
 // the static-rebuild tag loop.
 func (s *Store) AllTags(ctx context.Context, wid int64) ([]domain.Tag, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, name, slug, created_at, updated_at
+		SELECT `+tagColumns+`
 		FROM tags WHERE wid = ?
 		ORDER BY name ASC`, wid)
 	if err != nil {
@@ -74,7 +85,7 @@ func (s *Store) TagBySlug(ctx context.Context, wid int64, slug string) (*domain.
 		return nil, ErrNotFound
 	}
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, name, slug, created_at, updated_at
+		SELECT `+tagColumns+`
 		FROM tags WHERE wid = ? AND slug = ?`, wid, slug)
 	return scanTag(row, "TagBySlug")
 }
@@ -82,7 +93,7 @@ func (s *Store) TagBySlug(ctx context.Context, wid int64, slug string) (*domain.
 // TagByID is the admin-side counterpart used by edit / delete handlers.
 func (s *Store) TagByID(ctx context.Context, wid, id int64) (*domain.Tag, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, name, slug, created_at, updated_at
+		SELECT `+tagColumns+`
 		FROM tags WHERE wid = ? AND id = ?`, wid, id)
 	return scanTag(row, "TagByID")
 }
@@ -239,7 +250,7 @@ func (s *Store) SetEntryTags(ctx context.Context, entryID int64, tagIDs []int64)
 // template layer than checking for nil.
 func (s *Store) TagsByEntry(ctx context.Context, entryID int64) ([]domain.Tag, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT t.id, t.wid, t.name, t.slug, t.created_at, t.updated_at
+		SELECT `+tagColumnsQualified+`
 		FROM tags t
 		JOIN entry_tags et ON et.tag_id = t.id
 		WHERE et.entry_id = ?
@@ -348,7 +359,7 @@ func (s *Store) TagEntryCount(ctx context.Context, tagID int64) (int64, error) {
 // usually addressed by slug would invite inconsistent call sites.
 func (s *Store) tagByName(ctx context.Context, wid int64, name string) (*domain.Tag, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, name, slug, created_at, updated_at
+		SELECT `+tagColumns+`
 		FROM tags WHERE wid = ? AND name = ?`, wid, name)
 	return scanTag(row, "tagByName")
 }

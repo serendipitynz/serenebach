@@ -10,10 +10,14 @@ import (
 	"github.com/serendipitynz/serenebach/internal/domain"
 )
 
+// pageColumns is the canonical column list for the pages table. Order
+// must match the Scan argument order in scanPage / scanPages.
+const pageColumns = `id, wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at`
+
 // PageBySlug returns one page by its slug (including the leading "/").
 func (s *Store) PageBySlug(ctx context.Context, wid int64, slug string) (*domain.Page, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at
+		SELECT `+pageColumns+`
 		FROM pages WHERE wid = ? AND slug = ?`, wid, slug)
 	return scanPage(row)
 }
@@ -21,7 +25,7 @@ func (s *Store) PageBySlug(ctx context.Context, wid int64, slug string) (*domain
 // PageByID returns one page by id.
 func (s *Store) PageByID(ctx context.Context, wid, id int64) (*domain.Page, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at
+		SELECT `+pageColumns+`
 		FROM pages WHERE wid = ? AND id = ?`, wid, id)
 	return scanPage(row)
 }
@@ -29,7 +33,7 @@ func (s *Store) PageByID(ctx context.Context, wid, id int64) (*domain.Page, erro
 // ListPagesForAdmin returns every page for the weblog ordered by sort_order then id.
 func (s *Store) ListPagesForAdmin(ctx context.Context, wid int64) ([]domain.Page, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at
+		SELECT `+pageColumns+`
 		FROM pages WHERE wid = ? ORDER BY sort_order, id`, wid)
 	if err != nil {
 		return nil, fmt.Errorf("repo: ListPagesForAdmin: %w", err)
@@ -41,7 +45,7 @@ func (s *Store) ListPagesForAdmin(ctx context.Context, wid int64) ([]domain.Page
 // PublishedPages returns only published pages, ordered by sort_order then id.
 func (s *Store) PublishedPages(ctx context.Context, wid int64) ([]domain.Page, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at
+		SELECT `+pageColumns+`
 		FROM pages WHERE wid = ? AND status = ? ORDER BY sort_order, id`, wid, domain.PagePublished)
 	if err != nil {
 		return nil, fmt.Errorf("repo: PublishedPages: %w", err)

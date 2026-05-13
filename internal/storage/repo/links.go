@@ -10,12 +10,17 @@ import (
 	"github.com/serendipitynz/serenebach/internal/domain"
 )
 
+// linkColumns is the canonical column list for the links table. Order
+// must match the inline Scan call sites in AllLinks / VisibleLinks /
+// LinkByID.
+const linkColumns = `id, wid, name, url, description, target, kind, parent_id, sort_order, disp, created_at, updated_at`
+
 // AllLinks returns every link row for a weblog, ordered by sort_order.
 // Admin list + public sidebar both iterate in this order; group vs link
 // disambiguation is done by the caller via Link.IsGroup.
 func (s *Store) AllLinks(ctx context.Context, wid int64) ([]domain.Link, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, name, url, description, target, kind, parent_id, sort_order, disp, created_at, updated_at
+		SELECT `+linkColumns+`
 		FROM links WHERE wid = ?
 		ORDER BY sort_order ASC, id ASC`, wid)
 	if err != nil {
@@ -38,7 +43,7 @@ func (s *Store) AllLinks(ctx context.Context, wid int64) ([]domain.Link, error) 
 // visible children; the renderer trims empty groups itself.
 func (s *Store) VisibleLinks(ctx context.Context, wid int64) ([]domain.Link, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, wid, name, url, description, target, kind, parent_id, sort_order, disp, created_at, updated_at
+		SELECT `+linkColumns+`
 		FROM links WHERE wid = ? AND disp = 0
 		ORDER BY sort_order ASC, id ASC`, wid)
 	if err != nil {
@@ -61,7 +66,7 @@ func (s *Store) VisibleLinks(ctx context.Context, wid int64) ([]domain.Link, err
 func (s *Store) LinkByID(ctx context.Context, wid, id int64) (*domain.Link, error) {
 	var l domain.Link
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, wid, name, url, description, target, kind, parent_id, sort_order, disp, created_at, updated_at
+		SELECT `+linkColumns+`
 		FROM links WHERE wid = ? AND id = ?`, wid, id).
 		Scan(&l.ID, &l.WID, &l.Name, &l.URL, &l.Description, &l.Target, &l.Kind, &l.ParentID, &l.SortOrder, &l.Disp, &l.CreatedAt, &l.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
