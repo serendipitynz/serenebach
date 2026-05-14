@@ -35,6 +35,14 @@ type LegacyEntryRef struct {
 	Slug string
 }
 
+// LegacyCategoryRef mirrors LegacyEntryRef for the category dir lookup.
+// The redirect layer prefers slug when set so a redirect from an SB3
+// category dir lands on the canonical /category/<slug>/ surface.
+type LegacyCategoryRef struct {
+	ID   int64
+	Slug string
+}
+
 // WeblogLegacyURLByID loads the legacy URL settings for one weblog. An
 // all-zero result is normal (the weblog was never imported from SB3) and
 // not an error.
@@ -111,25 +119,36 @@ func (s *Store) CategoryIDByLegacyID(ctx context.Context, wid, legacyID int64) (
 	return id, nil
 }
 
-// CategoryIDByLegacyDir resolves an SB3 category_dir to the destination
-// category id. Empty input is rejected for the same reason as
+// CategoryByLegacyDir resolves an SB3 category_dir to the destination
+// category's id + slug. Empty input is rejected for the same reason as
 // EntryByLegacyFile — a default-only-dir blog leaves every row with the
 // global log_path, and we don't want a bare hit at the log root to map
 // to an arbitrary category.
-func (s *Store) CategoryIDByLegacyDir(ctx context.Context, wid int64, dir string) (int64, error) {
+func (s *Store) CategoryByLegacyDir(ctx context.Context, wid int64, dir string) (LegacyCategoryRef, error) {
+	var ref LegacyCategoryRef
 	if dir == "" {
-		return 0, ErrNotFound
+		return ref, ErrNotFound
 	}
-	var id int64
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id FROM categories
+		SELECT id, slug FROM categories
 		WHERE wid = ? AND legacy_dir = ?
-		LIMIT 1`, wid, dir).Scan(&id)
+		LIMIT 1`, wid, dir).Scan(&ref.ID, &ref.Slug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, ErrNotFound
+			return ref, ErrNotFound
 		}
-		return 0, fmt.Errorf("repo: CategoryIDByLegacyDir: %w", err)
+		return ref, fmt.Errorf("repo: CategoryByLegacyDir: %w", err)
 	}
-	return id, nil
+	return ref, nil
+}
+
+// CategoryIDByLegacyDir is a thin wrapper around CategoryByLegacyDir
+// that drops the slug. Retained for callers that only need the id (e.g.
+// the legacy_cgi.go redirect that emits id-form URLs unchanged).
+func (s *Store) CategoryIDByLegacyDir(ctx context.Context, wid int64, dir string) (int64, error) {
+	ref, err := s.CategoryByLegacyDir(ctx, wid, dir)
+	if err != nil {
+		return 0, err
+	}
+	return ref.ID, nil
 }

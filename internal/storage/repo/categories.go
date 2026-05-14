@@ -53,6 +53,54 @@ func (s *Store) CategoryByID(ctx context.Context, wid, id int64) (*domain.Catego
 	return &c, nil
 }
 
+// CategoryBySlug fetches one category row by its slug. Empty input is
+// rejected up-front so the slug-less default (slug = '') doesn't match
+// every category that has no custom slug. When two rows happen to share
+// the same slug the lowest id wins, giving deterministic resolution
+// until admin-side uniqueness validation lands.
+func (s *Store) CategoryBySlug(ctx context.Context, wid int64, slug string) (*domain.Category, error) {
+	if slug == "" {
+		return nil, ErrNotFound
+	}
+	var c domain.Category
+	err := s.db.QueryRowContext(ctx, `
+		SELECT `+categoryColumns+`
+		FROM categories
+		WHERE wid = ? AND slug = ?
+		ORDER BY id LIMIT 1`, wid, slug).Scan(
+		&c.ID, &c.WID, &c.ParentID, &c.Name, &c.Slug, &c.SortOrder, &c.Description, &c.DescriptionFormat, &c.TemplateID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("repo: CategoryBySlug: %w", err)
+	}
+	return &c, nil
+}
+
+// CategorySlugInUse reports whether another category in this weblog
+// already uses the given slug. exceptID lets the admin edit form
+// exclude the row currently being edited (pass 0 on create). Empty
+// slug is reported as "not in use" so the slug-less default doesn't
+// trip uniqueness validation.
+func (s *Store) CategorySlugInUse(ctx context.Context, wid int64, slug string, exceptID int64) (bool, error) {
+	if slug == "" {
+		return false, nil
+	}
+	var id int64
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id FROM categories
+		WHERE wid = ? AND slug = ? AND id <> ?
+		LIMIT 1`, wid, slug, exceptID).Scan(&id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, fmt.Errorf("repo: CategorySlugInUse: %w", err)
+	}
+	return true, nil
+}
+
 // CategoriesByIDs returns the categories matching the given ids as a map
 // keyed by id, so a caller rendering a list of entries can look up each
 // entry's category without N+1 queries.
