@@ -528,6 +528,27 @@ func tagsForEntries(ctx context.Context, store *repo.Store, entries []domain.Ent
 	return out
 }
 
+// adjacentEntries resolves prev/next for a rebuild target. When the
+// target's category is hidden, both are skipped — matching the dynamic
+// permalink handler at internal/handler/public/entry.go so the static
+// deploy never chains a hidden-category entry back into the visible
+// feed. ErrNotFound is collapsed to nil (no neighbour); any other
+// error bubbles up so the rebuild fails loudly.
+func adjacentEntries(ctx context.Context, store *repo.Store, wid int64, e domain.Entry, cat *domain.Category) (*domain.Entry, *domain.Entry, error) {
+	if cat != nil && cat.Hidden {
+		return nil, nil, nil
+	}
+	prev, err := store.PrevPublishedEntry(ctx, wid, e)
+	if err != nil && !errors.Is(err, repo.ErrNotFound) {
+		return nil, nil, fmt.Errorf("rebuild: prev entry %d: %w", e.ID, err)
+	}
+	next, err := store.NextPublishedEntry(ctx, wid, e)
+	if err != nil && !errors.Is(err, repo.ErrNotFound) {
+		return nil, nil, fmt.Errorf("rebuild: next entry %d: %w", e.ID, err)
+	}
+	return prev, next, nil
+}
+
 func writeEntries(ctx context.Context, store *repo.Store, opts Options, site content.Site, tmpl *domain.Template, weblog *domain.Weblog, all []domain.Entry, cats map[int64]domain.Category, users map[int64]domain.User, profileUsers []domain.User, sidebar content.SidebarData, rep *Report) error {
 	for i := range all {
 		e := all[i]
@@ -540,25 +561,9 @@ func writeEntries(ctx context.Context, store *repo.Store, opts Options, site con
 			authorPtr = &u
 		}
 
-		// Adjacent entries. Using AllPublishedEntries (already ordered newest
-		// first) would be faster than round-tripping to the DB, but staying
-		// on the same repo API keeps behaviour identical to the dynamic
-		// permalink handler. Skip prev/next entirely when the entry itself
-		// belongs to a hidden category — the dynamic handler does the same
-		// (internal/handler/public/entry.go) so the static deploy must not
-		// expose a navigation chain back into the visible feed.
-		var prev, next *domain.Entry
-		if catPtr == nil || !catPtr.Hidden {
-			p, err := store.PrevPublishedEntry(ctx, opts.WID, e)
-			if err != nil && !errors.Is(err, repo.ErrNotFound) {
-				return fmt.Errorf("rebuild: prev entry %d: %w", e.ID, err)
-			}
-			prev = p
-			n, err := store.NextPublishedEntry(ctx, opts.WID, e)
-			if err != nil && !errors.Is(err, repo.ErrNotFound) {
-				return fmt.Errorf("rebuild: next entry %d: %w", e.ID, err)
-			}
-			next = n
+		prev, next, err := adjacentEntries(ctx, store, opts.WID, e, catPtr)
+		if err != nil {
+			return err
 		}
 
 		// Approved comments for the entry so static pages also show them.

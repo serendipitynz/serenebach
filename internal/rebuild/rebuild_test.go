@@ -169,15 +169,15 @@ func TestBuildSkipsPrevNextForHiddenCategoryEntry(t *testing.T) {
 		t.Fatalf("read hidden entry page: %v", err)
 	}
 	s := string(body)
-	open := strings.Index(s, `<div class="entry_navi">`)
-	if open < 0 {
+	openIdx := strings.Index(s, `<div class="entry_navi">`)
+	if openIdx < 0 {
 		t.Fatalf("entry_navi region not found in rendered entry; default template changed?\nbody:\n%s", s)
 	}
-	close := strings.Index(s[open:], "</div>")
-	if close < 0 {
+	closeIdx := strings.Index(s[openIdx:], "</div>")
+	if closeIdx < 0 {
 		t.Fatalf("entry_navi region not terminated; body:\n%s", s)
 	}
-	nav := s[open : open+close]
+	nav := s[openIdx : openIdx+closeIdx]
 	for _, leak := range []string{
 		`href="/entry/`, // any prev/next link to a sibling entry
 		"« ",            // navLink prefix for prev
