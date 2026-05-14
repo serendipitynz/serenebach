@@ -90,15 +90,24 @@ func TestAdminTemplateSettingsArchivePinAffectsCategoryPage(t *testing.T) {
 	}
 	archiveID, _ := res.LastInsertId()
 
-	// Find an existing seeded category for the GET target.
-	var catID int64
-	if err := a.DB.QueryRow(`SELECT id FROM categories LIMIT 1`).Scan(&catID); err != nil {
+	// Find an existing seeded category for the GET target. Pick the slug
+	// when present so the request lands on the canonical URL — an id-form
+	// hit redirects to the slug surface and skips the template render.
+	var (
+		catID   int64
+		catSlug string
+	)
+	if err := a.DB.QueryRow(`SELECT id, slug FROM categories LIMIT 1`).Scan(&catID, &catSlug); err != nil {
 		t.Fatal(err)
+	}
+	catKey := catSlug
+	if catKey == "" {
+		catKey = itoa64(catID)
 	}
 
 	// Before the pin: category page renders with the active template
 	// (no ARCHIVE-MARKER substring).
-	before := authedGET(t, a.Handler(), "/category/"+itoa64(catID)+"/", cookies).Body.String()
+	before := authedGET(t, a.Handler(), "/category/"+catKey+"/", cookies).Body.String()
 	if strings.Contains(before, "ARCHIVE-MARKER") {
 		t.Fatalf("ARCHIVE-MARKER leaked into category page before pin")
 	}
@@ -112,7 +121,7 @@ func TestAdminTemplateSettingsArchivePinAffectsCategoryPage(t *testing.T) {
 		t.Fatalf("pin save status = %d", w.Code)
 	}
 
-	after := authedGET(t, a.Handler(), "/category/"+itoa64(catID)+"/", cookies).Body.String()
+	after := authedGET(t, a.Handler(), "/category/"+catKey+"/", cookies).Body.String()
 	if !strings.Contains(after, "ARCHIVE-MARKER") {
 		t.Errorf("category page should use the pinned archive template after settings save; body:\n%s", after)
 	}

@@ -7,11 +7,11 @@ Every route the running server exposes, split between the public surface and the
 | Path | Purpose |
 |---|---|
 | `/` | Home: most recent published entries |
-| `/entry/{id}/` | Single entry permalink with prev / next navigation |
-| `/entry/{id}/comment` | POST target for the comment form |
-| `/entry/{id}/like` | POST target for the like button (monotonic counter, cookie + fingerprint dedup) |
-| `/entry/{id}/stamp` | POST target for stamp reactions (`kind=heart|laugh|wow|party`) |
-| `/category/{id}/` | Entries in one category |
+| `/entry/{key}/` | Single entry permalink with prev / next navigation. `{key}` is the entry's slug when one is set; otherwise the numeric id. A hit on the id-form 301s to the slug surface |
+| `/entry/{key}/comment` | POST target for the comment form |
+| `/entry/{key}/like` | POST target for the like button (monotonic counter, cookie + fingerprint dedup) |
+| `/entry/{key}/stamp` | POST target for stamp reactions (`kind=heart|laugh|wow|party`) |
+| `/category/{key}/` | Entries in one category. `{key}` is the category's slug when one is set; otherwise the numeric id. A hit on the id-form 301s to the slug surface, mirroring the entry route |
 | `/tag/{slug}/` | Entries carrying one tag (tags are author-assigned; see admin tag management) |
 | `/archive/{year}/` | Year archive |
 | `/archive/{year}/{month}/` | Month archive |

@@ -186,6 +186,7 @@ HTML テンプレートは基本的に HTML の要素で構成されます。内
 | `{sb_entry_marking}` | リストページではスクロール用アンカー、個別記事ページでは空 |
 | `{category_name}` | カテゴリー名へのリンク（未分類時は `-`） |
 | `{category_id}` | カテゴリー ID（未分類時は空） |
+| `{category_slug}` | カテゴリーのスラッグ。設定されていれば `/category/<slug>/` の URL セグメントと一致（未設定時は空） |
 | `{category_disp_name}` | カテゴリー表示名（未分類時は `-`） |
 | `{user_name}` | 記事の著者の**ログイン名**（SB3 互換） |
 | `{user_disp_name}` | 記事の著者の表示名 |
@@ -264,6 +265,7 @@ HTML テンプレートは基本的に HTML の要素で構成されます。内
 |---|---|
 | `{category_pagename}` | カテゴリー自身の名前 |
 | `{category_fullname}` | 親チェーン付きフルネーム（`Parent > Child`） |
+| `{category_slug}` | カテゴリーのスラッグ（未設定時は空） |
 | `{category_description}` | カテゴリー説明（フォーマット適用済み HTML） |
 
 ### `archives` ブロック内のタグ

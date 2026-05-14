@@ -117,7 +117,7 @@ func (h *Handler) tryLegacyCategoryDir(w http.ResponseWriter, r *http.Request) b
 	if dir == cfg.LogPath {
 		return false
 	}
-	id, err := h.Store.CategoryIDByLegacyDir(r.Context(), h.WID, dir)
+	ref, err := h.Store.CategoryByLegacyDir(r.Context(), h.WID, dir)
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
 			return false
@@ -125,8 +125,18 @@ func (h *Handler) tryLegacyCategoryDir(w http.ResponseWriter, r *http.Request) b
 		http.Error(w, "lookup failed", http.StatusInternalServerError)
 		return true
 	}
-	http.Redirect(w, r, root(r)+"/category/"+strconv.FormatInt(id, 10)+"/", http.StatusMovedPermanently)
+	http.Redirect(w, r, root(r)+"/category/"+categoryKeyForRef(ref)+"/", http.StatusMovedPermanently)
 	return true
+}
+
+// categoryKeyForRef mirrors categoryKeyFor() but takes the redirect-only
+// LegacyCategoryRef so legacy_static.go and legacy_cgi.go can build
+// canonical URLs without a full domain.Category load.
+func categoryKeyForRef(ref repo.LegacyCategoryRef) string {
+	if ref.Slug != "" {
+		return ref.Slug
+	}
+	return strconv.FormatInt(ref.ID, 10)
 }
 
 // stripLegacyPrefix removes base_path (default "/") then log_path

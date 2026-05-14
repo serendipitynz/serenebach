@@ -331,6 +331,8 @@
   "categories.form.error.parentInvalid": "親カテゴリーの値が不正です。",
   "categories.form.error.parentSelf": "自分自身を親にはできません。",
   "categories.form.error.sortOrderInvalid": "並び順は数値で入力してください。",
+  "categories.form.error.slugInvalid": "スラッグは英小文字・数字・ハイフンで入力してください (例: travel-notes)。",
+  "categories.form.error.slugInUse": "そのスラッグは別のカテゴリーで使われています。",
   "categories.form.error.templateInvalid": "テンプレートの値が不正です。",
 
   "tags.title": "タグ",

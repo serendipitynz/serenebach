@@ -184,6 +184,7 @@ Usable inside and outside the `page` block.
 | `{sb_entry_marking}` | Scroll anchor on list pages; empty on single-entry pages |
 | `{category_name}` | Category name link (`-` when uncategorised) |
 | `{category_id}` | Category ID (empty when uncategorised) |
+| `{category_slug}` | Category slug — matches the `/category/<slug>/` URL segment when set (empty otherwise) |
 | `{category_disp_name}` | Category display name (`-` when uncategorised) |
 | `{user_name}` | Author **login name** (SB3-compatible) |
 | `{user_disp_name}` | Author display name |
@@ -262,6 +263,7 @@ Per-kind stamp counts are available as `{entry_stamps_heart}`, `{entry_stamps_la
 |---|---|
 | `{category_pagename}` | The category's own name |
 | `{category_fullname}` | Full name with parent chain (`Parent > Child`) |
+| `{category_slug}` | Category slug (empty when unset) |
 | `{category_description}` | Category description (format-rendered HTML) |
 
 ### Tags inside the `archives` block

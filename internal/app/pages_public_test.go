@@ -112,7 +112,7 @@ func TestPublicFlatPageDoesNotLeakIntoHomeOrCategory(t *testing.T) {
 	}
 
 	// Category page must not show the flat page
-	cat := httptest.NewRequest("GET", "/category/1", nil)
+	cat := httptest.NewRequest("GET", "/category/news", nil)
 	rc := httptest.NewRecorder()
 	a.Handler().ServeHTTP(rc, cat)
 	if rc.Code != 200 {

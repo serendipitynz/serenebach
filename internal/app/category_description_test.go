@@ -55,7 +55,7 @@ func TestCategoryDescriptionSurfacesOnPublicPage(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
-	a.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/category/1/", nil))
+	a.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/category/news/", nil))
 	if w.Code != 200 {
 		t.Fatalf("category page status = %d", w.Code)
 	}
@@ -109,7 +109,7 @@ func TestCategoryTemplatePinOverridesArchivePin(t *testing.T) {
 
 	// The category page now uses the pinned template.
 	w = httptest.NewRecorder()
-	a.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/category/1/", nil))
+	a.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/category/news/", nil))
 	if w.Code != 200 {
 		t.Fatalf("category status = %d", w.Code)
 	}

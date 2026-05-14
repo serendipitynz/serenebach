@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -222,6 +223,25 @@ func filterParents(all []domain.Category, selfID int64) []domain.Category {
 	return out
 }
 
+// validateCategorySlugUnique returns (i18nKey, err). When the slug is
+// empty or unused the key is empty (no error to surface). On a hit it
+// returns the form-field i18n key so the caller can re-render the
+// edit/create form with a localised message. exceptID lets updates
+// skip the row being edited (pass 0 on create).
+func (h *Handler) validateCategorySlugUnique(ctx context.Context, slug string, exceptID int64) (string, error) {
+	if slug == "" {
+		return "", nil
+	}
+	inUse, err := h.Store.CategorySlugInUse(ctx, h.wid(), slug, exceptID)
+	if err != nil {
+		return "", err
+	}
+	if inUse {
+		return "categories.form.error.slugInUse", nil
+	}
+	return "", nil
+}
+
 // ---- create / update --------------------------------------------------
 
 // parseCategoryForm pulls the name / slug / parent / sort-order off a
@@ -236,7 +256,15 @@ func parseCategoryForm(r *http.Request, base domain.Category) (domain.Category, 
 	if base.Name == "" {
 		return base, tr(r, "categories.form.error.nameRequired")
 	}
+	// Slug is optional. Empty means "fall back to /category/<id>/" — the
+	// canonical path in that case. When filled, validate the format here
+	// so the rest of the pipeline (router, rebuild, sbtemplate) can rely
+	// on a URL-safe value. Duplicate detection happens at the caller so
+	// it can pass the row id being edited as the exception.
 	base.Slug = strings.TrimSpace(r.PostFormValue("slug"))
+	if base.Slug != "" && !domain.IsValidSlug(base.Slug) {
+		return base, tr(r, "categories.form.error.slugInvalid")
+	}
 
 	if raw := strings.TrimSpace(r.PostFormValue("parent_id")); raw != "" {
 		v, err := strconv.ParseInt(raw, 10, 64)
@@ -278,6 +306,14 @@ func (h *Handler) categoryCreate(w http.ResponseWriter, r *http.Request) {
 		h.renderCategoryForm(w, r, "/admin/categories/new", cat, 0, errMsg, tr(r, "categories.form.titleNewPlain"), "category-new")
 		return
 	}
+	if msg, err := h.validateCategorySlugUnique(r.Context(), cat.Slug, 0); err != nil {
+		log.Printf("admin.categoryCreate: slug uniqueness: %v", err)
+		http.Error(w, "failed to validate slug", http.StatusInternalServerError)
+		return
+	} else if msg != "" {
+		h.renderCategoryForm(w, r, "/admin/categories/new", cat, 0, tr(r, msg), tr(r, "categories.form.titleNewPlain"), "category-new")
+		return
+	}
 	if _, err := h.Store.CreateCategory(r.Context(), cat, cat.SortOrder); err != nil {
 		log.Printf("admin.categoryCreate: %v", err)
 		http.Error(w, "failed to create category", http.StatusInternalServerError)
@@ -307,6 +343,15 @@ func (h *Handler) categoryUpdate(w http.ResponseWriter, r *http.Request) {
 	if errMsg != "" {
 		count, _ := h.Store.CountEntriesByCategory(r.Context(), h.wid(), id)
 		h.renderCategoryForm(w, r, fmt.Sprintf("/admin/categories/%d/edit", id), cat, count, errMsg, tr(r, "categories.form.titleEditPlain"), "categories")
+		return
+	}
+	if msg, err := h.validateCategorySlugUnique(r.Context(), cat.Slug, id); err != nil {
+		log.Printf("admin.categoryUpdate: slug uniqueness: %v", err)
+		http.Error(w, "failed to validate slug", http.StatusInternalServerError)
+		return
+	} else if msg != "" {
+		count, _ := h.Store.CountEntriesByCategory(r.Context(), h.wid(), id)
+		h.renderCategoryForm(w, r, fmt.Sprintf("/admin/categories/%d/edit", id), cat, count, tr(r, msg), tr(r, "categories.form.titleEditPlain"), "categories")
 		return
 	}
 	if err := h.Store.UpdateCategory(r.Context(), cat, cat.SortOrder); err != nil {

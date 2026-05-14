@@ -54,7 +54,7 @@ func TestPublicRouteBuiltInsBeatFlatPageCatchall(t *testing.T) {
 		wantBodyAbsent string
 	}{
 		{"/entry/1", http.StatusOK, "FORGED-ENTRY-PAGE"},
-		{"/category/1/", http.StatusOK, "FORGED-CATEGORY-PAGE"},
+		{"/category/news/", http.StatusOK, "FORGED-CATEGORY-PAGE"},
 		{"/archive/2026/", http.StatusOK, "FORGED-ARCHIVE-PAGE"},
 		{"/profile/1/", http.StatusOK, "FORGED-PROFILE-PAGE"},
 		{"/rss.xml", http.StatusOK, "FORGED-RSS-PAGE"},

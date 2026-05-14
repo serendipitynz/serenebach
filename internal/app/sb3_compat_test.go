@@ -95,7 +95,7 @@ func TestSB3CompatSiteLevelTags(t *testing.T) {
 	}{
 		{"/", "page", "", ""},
 		{"/entry/1/", "entry", "1", "ようこそ Serene Bach へ"},
-		{"/category/1/", "category", "1", "Category: お知らせ"},
+		{"/category/news/", "category", "1", "Category: お知らせ"},
 		{"/archive/2026/04/", "archive", "202604", "Archive: 2026/04"},
 	}
 	for _, tc := range cases {
@@ -231,7 +231,7 @@ func TestSB3CompatCategoryAreaBlock(t *testing.T) {
 	}
 
 	w := httptest.NewRecorder()
-	a.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/category/1/", nil))
+	a.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/category/news/", nil))
 	if w.Code != 200 {
 		t.Fatalf("status = %d", w.Code)
 	}
@@ -249,5 +249,45 @@ func TestSB3CompatCategoryAreaBlock(t *testing.T) {
 	a.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
 	if strings.Contains(w.Body.String(), `announcements channel`) {
 		t.Errorf("category_area leaked onto home page")
+	}
+}
+
+// TestCategorySlugTagSurfaces confirms {category_slug} resolves on a
+// category page header, inside the SB3 category_area block, and on
+// entry-loop iterations. The slug is the same string the URL uses, so
+// templates can render link variants without re-deriving it.
+func TestCategorySlugTagSurfaces(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	// Inject the new tag in three surfaces: page-level header, the
+	// gated category_area block, and the entry loop's per-entry
+	// category context.
+	main := "<!doctype html><html><body>\n" +
+		`<header data-slug="{category_slug}"></header>` + "\n" +
+		"<!-- BEGIN category_area -->\n" +
+		`<aside data-block-slug="{category_slug}"></aside>` + "\n" +
+		"<!-- END category_area -->\n" +
+		"<!-- BEGIN entry -->\n" +
+		`<article data-entry-slug="{category_slug}"></article>` + "\n" +
+		"<!-- END entry -->\n" +
+		"</body></html>\n"
+	if _, err := a.DB.Exec(`UPDATE templates SET main_body = ? WHERE is_active = 1`, main); err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	a.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/category/news/", nil))
+	if w.Code != 200 {
+		t.Fatalf("status = %d", w.Code)
+	}
+	body := w.Body.String()
+	for _, want := range []string{
+		`<header data-slug="news">`,
+		`<aside data-block-slug="news">`,
+		`<article data-entry-slug="news">`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q\nbody: %s", want, body)
+		}
 	}
 }

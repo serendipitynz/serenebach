@@ -189,6 +189,7 @@ func (v EntryView) applyCategoryTags(c *sbtemplate.Context) {
 	catName := html.EscapeString(v.Category.Name)
 	c.TagHTML("category_name", `<a href="`+catLink+`">`+catName+`</a>`)
 	c.Tag("category_id", strconv.FormatInt(v.Category.ID, 10))
+	c.Tag("category_slug", v.Category.Slug)
 	c.Tag("category_disp_name", v.Category.Name)
 }
 

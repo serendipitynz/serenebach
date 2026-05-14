@@ -331,6 +331,8 @@
   "categories.form.error.parentInvalid": "Invalid parent category value.",
   "categories.form.error.parentSelf": "A category cannot be its own parent.",
   "categories.form.error.sortOrderInvalid": "Sort order must be a number.",
+  "categories.form.error.slugInvalid": "Slug must use lowercase letters, digits and hyphens (e.g. travel-notes).",
+  "categories.form.error.slugInUse": "That slug is already used by another category.",
   "categories.form.error.templateInvalid": "Invalid template value.",
 
   "tags.title": "Tags",

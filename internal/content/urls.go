@@ -39,9 +39,32 @@ func (s Site) EntryStaticPath(e domain.Entry) string {
 }
 
 // CategoryPermalink returns the URL for a category listing page. Same
-// "change here and router at once" discipline as EntryPermalink.
+// "change here and router at once" discipline as EntryPermalink — when
+// a category has a custom slug the canonical URL is
+// /category/<slug>/; otherwise it falls back to the numeric id form.
+// The public router accepts either key shape and 301s id → slug when a
+// slug exists.
 func (s Site) CategoryPermalink(c domain.Category) string {
-	return s.TopURL() + "category/" + strconv.FormatInt(c.ID, 10) + "/"
+	return s.TopURL() + "category/" + categoryKey(c) + "/"
+}
+
+// categoryKey returns the slug when set, falling back to the numeric
+// id. Exposed package-private so rebuild can place the static output at
+// the same path the handler resolves. Not exported: callers should go
+// through CategoryPermalink to stay consistent.
+func categoryKey(c domain.Category) string {
+	if c.Slug != "" {
+		return c.Slug
+	}
+	return strconv.FormatInt(c.ID, 10)
+}
+
+// CategoryStaticPath returns the static-snapshot filesystem segment for
+// a category — "category/<key>" without a leading or trailing slash —
+// so rebuild can write `<out>/<CategoryStaticPath(c)>/index.html`.
+// Mirrors EntryStaticPath so the two never drift.
+func (s Site) CategoryStaticPath(c domain.Category) string {
+	return "category/" + categoryKey(c)
 }
 
 // TagPermalink returns the URL for a tag listing page. Slug is the
