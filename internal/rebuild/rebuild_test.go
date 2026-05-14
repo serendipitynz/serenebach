@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -119,6 +120,71 @@ func TestBuildHomeContainsSeededTitles(t *testing.T) {
 		if !strings.Contains(s, want) {
 			t.Errorf("home missing %q; body:\n%s", want, s)
 			return
+		}
+	}
+}
+
+// TestBuildSkipsPrevNextForHiddenCategoryEntry verifies the static
+// rebuild does not write a prev/next navigation pointing into the
+// visible feed from an entry that lives in a hidden category. The
+// dynamic permalink handler already drops the nav in this case
+// (internal/handler/public/entry.go); the static surface must match,
+// or a deploy will re-expose a chain back into the main timeline.
+func TestBuildSkipsPrevNextForHiddenCategoryEntry(t *testing.T) {
+	a := newSeededApp(t)
+	ctx := context.Background()
+
+	// Seed a hidden category and plant one published entry inside it,
+	// dated between the two seeded entries so that without the skip
+	// it would have both prev and next links.
+	now := time.Now()
+	mid := now.Add(-12 * time.Hour).Unix()
+	res, err := a.DB.ExecContext(ctx, `
+		INSERT INTO categories (wid, parent_id, name, slug, sort_order, hidden, created_at, updated_at)
+		VALUES (1, 0, 'Internal', 'internal', 0, 1, ?, ?)`, mid, mid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hiddenCat, _ := res.LastInsertId()
+	er, err := a.DB.ExecContext(ctx, `
+		INSERT INTO entries (wid, author_id, category_id, title, body, more, format, status, posted_at, created_at, updated_at)
+		VALUES (1, 1, ?, 'INTERNAL-ENTRY', '<p>internal</p>', '', '', 1, ?, ?, ?)`,
+		hiddenCat, mid, mid, mid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hiddenID, _ := er.LastInsertId()
+
+	out := filepath.Join(t.TempDir(), "public")
+	if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	// The hidden entry page must exist (direct URL stays live by design)
+	// but the entry_navi region must not link into the visible feed via
+	// prev/next. Sidebar fragments (latest entries, etc.) can still link
+	// to the seeded entries — only the prev/next nav matters here.
+	body, err := os.ReadFile(filepath.Join(out, "entry", strconv.FormatInt(hiddenID, 10), "index.html"))
+	if err != nil {
+		t.Fatalf("read hidden entry page: %v", err)
+	}
+	s := string(body)
+	open := strings.Index(s, `<div class="entry_navi">`)
+	if open < 0 {
+		t.Fatalf("entry_navi region not found in rendered entry; default template changed?\nbody:\n%s", s)
+	}
+	close := strings.Index(s[open:], "</div>")
+	if close < 0 {
+		t.Fatalf("entry_navi region not terminated; body:\n%s", s)
+	}
+	nav := s[open : open+close]
+	for _, leak := range []string{
+		`href="/entry/`, // any prev/next link to a sibling entry
+		"« ",            // navLink prefix for prev
+		" »",            // navLink suffix for next
+	} {
+		if strings.Contains(nav, leak) {
+			t.Errorf("entry_navi contains %q — prev/next should be empty for hidden category\nnav:\n%s", leak, nav)
 		}
 	}
 }

@@ -543,14 +543,22 @@ func writeEntries(ctx context.Context, store *repo.Store, opts Options, site con
 		// Adjacent entries. Using AllPublishedEntries (already ordered newest
 		// first) would be faster than round-tripping to the DB, but staying
 		// on the same repo API keeps behaviour identical to the dynamic
-		// permalink handler.
-		prev, err := store.PrevPublishedEntry(ctx, opts.WID, e)
-		if err != nil && !errors.Is(err, repo.ErrNotFound) {
-			return fmt.Errorf("rebuild: prev entry %d: %w", e.ID, err)
-		}
-		next, err := store.NextPublishedEntry(ctx, opts.WID, e)
-		if err != nil && !errors.Is(err, repo.ErrNotFound) {
-			return fmt.Errorf("rebuild: next entry %d: %w", e.ID, err)
+		// permalink handler. Skip prev/next entirely when the entry itself
+		// belongs to a hidden category — the dynamic handler does the same
+		// (internal/handler/public/entry.go) so the static deploy must not
+		// expose a navigation chain back into the visible feed.
+		var prev, next *domain.Entry
+		if catPtr == nil || !catPtr.Hidden {
+			p, err := store.PrevPublishedEntry(ctx, opts.WID, e)
+			if err != nil && !errors.Is(err, repo.ErrNotFound) {
+				return fmt.Errorf("rebuild: prev entry %d: %w", e.ID, err)
+			}
+			prev = p
+			n, err := store.NextPublishedEntry(ctx, opts.WID, e)
+			if err != nil && !errors.Is(err, repo.ErrNotFound) {
+				return fmt.Errorf("rebuild: next entry %d: %w", e.ID, err)
+			}
+			next = n
 		}
 
 		// Approved comments for the entry so static pages also show them.
