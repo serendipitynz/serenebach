@@ -80,6 +80,85 @@ func TestAdminCategoryCreateAndEdit(t *testing.T) {
 	}
 }
 
+// TestAdminCategoryRejectsInvalidSlug confirms that slugs which would
+// break the /category/<slug>/ surface or the rebuild path are refused
+// on save. Domain.IsValidSlug enforces the same shape entries use.
+func TestAdminCategoryRejectsInvalidSlug(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	cookies := login(t, a.Handler(), "admin", "changeme")
+
+	cases := []string{
+		"foo bar",  // whitespace
+		"foo/bar",  // path separator
+		"../x",     // path traversal
+		"Foo",      // uppercase
+		"foo--bar", // double hyphen (rejected by IsValidSlug)
+	}
+	for _, slug := range cases {
+		form := url.Values{
+			"name":      {"x"},
+			"slug":      {slug},
+			"parent_id": {"0"},
+		}
+		w := authedPOSTForm(t, a.Handler(), "/admin/categories/new", form, cookies)
+		if w.Code != 200 {
+			t.Errorf("slug=%q: status = %d, want 200 (stay on form)", slug, w.Code)
+			continue
+		}
+		if !strings.Contains(w.Body.String(), "スラッグは英小文字・数字・ハイフン") {
+			t.Errorf("slug=%q: missing slug-format validation message; body:\n%s", slug, w.Body.String())
+		}
+	}
+}
+
+// TestAdminCategoryRejectsDuplicateSlug ensures the admin save path
+// refuses a slug that already belongs to another category in the same
+// weblog. Without this guard the live router would non-deterministically
+// resolve /category/<slug>/ and rebuild would overwrite snapshots.
+func TestAdminCategoryRejectsDuplicateSlug(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	cookies := login(t, a.Handler(), "admin", "changeme")
+
+	// The seed category already uses slug "news".
+	form := url.Values{
+		"name":      {"News Two"},
+		"slug":      {"news"},
+		"parent_id": {"0"},
+	}
+	w := authedPOSTForm(t, a.Handler(), "/admin/categories/new", form, cookies)
+	if w.Code != 200 {
+		t.Fatalf("status = %d, want 200 (stay on form); body:\n%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "別のカテゴリーで使われています") {
+		t.Errorf("missing duplicate-slug validation message; body:\n%s", w.Body.String())
+	}
+}
+
+// TestAdminCategoryEditKeepingSlugSucceeds confirms the uniqueness
+// check excludes the row being edited — re-saving an existing category
+// without changing its slug must not trip the duplicate guard.
+func TestAdminCategoryEditKeepingSlugSucceeds(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	cookies := login(t, a.Handler(), "admin", "changeme")
+
+	var id int64
+	if err := a.DB.QueryRow(`SELECT id FROM categories WHERE slug = 'news'`).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	update := url.Values{
+		"name":      {"お知らせ (renamed)"},
+		"slug":      {"news"},
+		"parent_id": {"0"},
+	}
+	w := authedPOSTForm(t, a.Handler(), "/admin/categories/"+itoa64(id)+"/edit", update, cookies)
+	if w.Code != http.StatusFound {
+		t.Fatalf("status = %d, want 302; body:\n%s", w.Code, w.Body.String())
+	}
+}
+
 func TestAdminCategoryRejectsBlankName(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
