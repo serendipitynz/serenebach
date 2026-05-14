@@ -134,6 +134,94 @@ func TestHiddenCategoryEntryPermalinkStillResponds(t *testing.T) {
 	}
 }
 
+// TestHiddenCategoryDropsFromRecentCommentList plants approved comments
+// on a visible-category entry and a hidden-category entry, then
+// renders the sidebar {recent_comment_list} block. The visible entry's
+// comment must appear and the hidden one must not — otherwise the
+// sidebar re-exposes a permalink the listing surfaces deliberately
+// dropped.
+func TestHiddenCategoryDropsFromRecentCommentList(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+
+	ctx := context.Background()
+	now := time.Now().Unix()
+	// Render the sidebar block. BEGIN/END markers must sit on their
+	// own lines for the line-based sbtemplate parser.
+	mainBody := "<!-- BEGIN entry -->\n" +
+		"<article></article>\n" +
+		"<!-- END entry -->\n" +
+		"<!-- BEGIN recent_comment -->\n" +
+		"<section class=\"rc\">{recent_comment_list}</section>\n" +
+		"<!-- END recent_comment -->\n"
+	if _, err := a.DB.ExecContext(ctx,
+		`UPDATE templates SET main_body = ? WHERE is_active = 1`, mainBody); err != nil {
+		t.Fatal(err)
+	}
+
+	// Visible category + entry + approved comment.
+	visRes, err := a.DB.ExecContext(ctx, `
+		INSERT INTO categories (wid, parent_id, name, slug, sort_order, hidden, created_at, updated_at)
+		VALUES (1, 0, 'Public', 'public', 0, 0, ?, ?)`, now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	visCat, _ := visRes.LastInsertId()
+	visEntry, err := a.DB.ExecContext(ctx, `
+		INSERT INTO entries (wid, author_id, category_id, title, body, more, format, status, posted_at, created_at, updated_at)
+		VALUES (1, 1, ?, 'VISIBLE-ENTRY', '<p>x</p>', '', '', 1, ?, ?, ?)`,
+		visCat, now, now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	visEntryID, _ := visEntry.LastInsertId()
+	if _, err := a.DB.ExecContext(ctx, `
+		INSERT INTO messages (wid, entry_id, status, posted_at, author_name, author_email, author_url, body, ip_address, user_agent, created_at, updated_at)
+		VALUES (1, ?, 1, ?, 'VisibleCommenter', '', '', 'visible-comment-body', '', '', ?, ?)`,
+		visEntryID, now, now, now); err != nil {
+		t.Fatal(err)
+	}
+
+	// Hidden category + entry + approved comment.
+	hidRes, err := a.DB.ExecContext(ctx, `
+		INSERT INTO categories (wid, parent_id, name, slug, sort_order, hidden, created_at, updated_at)
+		VALUES (1, 0, 'Internal', 'internal', 0, 1, ?, ?)`, now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hidCat, _ := hidRes.LastInsertId()
+	hidEntry, err := a.DB.ExecContext(ctx, `
+		INSERT INTO entries (wid, author_id, category_id, title, body, more, format, status, posted_at, created_at, updated_at)
+		VALUES (1, 1, ?, 'INTERNAL-ENTRY', '<p>x</p>', '', '', 1, ?, ?, ?)`,
+		hidCat, now+1, now+1, now+1) // posted slightly later so it would rank above otherwise
+	if err != nil {
+		t.Fatal(err)
+	}
+	hidEntryID, _ := hidEntry.LastInsertId()
+	if _, err := a.DB.ExecContext(ctx, `
+		INSERT INTO messages (wid, entry_id, status, posted_at, author_name, author_email, author_url, body, ip_address, user_agent, created_at, updated_at)
+		VALUES (1, ?, 1, ?, 'HiddenCommenter', '', '', 'hidden-comment-body', '', '', ?, ?)`,
+		hidEntryID, now+1, now+1, now+1); err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	a.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+	if w.Code != 200 {
+		t.Fatalf("status = %d", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "VisibleCommenter") {
+		t.Fatalf("visible-category comment missing — block did not render, hidden assertion would be vacuous\nbody:\n%s", body)
+	}
+	if strings.Contains(body, "HiddenCommenter") {
+		t.Errorf("recent_comment_list leaked a hidden-category comment\nbody:\n%s", body)
+	}
+	if strings.Contains(body, "INTERNAL-ENTRY") {
+		t.Errorf("recent_comment_list leaked hidden-category entry title\nbody:\n%s", body)
+	}
+}
+
 // TestHiddenCategoryDropsFromSidebarList plants a hidden category and
 // asserts the sidebar {category_list} fragment never offers a link to
 // it on home, even though it is a top-level category.

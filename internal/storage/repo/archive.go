@@ -76,13 +76,16 @@ func (s *Store) ArchivePeriodsWithCounts(ctx context.Context, wid int64, loc *ti
 
 // RecentApprovedMessages fetches the N most recent approved comments
 // across every entry on the weblog — powers the SB3
-// `{recent_comment_list}` sidebar block.
+// `{recent_comment_list}` sidebar block. Comments on entries in a
+// hidden category are excluded so the sidebar never re-exposes an
+// entry the listing surfaces deliberately dropped.
 func (s *Store) RecentApprovedMessages(ctx context.Context, wid int64, limit int) ([]RecentApprovedMessage, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT m.entry_id, e.title, e.slug, m.author_name, m.posted_at
 		FROM messages m
 		JOIN entries e ON e.id = m.entry_id
-		WHERE m.wid = ? AND m.status = ? AND e.status = ?
+		WHERE m.wid = ? AND m.status = ? AND e.status = ?`+
+		excludeHiddenCategoryClauseE+`
 		ORDER BY m.posted_at DESC
 		LIMIT ?`, wid, domain.MessageApproved, domain.EntryPublished, limit)
 	if err != nil {
