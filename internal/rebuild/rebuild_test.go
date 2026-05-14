@@ -74,7 +74,7 @@ func TestBuildProducesAllSections(t *testing.T) {
 		"style.css",
 		"entry/1/index.html",
 		"entry/2/index.html",
-		"category/1/index.html",
+		"category/news/index.html",
 		"rss.xml",
 		"atom.xml",
 	} {
@@ -334,7 +334,7 @@ func preservesRunInitialBuild(t *testing.T, a *app.App, out string) {
 	if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
 		t.Fatalf("initial Build: %v", err)
 	}
-	for _, p := range []string{"index.html", "entry/1/index.html", "entry/2/index.html", "category/1/index.html"} {
+	for _, p := range []string{"index.html", "entry/1/index.html", "entry/2/index.html", "category/news/index.html"} {
 		if _, err := os.Stat(filepath.Join(out, p)); err != nil {
 			t.Fatalf("first build: missing %s: %v", p, err)
 		}
@@ -388,7 +388,7 @@ func preservesAssertLiveByteMatch(t *testing.T, out string, wantHome, wantEntry 
 
 func preservesAssertOtherPagesIntact(t *testing.T, out string) {
 	t.Helper()
-	for _, p := range []string{"entry/2/index.html", "category/1/index.html"} {
+	for _, p := range []string{"entry/2/index.html", "category/news/index.html"} {
 		if _, err := os.Stat(filepath.Join(out, p)); err != nil {
 			t.Errorf("%s disappeared after failed rebuild: %v", p, err)
 		}
@@ -928,7 +928,7 @@ func TestBuildFlatPagesCoexistWithEntryRoutes(t *testing.T) {
 		"index.html",
 		"about/index.html",
 		"entry/1/index.html",
-		"category/1/index.html",
+		"category/news/index.html",
 		"rss.xml",
 		"atom.xml",
 	} {

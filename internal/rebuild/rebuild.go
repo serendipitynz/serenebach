@@ -630,7 +630,10 @@ func writeCategories(ctx context.Context, store *repo.Store, opts Options, site 
 		if err != nil {
 			return fmt.Errorf("rebuild: render category %d: %w", cat.ID, err)
 		}
-		path := filepath.Join(opts.OutDir, "category", strconv.FormatInt(c.ID, 10), "index.html")
+		// Site.CategoryStaticPath keeps the rebuild + dynamic router using
+		// the same key choice (slug when set, numeric id otherwise) so a
+		// snapshot file lands at the same URL the live handler would serve.
+		path := filepath.Join(opts.OutDir, filepath.FromSlash(site.CategoryStaticPath(c)), "index.html")
 		if err := writeFile(path, []byte(body)); err != nil {
 			return err
 		}
