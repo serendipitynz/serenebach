@@ -41,28 +41,37 @@ func TestCategoryBySlug(t *testing.T) {
 	}
 }
 
-func TestCategoryBySlugDuplicateLowestIDWins(t *testing.T) {
+// TestCategorySlugUniqueIndex confirms the partial unique index on
+// categories(wid, slug) prevents a second non-empty slug duplicate
+// from being inserted. The admin form rejects duplicates earlier, but
+// the DB-level guard backstops anything that bypasses the handler
+// (importer, manual SQL, future write paths).
+func TestCategorySlugUniqueIndex(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
 
-	first, err := s.CreateCategory(ctx, domain.Category{
+	if _, err := s.CreateCategory(ctx, domain.Category{
 		WID: 1, Name: "First", Slug: "shared",
-	}, 0)
-	if err != nil {
+	}, 0); err != nil {
 		t.Fatalf("CreateCategory first: %v", err)
 	}
 	if _, err := s.CreateCategory(ctx, domain.Category{
 		WID: 1, Name: "Second", Slug: "shared",
-	}, 1); err != nil {
-		t.Fatalf("CreateCategory second: %v", err)
+	}, 1); err == nil {
+		t.Fatal("expected duplicate slug insert to fail at the unique index")
 	}
 
-	got, err := s.CategoryBySlug(ctx, 1, "shared")
-	if err != nil {
-		t.Fatalf("CategoryBySlug: %v", err)
+	// Empty slugs may coexist freely (the partial index excludes the
+	// blank value so the slug-less default does not block anybody).
+	if _, err := s.CreateCategory(ctx, domain.Category{
+		WID: 1, Name: "Plain A", Slug: "",
+	}, 2); err != nil {
+		t.Fatalf("empty slug A: %v", err)
 	}
-	if got.ID != first {
-		t.Errorf("got id %d, want first-created id %d", got.ID, first)
+	if _, err := s.CreateCategory(ctx, domain.Category{
+		WID: 1, Name: "Plain B", Slug: "",
+	}, 3); err != nil {
+		t.Fatalf("empty slug B: %v", err)
 	}
 }
 
