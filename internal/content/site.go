@@ -124,6 +124,7 @@ func applyCategoryAreaBlock(c *sbtemplate.Context, tmpl *sbtemplate.Template, ca
 	c.Num(0)
 	c.Tag("category_pagename", cat.Name)
 	c.Tag("category_fullname", categoryFullname(*cat, all))
+	c.Tag("category_slug", cat.Slug)
 	c.TagHTML("category_description", renderDescription(cat.Description, cat.DescriptionFormat))
 	c.Block("category_area", 1)
 }

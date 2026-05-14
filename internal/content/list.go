@@ -195,6 +195,7 @@ func (v ListView) applyEntryCategoryTags(c *sbtemplate.Context, e domain.Entry) 
 	if !ok {
 		c.Tag("category_name", "-")
 		c.Tag("category_id", "")
+		c.Tag("category_slug", "")
 		c.Tag("category_disp_name", "-")
 		return
 	}
@@ -202,6 +203,7 @@ func (v ListView) applyEntryCategoryTags(c *sbtemplate.Context, e domain.Entry) 
 	catName := html.EscapeString(cat.Name)
 	c.TagHTML("category_name", `<a href="`+catLink+`">`+catName+`</a>`)
 	c.Tag("category_id", strconv.FormatInt(cat.ID, 10))
+	c.Tag("category_slug", cat.Slug)
 	c.Tag("category_disp_name", cat.Name)
 }
 
