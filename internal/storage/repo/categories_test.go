@@ -110,6 +110,72 @@ func TestCategorySlugInUse(t *testing.T) {
 	}
 }
 
+// TestMigration0044BlanksInvalidLegacySlugs pins the migration-time
+// cleanup that blanks pre-existing slugs whose shape does not match
+// domain.IsValidSlug. The admin form did not validate this field
+// before the surrounding PR landed, so existing databases may carry
+// values like `foo/bar` or `Travel Notes` that would now feed
+// CategoryPermalink / CategoryStaticPath directly. The migration
+// SQL is re-run here against synthetic rows to confirm the GLOB
+// patterns cover the cases the reviewer flagged.
+func TestMigration0044BlanksInvalidLegacySlugs(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	// The unique index is partial (WHERE slug != ''); INSERT of an
+	// invalid-but-unique slug is therefore not blocked at the DB layer,
+	// matching the situation a pre-migration row would have been in.
+	cases := []struct {
+		slug    string
+		wantOut string
+	}{
+		{"foo/bar", ""},      // contains '/'
+		{"../x", ""},         // dot segment
+		{"Travel Notes", ""}, // whitespace + uppercase
+		{"UPPER", ""},        // uppercase only
+		{"日本語", ""},          // multi-byte
+		{"-leading", ""},     // leading hyphen
+		{"trailing-", ""},    // trailing hyphen
+		{"double--hyphen", ""},
+		{"travel-notes", "travel-notes"}, // valid — must remain untouched
+		{"v2", "v2"},                     // valid — must remain untouched
+	}
+	for i, tc := range cases {
+		if _, err := s.db.ExecContext(ctx, `
+			INSERT INTO categories (wid, parent_id, name, slug, sort_order, created_at, updated_at)
+			VALUES (?, 0, ?, ?, 0, 0, 0)`,
+			i+10, "cat-"+tc.slug, tc.slug); err != nil {
+			t.Fatalf("seed %q: %v", tc.slug, err)
+		}
+	}
+
+	// Same SQL the migration runs to blank invalid slugs.
+	if _, err := s.db.ExecContext(ctx, `
+		UPDATE categories
+		   SET slug = ''
+		 WHERE slug != ''
+		   AND (
+		        length(slug) > 100
+		     OR slug GLOB '*[^a-z0-9-]*'
+		     OR slug GLOB '-*'
+		     OR slug GLOB '*-'
+		     OR slug LIKE '%--%'
+		   )`); err != nil {
+		t.Fatalf("apply cleanup: %v", err)
+	}
+
+	for i, tc := range cases {
+		var got string
+		if err := s.db.QueryRowContext(ctx,
+			`SELECT slug FROM categories WHERE wid = ?`, i+10).Scan(&got); err != nil {
+			t.Fatalf("read back %q: %v", tc.slug, err)
+		}
+		if got != tc.wantOut {
+			t.Errorf("input %q: got %q, want %q", tc.slug, got, tc.wantOut)
+		}
+	}
+}
+
 func TestCategoryByLegacyDir(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
