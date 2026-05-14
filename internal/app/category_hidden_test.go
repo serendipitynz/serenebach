@@ -224,7 +224,10 @@ func TestHiddenCategoryDropsFromRecentCommentList(t *testing.T) {
 
 // TestHiddenCategoryDropsFromSidebarList plants a hidden category and
 // asserts the sidebar {category_list} fragment never offers a link to
-// it on home, even though it is a top-level category.
+// it on home, even though it is a top-level category. A visible
+// category is seeded alongside so the test also verifies the block
+// actually renders — otherwise an empty {category_list} would pass
+// vacuously.
 func TestHiddenCategoryDropsFromSidebarList(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
@@ -232,9 +235,30 @@ func TestHiddenCategoryDropsFromSidebarList(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().Unix()
 	// Inject a {category_list} renderer into the active template's main
-	// body so the assertion can look for the actual rendered fragment.
+	// body. The sbtemplate parser is line-based, so BEGIN/END markers
+	// must live on their own lines or the block body registers as empty.
+	mainBody := "<!-- BEGIN category -->\n" +
+		"<nav class=\"cats\">{category_list}</nav>\n" +
+		"<!-- END category -->\n" +
+		"<!-- BEGIN entry -->\n" +
+		"<article></article>\n" +
+		"<!-- END entry -->\n"
 	if _, err := a.DB.ExecContext(ctx,
-		`UPDATE templates SET main_body = '<!-- BEGIN category --><nav class="cats">{category_list}</nav><!-- END category --><!-- BEGIN entry --><article></article><!-- END entry -->' WHERE is_active = 1`); err != nil {
+		`UPDATE templates SET main_body = ? WHERE is_active = 1`, mainBody); err != nil {
+		t.Fatal(err)
+	}
+	// Seed a visible category + entry so we can prove the block renders.
+	visRes, err := a.DB.ExecContext(ctx, `
+		INSERT INTO categories (wid, parent_id, name, slug, sort_order, hidden, created_at, updated_at)
+		VALUES (1, 0, 'Public', 'public', 0, 0, ?, ?)`, now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	visCat, _ := visRes.LastInsertId()
+	if _, err := a.DB.ExecContext(ctx, `
+		INSERT INTO entries (wid, author_id, category_id, title, body, more, format, status, posted_at, created_at, updated_at)
+		VALUES (1, 1, ?, 'PUBLIC-ENTRY', '<p>x</p>', '', '', 1, ?, ?, ?)`,
+		visCat, now, now, now); err != nil {
 		t.Fatal(err)
 	}
 	// Seed a hidden category with an entry so its sidebar count would
@@ -259,6 +283,9 @@ func TestHiddenCategoryDropsFromSidebarList(t *testing.T) {
 		t.Fatalf("status = %d", w.Code)
 	}
 	body := w.Body.String()
+	if !strings.Contains(body, "/category/public/") {
+		t.Fatalf("visible category link missing — block did not render, hidden assertion would be vacuous\nbody:\n%s", body)
+	}
 	if strings.Contains(body, "/category/internal/") {
 		t.Errorf("sidebar category_list leaked hidden category link\nbody:\n%s", body)
 	}
