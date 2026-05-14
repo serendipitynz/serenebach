@@ -54,10 +54,11 @@ func (s *Store) CategoryByID(ctx context.Context, wid, id int64) (*domain.Catego
 }
 
 // CategoryBySlug fetches one category row by its slug. Empty input is
-// rejected up-front so the slug-less default (slug = '') doesn't match
-// every category that has no custom slug. When two rows happen to share
-// the same slug the lowest id wins, giving deterministic resolution
-// until admin-side uniqueness validation lands.
+// rejected up-front so the slug-less default (an empty slug value)
+// doesn't match every category that has no custom slug. When two rows
+// happen to share the same slug the lowest id wins, giving
+// deterministic resolution until admin-side uniqueness validation
+// lands.
 func (s *Store) CategoryBySlug(ctx context.Context, wid int64, slug string) (*domain.Category, error) {
 	if slug == "" {
 		return nil, ErrNotFound
