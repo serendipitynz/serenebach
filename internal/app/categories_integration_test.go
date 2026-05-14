@@ -159,6 +159,60 @@ func TestAdminCategoryEditKeepingSlugSucceeds(t *testing.T) {
 	}
 }
 
+// TestAdminCategoryHiddenToggle confirms the admin form persists the
+// hidden checkbox and the listing surfaces the "Hidden" badge once
+// the flag is set.
+func TestAdminCategoryHiddenToggle(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	cookies := login(t, a.Handler(), "admin", "changeme")
+
+	// Create a hidden category.
+	form := url.Values{
+		"name":      {"Internal"},
+		"slug":      {"internal"},
+		"parent_id": {"0"},
+		"hidden":    {"1"},
+	}
+	w := authedPOSTForm(t, a.Handler(), "/admin/categories/new", form, cookies)
+	if w.Code != http.StatusFound {
+		t.Fatalf("create hidden status = %d; body:\n%s", w.Code, w.Body.String())
+	}
+
+	var id int64
+	var hidden int
+	if err := a.DB.QueryRow(`SELECT id, hidden FROM categories WHERE slug = 'internal'`).Scan(&id, &hidden); err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if hidden != 1 {
+		t.Errorf("DB hidden column = %d, want 1", hidden)
+	}
+
+	// Listing shows the hidden badge.
+	list := authedGET(t, a.Handler(), "/admin/categories", cookies).Body.String()
+	if !strings.Contains(list, "非表示") {
+		t.Errorf("admin list missing 非表示 badge; body:\n%s", list)
+	}
+
+	// Flip back to visible by submitting the edit form without the
+	// hidden checkbox.
+	update := url.Values{
+		"name":      {"Internal"},
+		"slug":      {"internal"},
+		"parent_id": {"0"},
+	}
+	w2 := authedPOSTForm(t, a.Handler(), "/admin/categories/"+itoa64(id)+"/edit", update, cookies)
+	if w2.Code != http.StatusFound {
+		t.Fatalf("unhide status = %d; body:\n%s", w2.Code, w2.Body.String())
+	}
+	if err := a.DB.QueryRow(`SELECT hidden FROM categories WHERE id = ?`, id).Scan(&hidden); err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if hidden != 0 {
+		t.Errorf("hidden = %d after unhide; want 0", hidden)
+	}
+}
+
 func TestAdminCategoryRejectsBlankName(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
