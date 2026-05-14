@@ -37,6 +37,14 @@
     </div>
   </div>
 
+  <div class="field-stack">
+    <label class="inline-field">
+      <input type="checkbox" name="hidden" value="1"{{if .Category.Hidden}} checked{{end}}>
+      {{T "categories.form.hiddenLabel"}}
+    </label>
+    <p class="hint">{{T "categories.form.hiddenHint"}}</p>
+  </div>
+
   <div class="rich-description">
     <div class="rich-description-head">
       <div class="label">{{T "categories.form.descriptionLabel"}}</div>
