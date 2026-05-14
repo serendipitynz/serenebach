@@ -528,6 +528,27 @@ func tagsForEntries(ctx context.Context, store *repo.Store, entries []domain.Ent
 	return out
 }
 
+// adjacentEntries resolves prev/next for a rebuild target. When the
+// target's category is hidden, both are skipped — matching the dynamic
+// permalink handler at internal/handler/public/entry.go so the static
+// deploy never chains a hidden-category entry back into the visible
+// feed. ErrNotFound is collapsed to nil (no neighbour); any other
+// error bubbles up so the rebuild fails loudly.
+func adjacentEntries(ctx context.Context, store *repo.Store, wid int64, e domain.Entry, cat *domain.Category) (*domain.Entry, *domain.Entry, error) {
+	if cat != nil && cat.Hidden {
+		return nil, nil, nil
+	}
+	prev, err := store.PrevPublishedEntry(ctx, wid, e)
+	if err != nil && !errors.Is(err, repo.ErrNotFound) {
+		return nil, nil, fmt.Errorf("rebuild: prev entry %d: %w", e.ID, err)
+	}
+	next, err := store.NextPublishedEntry(ctx, wid, e)
+	if err != nil && !errors.Is(err, repo.ErrNotFound) {
+		return nil, nil, fmt.Errorf("rebuild: next entry %d: %w", e.ID, err)
+	}
+	return prev, next, nil
+}
+
 func writeEntries(ctx context.Context, store *repo.Store, opts Options, site content.Site, tmpl *domain.Template, weblog *domain.Weblog, all []domain.Entry, cats map[int64]domain.Category, users map[int64]domain.User, profileUsers []domain.User, sidebar content.SidebarData, rep *Report) error {
 	for i := range all {
 		e := all[i]
@@ -540,17 +561,9 @@ func writeEntries(ctx context.Context, store *repo.Store, opts Options, site con
 			authorPtr = &u
 		}
 
-		// Adjacent entries. Using AllPublishedEntries (already ordered newest
-		// first) would be faster than round-tripping to the DB, but staying
-		// on the same repo API keeps behaviour identical to the dynamic
-		// permalink handler.
-		prev, err := store.PrevPublishedEntry(ctx, opts.WID, e)
-		if err != nil && !errors.Is(err, repo.ErrNotFound) {
-			return fmt.Errorf("rebuild: prev entry %d: %w", e.ID, err)
-		}
-		next, err := store.NextPublishedEntry(ctx, opts.WID, e)
-		if err != nil && !errors.Is(err, repo.ErrNotFound) {
-			return fmt.Errorf("rebuild: next entry %d: %w", e.ID, err)
+		prev, next, err := adjacentEntries(ctx, store, opts.WID, e, catPtr)
+		if err != nil {
+			return err
 		}
 
 		// Approved comments for the entry so static pages also show them.
@@ -601,6 +614,15 @@ func writeCategories(ctx context.Context, store *repo.Store, opts Options, site 
 	}
 	for _, c := range allCats {
 		cat := c // loop var escapes into pointer below
+		// Skip hidden categories: the dynamic /category/<key>/ route
+		// keeps responding for direct hits, but the static snapshot is
+		// intentionally absent so an operator who flipped a category
+		// hidden doesn't keep a stale public-facing archive page on the
+		// CDN. promoteManagedSubtree's swap removes any previous
+		// snapshot in the same run.
+		if cat.Hidden {
+			continue
+		}
 		entries, err := store.PublishedEntriesByCategoryPage(ctx, opts.WID, cat.ID, opts.EntryListLimit, 0)
 		if err != nil {
 			return fmt.Errorf("rebuild: category %d entries: %w", cat.ID, err)

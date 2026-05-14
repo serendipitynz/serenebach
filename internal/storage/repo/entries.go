@@ -38,14 +38,30 @@ func (s *Store) EntryByID(ctx context.Context, wid, id int64) (*domain.Entry, er
 	return e, nil
 }
 
+// excludeHiddenCategoryClause is the WHERE-clause fragment list, feed,
+// and prev/next queries append so an entry whose category was flipped
+// hidden drops out of every public surface. The semantic is
+// "default-visible": a row is kept unless there is an explicit
+// categories row marked hidden = 1. That covers both the uncategorised
+// bucket (category_id = -1, no row in categories at all) and any
+// historical CategoryID = 0 left over from earlier code paths. Use
+// the `entries` form when the query has no alias and the `e.` form
+// (excludeHiddenCategoryClauseE) when entries is aliased to `e`.
+const excludeHiddenCategoryClause = ` AND NOT EXISTS (SELECT 1 FROM categories WHERE id = entries.category_id AND hidden = 1)`
+const excludeHiddenCategoryClauseE = ` AND NOT EXISTS (SELECT 1 FROM categories WHERE id = e.category_id AND hidden = 1)`
+
 // PrevPublishedEntry returns the most recent published entry strictly older
 // than the anchor (by posted_at, tie-broken by id). ErrNotFound at the edge.
+// Entries belonging to a hidden category are skipped so the prev/next
+// chain on a visible entry's permalink does not point into the hidden
+// subtree.
 func (s *Store) PrevPublishedEntry(ctx context.Context, wid int64, anchor domain.Entry) (*domain.Entry, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT `+entryColumns+`
 		FROM entries
 		WHERE wid = ? AND status = ?
-		  AND (posted_at < ? OR (posted_at = ? AND id < ?))
+		  AND (posted_at < ? OR (posted_at = ? AND id < ?))`+
+		excludeHiddenCategoryClause+`
 		ORDER BY posted_at DESC, id DESC
 		LIMIT 1`,
 		wid, domain.EntryPublished, anchor.PostedAt.Unix(), anchor.PostedAt.Unix(), anchor.ID)
@@ -53,13 +69,15 @@ func (s *Store) PrevPublishedEntry(ctx context.Context, wid int64, anchor domain
 }
 
 // NextPublishedEntry returns the earliest published entry strictly newer than
-// the anchor. ErrNotFound at the edge.
+// the anchor. ErrNotFound at the edge. Hidden-category entries are skipped
+// for the same reason PrevPublishedEntry skips them.
 func (s *Store) NextPublishedEntry(ctx context.Context, wid int64, anchor domain.Entry) (*domain.Entry, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT `+entryColumns+`
 		FROM entries
 		WHERE wid = ? AND status = ?
-		  AND (posted_at > ? OR (posted_at = ? AND id > ?))
+		  AND (posted_at > ? OR (posted_at = ? AND id > ?))`+
+		excludeHiddenCategoryClause+`
 		ORDER BY posted_at ASC, id ASC
 		LIMIT 1`,
 		wid, domain.EntryPublished, anchor.PostedAt.Unix(), anchor.PostedAt.Unix(), anchor.ID)
@@ -241,7 +259,8 @@ func (s *Store) RecentPublishedEntries(ctx context.Context, wid int64, limit int
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+entryColumns+`
 		FROM entries
-		WHERE wid = ? AND status = ?
+		WHERE wid = ? AND status = ?`+
+		excludeHiddenCategoryClause+`
 		ORDER BY posted_at DESC
 		LIMIT ?`, wid, domain.EntryPublished, limit)
 	if err != nil {
@@ -270,11 +289,14 @@ func (s *Store) PublishedEntriesByCategory(ctx context.Context, wid, catID int64
 
 // PublishedEntriesInRange returns published entries whose posted_at falls in
 // [from, to) (both in unix seconds), newest first. Used by archive handlers.
+// Hidden-category entries are dropped so the date archive stays consistent
+// with home and feed.
 func (s *Store) PublishedEntriesInRange(ctx context.Context, wid int64, from, to time.Time, limit int) ([]domain.Entry, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+entryColumns+`
 		FROM entries
-		WHERE wid = ? AND status = ? AND posted_at >= ? AND posted_at < ?
+		WHERE wid = ? AND status = ? AND posted_at >= ? AND posted_at < ?`+
+		excludeHiddenCategoryClause+`
 		ORDER BY posted_at DESC
 		LIMIT ?`, wid, domain.EntryPublished, from.Unix(), to.Unix(), limit)
 	if err != nil {
@@ -308,10 +330,13 @@ func scanEntries(rows *sql.Rows) ([]domain.Entry, error) {
 
 // CountPublishedEntries returns the total number of published entries
 // for the weblog — the denominator for the home page's pagination.
+// Hidden-category entries are dropped to stay consistent with the
+// page slice.
 func (s *Store) CountPublishedEntries(ctx context.Context, wid int64) (int64, error) {
 	var n int64
 	err := s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM entries WHERE wid = ? AND status = ?`,
+		`SELECT COUNT(*) FROM entries WHERE wid = ? AND status = ?`+
+			excludeHiddenCategoryClause,
 		wid, domain.EntryPublished).Scan(&n)
 	if err != nil {
 		return 0, fmt.Errorf("repo: CountPublishedEntries: %w", err)
@@ -335,14 +360,16 @@ func (s *Store) CountPublishedEntriesByCategory(ctx context.Context, wid, catID 
 
 // CountPublishedEntriesByTag mirrors PublishedEntriesByTag. Tag pages
 // need the total so paginator markup lines up with the one-page-at-a-
-// time slice the handler fetches.
+// time slice the handler fetches. Hidden-category entries are dropped
+// to stay consistent with the page slice.
 func (s *Store) CountPublishedEntriesByTag(ctx context.Context, wid, tagID int64) (int64, error) {
 	var n int64
 	err := s.db.QueryRowContext(ctx, `
 		SELECT COUNT(*)
 		FROM entries e
 		JOIN entry_tags et ON et.entry_id = e.id
-		WHERE e.wid = ? AND e.status = ? AND et.tag_id = ?`,
+		WHERE e.wid = ? AND e.status = ? AND et.tag_id = ?`+
+		excludeHiddenCategoryClauseE,
 		wid, domain.EntryPublished, tagID).Scan(&n)
 	if err != nil {
 		return 0, fmt.Errorf("repo: CountPublishedEntriesByTag: %w", err)
@@ -350,11 +377,13 @@ func (s *Store) CountPublishedEntriesByTag(ctx context.Context, wid, tagID int64
 	return n, nil
 }
 
-// CountPublishedEntriesInRange mirrors PublishedEntriesInRange.
+// CountPublishedEntriesInRange mirrors PublishedEntriesInRange. Hidden
+// categories are excluded to match the archive page slice.
 func (s *Store) CountPublishedEntriesInRange(ctx context.Context, wid int64, from, to time.Time) (int64, error) {
 	var n int64
 	err := s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM entries WHERE wid = ? AND status = ? AND posted_at >= ? AND posted_at < ?`,
+		`SELECT COUNT(*) FROM entries WHERE wid = ? AND status = ? AND posted_at >= ? AND posted_at < ?`+
+			excludeHiddenCategoryClause,
 		wid, domain.EntryPublished, from.Unix(), to.Unix()).Scan(&n)
 	if err != nil {
 		return 0, fmt.Errorf("repo: CountPublishedEntriesInRange: %w", err)
@@ -364,12 +393,14 @@ func (s *Store) CountPublishedEntriesInRange(ctx context.Context, wid int64, fro
 
 // RecentPublishedEntriesPage is RecentPublishedEntries + an OFFSET —
 // the same shape SB3 implements via `LIMIT disp OFFSET (page*disp)`.
-// Caller computes offset = (page-1) * limit.
+// Caller computes offset = (page-1) * limit. Hidden-category entries
+// are excluded so the home pagination stays consistent with the count.
 func (s *Store) RecentPublishedEntriesPage(ctx context.Context, wid int64, limit, offset int) ([]domain.Entry, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+entryColumns+`
 		FROM entries
-		WHERE wid = ? AND status = ?
+		WHERE wid = ? AND status = ?`+
+		excludeHiddenCategoryClause+`
 		ORDER BY pinned DESC, posted_at DESC
 		LIMIT ? OFFSET ?`, wid, domain.EntryPublished, limit, offset)
 	if err != nil {
@@ -397,11 +428,14 @@ func (s *Store) PublishedEntriesByCategoryPage(ctx context.Context, wid, catID i
 
 // PublishedEntriesInRangePage is the paginated sibling of
 // PublishedEntriesInRange. Used by year/month archive pagination.
+// Hidden-category entries are excluded to keep the archive page slice
+// aligned with CountPublishedEntriesInRange.
 func (s *Store) PublishedEntriesInRangePage(ctx context.Context, wid int64, from, to time.Time, limit, offset int) ([]domain.Entry, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+entryColumns+`
 		FROM entries
-		WHERE wid = ? AND status = ? AND posted_at >= ? AND posted_at < ?
+		WHERE wid = ? AND status = ? AND posted_at >= ? AND posted_at < ?`+
+		excludeHiddenCategoryClause+`
 		ORDER BY posted_at DESC
 		LIMIT ? OFFSET ?`, wid, domain.EntryPublished, from.Unix(), to.Unix(), limit, offset)
 	if err != nil {

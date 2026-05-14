@@ -12,7 +12,7 @@ import (
 
 // categoryColumns is the canonical column list for the categories table.
 // Order must match the inline Scan call sites.
-const categoryColumns = `id, wid, parent_id, name, slug, sort_order, description, description_format, template_id`
+const categoryColumns = `id, wid, parent_id, name, slug, sort_order, description, description_format, template_id, hidden`
 
 // AllCategories returns every category row for the weblog, ordered by
 // sort_order then id.
@@ -29,7 +29,7 @@ func (s *Store) AllCategories(ctx context.Context, wid int64) ([]domain.Category
 	var out []domain.Category
 	for rows.Next() {
 		var c domain.Category
-		if err := rows.Scan(&c.ID, &c.WID, &c.ParentID, &c.Name, &c.Slug, &c.SortOrder, &c.Description, &c.DescriptionFormat, &c.TemplateID); err != nil {
+		if err := rows.Scan(&c.ID, &c.WID, &c.ParentID, &c.Name, &c.Slug, &c.SortOrder, &c.Description, &c.DescriptionFormat, &c.TemplateID, &c.Hidden); err != nil {
 			return nil, fmt.Errorf("repo: scan category: %w", err)
 		}
 		out = append(out, c)
@@ -43,7 +43,7 @@ func (s *Store) CategoryByID(ctx context.Context, wid, id int64) (*domain.Catego
 	err := s.db.QueryRowContext(ctx, `
 		SELECT `+categoryColumns+`
 		FROM categories WHERE wid = ? AND id = ?`, wid, id).Scan(
-		&c.ID, &c.WID, &c.ParentID, &c.Name, &c.Slug, &c.SortOrder, &c.Description, &c.DescriptionFormat, &c.TemplateID)
+		&c.ID, &c.WID, &c.ParentID, &c.Name, &c.Slug, &c.SortOrder, &c.Description, &c.DescriptionFormat, &c.TemplateID, &c.Hidden)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -69,7 +69,7 @@ func (s *Store) CategoryBySlug(ctx context.Context, wid int64, slug string) (*do
 		FROM categories
 		WHERE wid = ? AND slug = ?
 		ORDER BY id LIMIT 1`, wid, slug).Scan(
-		&c.ID, &c.WID, &c.ParentID, &c.Name, &c.Slug, &c.SortOrder, &c.Description, &c.DescriptionFormat, &c.TemplateID)
+		&c.ID, &c.WID, &c.ParentID, &c.Name, &c.Slug, &c.SortOrder, &c.Description, &c.DescriptionFormat, &c.TemplateID, &c.Hidden)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -129,7 +129,7 @@ func (s *Store) CategoriesByIDs(ctx context.Context, ids []int64) (map[int64]dom
 	out := make(map[int64]domain.Category, len(ids))
 	for rows.Next() {
 		var c domain.Category
-		if err := rows.Scan(&c.ID, &c.WID, &c.ParentID, &c.Name, &c.Slug, &c.SortOrder, &c.Description, &c.DescriptionFormat, &c.TemplateID); err != nil {
+		if err := rows.Scan(&c.ID, &c.WID, &c.ParentID, &c.Name, &c.Slug, &c.SortOrder, &c.Description, &c.DescriptionFormat, &c.TemplateID, &c.Hidden); err != nil {
 			return nil, fmt.Errorf("repo: scan category: %w", err)
 		}
 		out[c.ID] = c
@@ -143,9 +143,9 @@ func (s *Store) CategoriesByIDs(ctx context.Context, ids []int64) (map[int64]dom
 func (s *Store) CreateCategory(ctx context.Context, c domain.Category, sortOrder int) (int64, error) {
 	now := time.Now().Unix()
 	res, err := s.db.ExecContext(ctx, `
-		INSERT INTO categories (wid, parent_id, name, slug, sort_order, description, description_format, template_id, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		c.WID, c.ParentID, c.Name, c.Slug, sortOrder, c.Description, defaultDescFormat(c.DescriptionFormat), c.TemplateID, now, now)
+		INSERT INTO categories (wid, parent_id, name, slug, sort_order, description, description_format, template_id, hidden, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.WID, c.ParentID, c.Name, c.Slug, sortOrder, c.Description, defaultDescFormat(c.DescriptionFormat), c.TemplateID, boolToInt(c.Hidden), now, now)
 	if err != nil {
 		return 0, fmt.Errorf("repo: CreateCategory: %w", err)
 	}
@@ -156,16 +156,17 @@ func (s *Store) CreateCategory(ctx context.Context, c domain.Category, sortOrder
 	return id, nil
 }
 
-// UpdateCategory overwrites name, slug, parent, and sort order. created_at
-// stays put; updated_at advances.
+// UpdateCategory overwrites name, slug, parent, sort order, description,
+// template, and the hidden flag. created_at stays put; updated_at
+// advances.
 func (s *Store) UpdateCategory(ctx context.Context, c domain.Category, sortOrder int) error {
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE categories
 		SET parent_id = ?, name = ?, slug = ?, sort_order = ?,
-		    description = ?, description_format = ?, template_id = ?, updated_at = ?
+		    description = ?, description_format = ?, template_id = ?, hidden = ?, updated_at = ?
 		WHERE wid = ? AND id = ?`,
 		c.ParentID, c.Name, c.Slug, sortOrder,
-		c.Description, defaultDescFormat(c.DescriptionFormat), c.TemplateID, time.Now().Unix(), c.WID, c.ID)
+		c.Description, defaultDescFormat(c.DescriptionFormat), c.TemplateID, boolToInt(c.Hidden), time.Now().Unix(), c.WID, c.ID)
 	if err != nil {
 		return fmt.Errorf("repo: UpdateCategory: %w", err)
 	}
@@ -174,6 +175,16 @@ func (s *Store) UpdateCategory(ctx context.Context, c domain.Category, sortOrder
 		return ErrNotFound
 	}
 	return nil
+}
+
+// boolToInt converts a Go bool to the 0/1 form SQLite stores in INTEGER
+// columns. Kept package-private; callers use it for the categories.hidden
+// flag where the domain field is bool but the column is INTEGER.
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 // DeleteCategory removes a category. Any entry that referenced it is

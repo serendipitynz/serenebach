@@ -26,7 +26,7 @@
         <tr data-category-id="{{.ID}}" draggable="true">
           <td class="drag-handle col-drag col-hide-mobile" title="{{T `common.dragToReorder`}}" aria-label="{{T `common.dragToReorder`}}">≡</td>
           <td class="num col-id col-hide-mobile">{{.ID}}</td>
-          <td class="col-flex-wide"><a href="{{Root}}/admin/categories/{{.ID}}/edit">{{.Name}}</a></td>
+          <td class="col-flex-wide"><a href="{{Root}}/admin/categories/{{.ID}}/edit">{{.Name}}</a>{{if .Hidden}} <span class="badge hint">{{T "categories.badge.hidden"}}</span>{{end}}</td>
           <td class="col-flex col-hide-mobile">{{if .Slug}}{{.Slug}}{{else}}<span class="hint">{{T "common.dash"}}</span>{{end}}</td>
           <td class="col-flex col-hide-mobile">{{if .ParentName}}{{.ParentName}}{{else}}<span class="hint">{{T "categories.parent.root"}}</span>{{end}}</td>
           <td class="num col-count">{{.EntryCount}}</td>

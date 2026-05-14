@@ -179,15 +179,21 @@ func (h *Handler) loadEntryViewData(ctx context.Context, entry *domain.Entry, we
 		data.author = &u
 	}
 
-	if prev, err := h.Store.PrevPublishedEntry(ctx, h.WID, *entry); err == nil {
-		data.prev = prev
-	} else if !errors.Is(err, repo.ErrNotFound) {
-		log.Printf("public.entry: prev: %v", err)
-	}
-	if next, err := h.Store.NextPublishedEntry(ctx, h.WID, *entry); err == nil {
-		data.next = next
-	} else if !errors.Is(err, repo.ErrNotFound) {
-		log.Printf("public.entry: next: %v", err)
+	// Prev/next navigation is skipped entirely for entries whose category
+	// is hidden — the design says hidden-category entries are reachable
+	// by direct URL but are "out of band" of the public listing chain,
+	// so chaining back into the visible feed would only confuse readers.
+	if data.category == nil || !data.category.Hidden {
+		if prev, err := h.Store.PrevPublishedEntry(ctx, h.WID, *entry); err == nil {
+			data.prev = prev
+		} else if !errors.Is(err, repo.ErrNotFound) {
+			log.Printf("public.entry: prev: %v", err)
+		}
+		if next, err := h.Store.NextPublishedEntry(ctx, h.WID, *entry); err == nil {
+			data.next = next
+		} else if !errors.Is(err, repo.ErrNotFound) {
+			log.Printf("public.entry: next: %v", err)
+		}
 	}
 
 	messages, err := h.Store.ApprovedMessagesByEntry(ctx, h.WID, entry.ID)

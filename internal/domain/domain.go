@@ -246,6 +246,14 @@ type Category struct {
 	// pin, then to the active template" — same resolution chain the
 	// archive pages already use.
 	TemplateID int64
+	// Hidden, when true, drops the category from public listing surfaces
+	// (home / archive / tag / feed / sidebar category_list / prev-next
+	// navigation) and tells the static rebuild to skip its snapshot.
+	// The individual entry permalink stays live so authors can keep
+	// linking to the post; the dynamic /category/<key>/ route also keeps
+	// responding 200 so a hidden archive remains reachable via a direct
+	// link.
+	Hidden bool
 }
 
 // MCPToken is a bearer credential the admin issues for MCP clients

@@ -296,6 +296,10 @@ func parseCategoryForm(r *http.Request, base domain.Category) (domain.Category, 
 	} else {
 		base.TemplateID = 0
 	}
+	// Checkbox: present (any value) = hidden, absent = visible. The
+	// admin form's submit always emits the value="1" when ticked, so a
+	// plain non-empty check is enough.
+	base.Hidden = r.PostFormValue("hidden") != ""
 	return base, ""
 }
 

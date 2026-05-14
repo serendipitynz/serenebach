@@ -306,13 +306,15 @@ func (s *Store) TagsByEntries(ctx context.Context, entryIDs []int64) (map[int64]
 // PublishedEntriesByTag returns published entries carrying the given
 // tag, newest first, capped at limit. Mirrors
 // PublishedEntriesByCategory's shape so the list-page handlers look
-// identical on both routes.
+// identical on both routes. Hidden-category entries drop out so the
+// tag archive stays consistent with home/feed.
 func (s *Store) PublishedEntriesByTag(ctx context.Context, wid, tagID int64, limit int) ([]domain.Entry, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT e.id, e.wid, e.author_id, e.category_id, e.title, e.slug, e.keywords, e.body, e.more, e.format, e.status, e.posted_at, e.updated_at, e.likes_count, e.stamps_count, e.comments_count, e.og_bg_image_path, e.pinned, e.accept_comments
 		FROM entries e
 		JOIN entry_tags et ON et.entry_id = e.id
-		WHERE e.wid = ? AND e.status = ? AND et.tag_id = ?
+		WHERE e.wid = ? AND e.status = ? AND et.tag_id = ?`+
+		excludeHiddenCategoryClauseE+`
 		ORDER BY e.posted_at DESC
 		LIMIT ?`, wid, domain.EntryPublished, tagID, limit)
 	if err != nil {
@@ -323,13 +325,14 @@ func (s *Store) PublishedEntriesByTag(ctx context.Context, wid, tagID int64, lim
 }
 
 // PublishedEntriesByTagPage is the paginated sibling of
-// PublishedEntriesByTag.
+// PublishedEntriesByTag. Same hidden-category exclusion applies.
 func (s *Store) PublishedEntriesByTagPage(ctx context.Context, wid, tagID int64, limit, offset int) ([]domain.Entry, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT e.id, e.wid, e.author_id, e.category_id, e.title, e.slug, e.keywords, e.body, e.more, e.format, e.status, e.posted_at, e.updated_at, e.likes_count, e.stamps_count, e.comments_count, e.og_bg_image_path, e.pinned, e.accept_comments
 		FROM entries e
 		JOIN entry_tags et ON et.entry_id = e.id
-		WHERE e.wid = ? AND e.status = ? AND et.tag_id = ?
+		WHERE e.wid = ? AND e.status = ? AND et.tag_id = ?`+
+		excludeHiddenCategoryClauseE+`
 		ORDER BY e.posted_at DESC
 		LIMIT ? OFFSET ?`, wid, domain.EntryPublished, tagID, limit, offset)
 	if err != nil {
