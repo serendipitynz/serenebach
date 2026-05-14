@@ -42,7 +42,8 @@ func (s *Store) ArchivePeriodsWithCounts(ctx context.Context, wid int64, loc *ti
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT posted_at
 		FROM entries
-		WHERE wid = ? AND status = ?`, wid, domain.EntryPublished)
+		WHERE wid = ? AND status = ?`+
+		excludeHiddenCategoryClause, wid, domain.EntryPublished)
 	if err != nil {
 		return nil, fmt.Errorf("repo: ArchivePeriodsWithCounts: %w", err)
 	}
@@ -114,7 +115,8 @@ func (s *Store) ArchivePeriods(ctx context.Context, wid int64, loc *time.Locatio
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT posted_at
 		FROM entries
-		WHERE wid = ? AND status = ?`, wid, domain.EntryPublished)
+		WHERE wid = ? AND status = ?`+
+		excludeHiddenCategoryClause, wid, domain.EntryPublished)
 	if err != nil {
 		return nil, fmt.Errorf("repo: ArchivePeriods: %w", err)
 	}

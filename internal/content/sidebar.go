@@ -151,6 +151,13 @@ func applyCategorySidebarBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.T
 	byParent := map[int64][]SidebarCategory{}
 	hasVisible := false
 	for _, sc := range cats {
+		// Hidden categories drop out of every public surface, so the
+		// sidebar nav must skip them too — otherwise a hidden category
+		// would still be clickable from the {category_list} fragment
+		// that imported SB3 templates render.
+		if sc.Category.Hidden {
+			continue
+		}
 		if sc.Count <= 0 {
 			continue
 		}
