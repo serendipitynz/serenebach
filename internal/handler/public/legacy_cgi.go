@@ -182,7 +182,7 @@ func (h *Handler) redirectLegacyCategoryID(w http.ResponseWriter, r *http.Reques
 		http.NotFound(w, r)
 		return
 	}
-	id, err := h.Store.CategoryIDByLegacyID(r.Context(), h.WID, legacyID)
+	ref, err := h.Store.CategoryByLegacyID(r.Context(), h.WID, legacyID)
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
 			http.NotFound(w, r)
@@ -191,7 +191,7 @@ func (h *Handler) redirectLegacyCategoryID(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "lookup failed", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, root(r)+"/category/"+strconv.FormatInt(id, 10)+"/", http.StatusMovedPermanently)
+	http.Redirect(w, r, root(r)+"/category/"+categoryKeyForRef(ref)+"/", http.StatusMovedPermanently)
 }
 
 // redirectLegacyMonth handles ?month=YYYYMM. The Go archive route is

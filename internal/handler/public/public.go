@@ -154,7 +154,9 @@ func (h *Handler) Mount(r chi.Router) {
 	// same-origin guard takes its place; static-rendered HTML can then
 	// post to the dynamic backend without a per-session token.
 	r.Get("/entry/{key}", h.entry)
-	r.Get("/category/{id}", h.category)
+	// {key} is either a numeric category id or a custom slug —
+	// resolveCategoryKey disambiguates. Symmetric with the entry route.
+	r.Get("/category/{key}", h.category)
 	r.Get("/tag/{slug}", h.tag)
 	r.Get("/archive/{year}", h.archiveYear)
 	r.Get("/archive/{year}/{month}", h.archiveMonth)

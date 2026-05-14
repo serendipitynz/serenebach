@@ -89,7 +89,7 @@ func TestCategoryDescriptionMarkdownFormat(t *testing.T) {
 		t.Fatal(err)
 	}
 	w = httptest.NewRecorder()
-	a.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/category/1/", nil))
+	a.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/category/news/", nil))
 	if w.Code != 200 {
 		t.Fatalf("category status = %d", w.Code)
 	}

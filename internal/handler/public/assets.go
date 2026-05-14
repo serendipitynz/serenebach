@@ -101,6 +101,30 @@ func entryKeyFor(e *domain.Entry) string {
 	return strconv.FormatInt(e.ID, 10)
 }
 
+// resolveCategoryKey loads a category from either a numeric id or a slug.
+// Returns (category, isNumericKey, error) — isNumericKey lets the GET
+// handler emit a 301 redirect when the request came in via id but the
+// category has since acquired a canonical slug. Mirrors resolveEntryKey
+// for symmetry.
+func (h *Handler) resolveCategoryKey(ctx context.Context, key string) (*domain.Category, bool, error) {
+	if id, err := strconv.ParseInt(key, 10, 64); err == nil && id > 0 {
+		c, err := h.Store.CategoryByID(ctx, h.WID, id)
+		return c, true, err
+	}
+	c, err := h.Store.CategoryBySlug(ctx, h.WID, key)
+	return c, false, err
+}
+
+// categoryKeyFor is the URL segment used to refer to this category —
+// slug when set, numeric id otherwise. Mirrors entryKeyFor / the
+// package-private categoryKey in content.
+func categoryKeyFor(c *domain.Category) string {
+	if c != nil && c.Slug != "" {
+		return c.Slug
+	}
+	return strconv.FormatInt(c.ID, 10)
+}
+
 // llmsIndex + llmsFull implement the /llms.txt + /llms-full.txt
 // public routes. Both 404 when the weblog hasn't flipped
 // the opt-in toggle on the 基本設定 tab — a blog owner who'd rather

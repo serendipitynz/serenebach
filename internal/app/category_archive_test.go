@@ -13,7 +13,7 @@ func TestCategoryPageShowsFilteredEntries(t *testing.T) {
 	a := newTestApp(t)
 
 	// seed places both sample entries into category id=1 ("お知らせ")
-	req := httptest.NewRequest("GET", "/category/1", nil)
+	req := httptest.NewRequest("GET", "/category/news", nil)
 	w := httptest.NewRecorder()
 	a.Handler().ServeHTTP(w, req)
 
@@ -44,12 +44,30 @@ func TestCategoryPage404ForUnknownID(t *testing.T) {
 	}
 }
 
+// TestCategoryIDFormRedirectsToSlug confirms an id-form hit on a
+// category that has a slug 301s to the canonical /category/<slug>/
+// surface, mirroring the entry id→slug redirect.
+func TestCategoryIDFormRedirectsToSlug(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+
+	req := httptest.NewRequest("GET", "/category/1/", nil)
+	w := httptest.NewRecorder()
+	a.Handler().ServeHTTP(w, req)
+	if w.Code != 301 {
+		t.Fatalf("status = %d, want 301", w.Code)
+	}
+	if loc := w.Result().Header.Get("Location"); loc != "/category/news/" {
+		t.Errorf("Location = %q, want /category/news/", loc)
+	}
+}
+
 func TestCategoryPageHidesEntriesInOtherCategories(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
 
 	// Insert a second category and a published entry belonging to it, so
-	// the /category/1 page must not mention the new entry's title.
+	// the /category/news page must not mention the new entry's title.
 	ctx := context.Background()
 	now := time.Now().Unix()
 	res, err := a.DB.ExecContext(ctx, `
@@ -66,7 +84,7 @@ func TestCategoryPageHidesEntriesInOtherCategories(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest("GET", "/category/1", nil)
+	req := httptest.NewRequest("GET", "/category/news", nil)
 	w := httptest.NewRecorder()
 	a.Handler().ServeHTTP(w, req)
 	if w.Code != 200 {
@@ -76,11 +94,11 @@ func TestCategoryPageHidesEntriesInOtherCategories(t *testing.T) {
 	// has a {latest_entry_list} widget that legitimately surfaces
 	// entries from every category.
 	if strings.Contains(mainArea(w.Body.String()), "ELSEWHERE") {
-		t.Errorf("entry from other category leaked into /category/1")
+		t.Errorf("entry from other category leaked into /category/news")
 	}
 
 	// But the other category's own page must show it.
-	req3 := httptest.NewRequest("GET", "/category/2", nil)
+	req3 := httptest.NewRequest("GET", "/category/other", nil)
 	w3 := httptest.NewRecorder()
 	a.Handler().ServeHTTP(w3, req3)
 	if !strings.Contains(w3.Body.String(), "ELSEWHERE") {

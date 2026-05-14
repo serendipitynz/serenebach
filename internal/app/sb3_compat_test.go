@@ -95,7 +95,7 @@ func TestSB3CompatSiteLevelTags(t *testing.T) {
 	}{
 		{"/", "page", "", ""},
 		{"/entry/1/", "entry", "1", "ようこそ Serene Bach へ"},
-		{"/category/1/", "category", "1", "Category: お知らせ"},
+		{"/category/news/", "category", "1", "Category: お知らせ"},
 		{"/archive/2026/04/", "archive", "202604", "Archive: 2026/04"},
 	}
 	for _, tc := range cases {
@@ -231,7 +231,7 @@ func TestSB3CompatCategoryAreaBlock(t *testing.T) {
 	}
 
 	w := httptest.NewRecorder()
-	a.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/category/1/", nil))
+	a.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/category/news/", nil))
 	if w.Code != 200 {
 		t.Fatalf("status = %d", w.Code)
 	}

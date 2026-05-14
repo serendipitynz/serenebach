@@ -157,7 +157,7 @@ func TestCategoryPageEmitsPinnedCSSURL(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest("GET", "/category/1/", nil)
+	req := httptest.NewRequest("GET", "/category/news/", nil)
 	w := httptest.NewRecorder()
 	a.Handler().ServeHTTP(w, req)
 	if w.Code != 200 {

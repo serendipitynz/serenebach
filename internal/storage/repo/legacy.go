@@ -102,21 +102,32 @@ func (s *Store) EntryByLegacyFile(ctx context.Context, wid int64, file string) (
 	return ref, nil
 }
 
-// CategoryIDByLegacyID resolves an SB3 category_id to the destination
-// category id.
-func (s *Store) CategoryIDByLegacyID(ctx context.Context, wid, legacyID int64) (int64, error) {
-	var id int64
+// CategoryByLegacyID resolves an SB3 category_id to the destination
+// category's id + slug so the redirect layer can prefer the slug URL
+// when one is set.
+func (s *Store) CategoryByLegacyID(ctx context.Context, wid, legacyID int64) (LegacyCategoryRef, error) {
+	var ref LegacyCategoryRef
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id FROM categories
+		SELECT id, slug FROM categories
 		WHERE wid = ? AND legacy_id = ?
-		LIMIT 1`, wid, legacyID).Scan(&id)
+		LIMIT 1`, wid, legacyID).Scan(&ref.ID, &ref.Slug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, ErrNotFound
+			return ref, ErrNotFound
 		}
-		return 0, fmt.Errorf("repo: CategoryIDByLegacyID: %w", err)
+		return ref, fmt.Errorf("repo: CategoryByLegacyID: %w", err)
 	}
-	return id, nil
+	return ref, nil
+}
+
+// CategoryIDByLegacyID is the id-only wrapper around CategoryByLegacyID,
+// retained for callers that don't need the slug.
+func (s *Store) CategoryIDByLegacyID(ctx context.Context, wid, legacyID int64) (int64, error) {
+	ref, err := s.CategoryByLegacyID(ctx, wid, legacyID)
+	if err != nil {
+		return 0, err
+	}
+	return ref.ID, nil
 }
 
 // CategoryByLegacyDir resolves an SB3 category_dir to the destination

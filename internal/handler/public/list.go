@@ -284,12 +284,8 @@ func paginationFor(page, size int, total int64, basePath string) (content.Pagina
 
 func (h *Handler) category(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
-		http.NotFound(w, r)
-		return
-	}
-	cat, err := h.Store.CategoryByID(ctx, h.WID, id)
+	key := chi.URLParam(r, "key")
+	cat, viaID, err := h.resolveCategoryKey(ctx, key)
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
 			http.NotFound(w, r)
@@ -297,6 +293,14 @@ func (h *Handler) category(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("public.category: load category: %v", err)
 		http.Error(w, "failed to load category", http.StatusInternalServerError)
+		return
+	}
+	// Mirror the entry handler: when the lookup came in via numeric id
+	// but the category has since acquired a slug, 301 to the canonical
+	// /category/<slug>/ surface so previously-cached links eventually
+	// settle on the slug form.
+	if viaID && cat.Slug != "" {
+		http.Redirect(w, r, root(r)+"/category/"+cat.Slug+"/", http.StatusMovedPermanently)
 		return
 	}
 	page, ok := parsePageParam(r)
@@ -311,7 +315,7 @@ func (h *Handler) category(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to count entries", http.StatusInternalServerError)
 		return
 	}
-	basePath := root(r) + "/category/" + strconv.FormatInt(cat.ID, 10) + "/"
+	basePath := root(r) + "/category/" + categoryKeyFor(cat) + "/"
 	pg, offset, ok := paginationFor(page, size, total, basePath)
 	if !ok {
 		http.NotFound(w, r)
