@@ -601,6 +601,15 @@ func writeCategories(ctx context.Context, store *repo.Store, opts Options, site 
 	}
 	for _, c := range allCats {
 		cat := c // loop var escapes into pointer below
+		// Skip hidden categories: the dynamic /category/<key>/ route
+		// keeps responding for direct hits, but the static snapshot is
+		// intentionally absent so an operator who flipped a category
+		// hidden doesn't keep a stale public-facing archive page on the
+		// CDN. promoteManagedSubtree's swap removes any previous
+		// snapshot in the same run.
+		if cat.Hidden {
+			continue
+		}
 		entries, err := store.PublishedEntriesByCategoryPage(ctx, opts.WID, cat.ID, opts.EntryListLimit, 0)
 		if err != nil {
 			return fmt.Errorf("rebuild: category %d entries: %w", cat.ID, err)
