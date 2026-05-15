@@ -7,9 +7,7 @@
 
 セルフホスト型 Go 製ウェブログエンジン。WordPress と Hugo の中間にある軽量な選択肢として位置づけています。
 
-<video src="https://go.serenebach.net/screenshots/admin-tour.mp4" controls muted playsinline preload="metadata" width="720">
-  <a href="https://go.serenebach.net/screenshots/admin-tour.mp4">管理画面ツアーを再生 (17秒、音声なし)</a>
-</video>
+[![管理画面ツアー (17秒、音声なし) — クリックで HD 版 mp4](docs/assets/admin-tour.webp)](https://go.serenebach.net/screenshots/admin-tour.mp4)
 
 🌐 **[go.serenebach.net](https://go.serenebach.net)** — 機能紹介・スクリーンショット
 📄 English: see [README.md](README.md)
