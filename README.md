@@ -7,7 +7,9 @@
 
 A self-hostable Go weblog engine — a lighter path between WordPress and Hugo. Small to place, familiar to publish.
 
-<video src="https://github.com/user-attachments/assets/8d837960-e338-40ef-be7c-36332d4ec370" controls muted playsinline width="720"></video>
+<video src="https://go.serenebach.net/screenshots/admin-tour.mp4" controls muted playsinline preload="metadata" width="720">
+  <a href="https://go.serenebach.net/screenshots/admin-tour.mp4">Watch admin tour (17s, no audio)</a>
+</video>
 
 🌐 **[go.serenebach.net](https://go.serenebach.net)** — features, screenshots, positioning
 📄 Japanese: see [README.ja.md](README.ja.md)
