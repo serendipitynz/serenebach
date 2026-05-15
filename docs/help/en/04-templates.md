@@ -164,7 +164,7 @@ Usable inside and outside the `page` block.
 | `{entry_id}` | Entry ID |
 | `{entry_permalink}` | Entry permalink URL |
 | `{entry_title}` | Entry title |
-| `{entry_date}` | Entry date (format differs between list and single-entry views) |
+| `{entry_date}` | Entry date. Formatted with "Design settings > Settings > Date/time formats > Entry date" (default: `%Year%-%Mon%-%Day% (%Week%)`) on both list and single-entry pages. |
 | `{entry_time}` | Posting time wrapped in a permalink anchor |
 | `{entry_disp_time}` | Posting time (plain string) |
 | `{entry_description}` | Entry body (format-rendered HTML) |

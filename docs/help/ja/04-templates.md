@@ -166,7 +166,7 @@ HTML テンプレートは基本的に HTML の要素で構成されます。内
 | `{entry_id}` | 記事 ID |
 | `{entry_permalink}` | 記事のパーマリンク URL |
 | `{entry_title}` | 記事タイトル |
-| `{entry_date}` | 記事の日付（リスト用 / 個別記事用で異なる書式） |
+| `{entry_date}` | 記事の日付。一覧ページ・個別記事ページのどちらでも「デザイン設定 > 設定 > 時刻表記設定 > 記事日付」（既定: `%Year%-%Mon%-%Day% (%Week%)`）で整形されます。 |
 | `{entry_time}` | 投稿時刻（パーマリンクで囲まれた HTML） |
 | `{entry_disp_time}` | 投稿時刻（プレーン文字列） |
 | `{entry_description}` | 記事本文（フォーマット適用済み HTML） |
