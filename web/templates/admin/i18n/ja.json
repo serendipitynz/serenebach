@@ -627,6 +627,7 @@
   "templates.settings.date.entryTime": "記事時刻",
   "templates.settings.date.comment": "コメント",
   "templates.settings.date.list": "リスト",
+  "templates.settings.date.listUnusedNote": "現時点では公開出力に反映されません（将来 {latest_entry_list} などサイドバー一覧ブロック内のインライン日付向けに利用予定）。一覧ページの <code>{entry_date}</code> は「記事日付」設定で整形されます。",
   "templates.settings.date.archive": "アーカイブ",
   "templates.settings.displayHeading": "表示件数・並び順",
   "templates.settings.display.perPage": "1 ページあたりの記事数",
