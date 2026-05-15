@@ -115,9 +115,55 @@ func TestDateFormatSettingsPageRendersPreview(t *testing.T) {
 		// Placeholder carries the package default — the fallback the
 		// public site actually uses when the field is empty.
 		`placeholder="%Year%-%Mon%-%Day% (%Week%)"`,
+		// DateFormatList default is SB3's " (%Mon%/%Day%)" verbatim,
+		// including the leading space and parens, so the placeholder
+		// must echo the same shape.
+		`placeholder=" (%Mon%/%Day%)"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("settings page missing %q", want)
 		}
+	}
+}
+
+// TestDateFormatSettingsPreservesLeadingSpace covers SB3 parity for
+// the date_format_list field: a user-entered pattern with a leading
+// space (e.g. " (%Mon%/%Day%)") must round-trip through the form
+// without the handler trimming whitespace. The previous TrimSpace
+// would silently drop the leading space and break the SB3 inline
+// shape in the sidebar widgets.
+func TestDateFormatSettingsPreservesLeadingSpace(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	cookies := login(t, a.Handler(), "admin", "changeme")
+	csrfCookie, token := fetchCSRF(t, a.Handler())
+
+	form := url.Values{
+		"csrf_token":          {token},
+		"archive_template_id": {"0"},
+		"profile_template_id": {"0"},
+		"date_format_entry":   {""},
+		"time_format_entry":   {""},
+		"date_format_comment": {""},
+		"date_format_list":    {" [%Mon%/%Day%] "},
+		"date_format_archive": {""},
+	}
+	req := httptest.NewRequest("POST", "/admin/templates/settings", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(csrfCookie)
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
+	w := httptest.NewRecorder()
+	a.Handler().ServeHTTP(w, req)
+	if w.Code != 302 {
+		t.Fatalf("save status = %d, want 302", w.Code)
+	}
+	var stored string
+	if err := a.DB.QueryRow(`SELECT date_format_list FROM weblogs WHERE id = 1`).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored != " [%Mon%/%Day%] " {
+		t.Errorf("stored date_format_list = %q, want leading/trailing spaces preserved", stored)
 	}
 }
