@@ -191,6 +191,6 @@ const (
 	DefaultEntryDate   = "%Year%-%Mon%-%Day% (%Week%)"
 	DefaultEntryTime   = "%Hour%:%Min%"
 	DefaultCommentDate = "%Year%-%Mon%-%Day% %Hour%:%Min%"
-	DefaultListDate    = "%Mon%/%Day%"
+	DefaultListDate    = " (%Mon%/%Day%)"
 	DefaultArchiveDate = "%Year%-%Mon%"
 )

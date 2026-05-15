@@ -216,8 +216,15 @@ func renderCategoryTree(s Site, byParent map[int64][]SidebarCategory, parent int
 }
 
 // applyRecentCommentBlock mirrors sb::Content::List::_comment. Emits
-// `{recent_comment_list}` as a `<ul><li>` fragment linking each
-// comment back to its entry.
+// `{recent_comment_list}` as
+// `<ul><li>EntryTitle<br />=&gt; <a href="...">AuthorDate</a></li>…</ul>`
+// — the same shape SB3 ships. The arrow is the literal SB3 fallback
+// for `lang->string('=&gt;')` (no resource entry registers it in
+// stock ja/en, so the key itself appears in the output). Date uses
+// `Site.FormatListDate(m.PostedAt)` so the SB3 `conf_dateinlist`
+// setting (DateFormatList) governs the inline date; the default
+// pattern `' (%Mon%/%Day%)'` already carries a leading space between
+// the author and the date.
 func applyRecentCommentBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Template, messages []repo.RecentApprovedMessage) {
 	if !tmpl.HasBlock("recent_comment") {
 		return
@@ -238,13 +245,15 @@ func applyRecentCommentBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Tem
 		if label == "" {
 			label = noNameLabel(s.Weblog.Lang)
 		}
-		b.WriteString(`<li><a href="`)
+		date := s.FormatListDate(m.PostedAt)
+		b.WriteString(`<li>`)
+		b.WriteString(html.EscapeString(m.EntryTitle))
+		b.WriteString(`<br />=&gt; <a href="`)
 		b.WriteString(html.EscapeString(url))
 		b.WriteString(`">`)
-		b.WriteString(html.EscapeString(m.EntryTitle))
-		b.WriteString(`</a> — `)
 		b.WriteString(html.EscapeString(label))
-		b.WriteString(`</li>`)
+		b.WriteString(html.EscapeString(date))
+		b.WriteString(`</a></li>`)
 	}
 	b.WriteString("</ul>")
 	c.Num(0)
@@ -352,8 +361,12 @@ func renderLinkItem(l domain.Link) string {
 }
 
 // applyLatestEntryBlock mirrors sb::Content::List::_latest. Emits
-// `{latest_entry_list}` as a simple `<ul><li><a>Title</a></li>…`
-// fragment.
+// `{latest_entry_list}` as `<ul><li><a href="...">Title</a>Date</li>…`,
+// where Date is `Site.FormatListDate(entry.PostedAt)` — the SB3
+// `conf_dateinlist` setting (DateFormatList). The default pattern
+// `' (%Mon%/%Day%)'` carries a leading space, so authors get
+// `<a>Title</a> (04/19)` straight from SB3-style configuration with
+// no extra padding from this renderer.
 func applyLatestEntryBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Template, entries []domain.Entry) {
 	if !tmpl.HasBlock("latest_entry") {
 		return
@@ -366,11 +379,14 @@ func applyLatestEntryBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Templ
 	b.WriteString("<ul>")
 	for _, e := range entries {
 		url := s.EntryPermalink(e)
+		date := s.FormatListDate(e.PostedAt)
 		b.WriteString(`<li><a href="`)
 		b.WriteString(html.EscapeString(url))
 		b.WriteString(`">`)
 		b.WriteString(html.EscapeString(e.Title))
-		b.WriteString(`</a></li>`)
+		b.WriteString(`</a>`)
+		b.WriteString(html.EscapeString(date))
+		b.WriteString(`</li>`)
 	}
 	b.WriteString("</ul>")
 	c.Num(0)
