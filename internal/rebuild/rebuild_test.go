@@ -1004,5 +1004,102 @@ func TestBuildFlatPagesCoexistWithEntryRoutes(t *testing.T) {
 	}
 }
 
+// TestBuildEntryUsesCategoryTemplatePin verifies the static rebuild mirrors
+// SB3's per-entry template priority: an entry whose main category carries a
+// template pin must be rendered with that template (EntryBody preferred),
+// not with the active template.
+func TestBuildEntryUsesCategoryTemplatePin(t *testing.T) {
+	a := newSeededApp(t)
+	ctx := context.Background()
+	now := time.Now().Unix()
+
+	// Add a category-specific template with a distinct EntryBody marker.
+	res, err := a.DB.ExecContext(ctx, `
+		INSERT INTO templates (wid, name, is_active, main_body, entry_body, css, info, sort_order, created_at, updated_at)
+		VALUES (1, 'cat-tmpl', 0,
+			'<!-- BEGIN entry -->'||char(10)||'CATEGORY_MAIN:{entry_title}'||char(10)||'<!-- END entry -->'||char(10),
+			'<!-- BEGIN entry -->'||char(10)||'CATEGORY_ENTRY:{entry_title}'||char(10)||'<!-- END entry -->'||char(10),
+			'', '', 0, ?, ?)`, now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	catTmplID, _ := res.LastInsertId()
+
+	// Override the active template with an identifiable marker.
+	if _, err := a.DB.ExecContext(ctx, `UPDATE templates SET
+		main_body = '<!-- BEGIN entry -->'||char(10)||'ACTIVE:{entry_title}'||char(10)||'<!-- END entry -->'||char(10),
+		entry_body = ''
+		WHERE is_active = 1`); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add a category pinned to catTmplID.
+	res, err = a.DB.ExecContext(ctx, `
+		INSERT INTO categories (wid, parent_id, name, slug, sort_order, template_id, created_at, updated_at)
+		VALUES (1, 0, 'Pinned', 'pinned', 0, ?, ?, ?)`, catTmplID, now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	catID, _ := res.LastInsertId()
+
+	// Add a published entry in that category.
+	res, err = a.DB.ExecContext(ctx, `
+		INSERT INTO entries (wid, author_id, category_id, title, body, more, format, status, posted_at, created_at, updated_at)
+		VALUES (1, 1, ?, 'PinnedEntry', '<p>body</p>', '', 'html', 1, ?, ?, ?)`,
+		catID, now, now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entryID, _ := res.LastInsertId()
+
+	out := filepath.Join(t.TempDir(), "public")
+	if _, err := rebuild.Build(ctx, a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	page, err := os.ReadFile(filepath.Join(out, "entry", strconv.FormatInt(entryID, 10), "index.html"))
+	if err != nil {
+		t.Fatalf("read entry page: %v", err)
+	}
+	s := string(page)
+
+	if !strings.Contains(s, "CATEGORY_ENTRY:PinnedEntry") {
+		t.Errorf("expected category EntryBody in static output; body:\n%s", s)
+	}
+	if strings.Contains(s, "ACTIVE:") {
+		t.Errorf("active template must not appear in static output; body:\n%s", s)
+	}
+	if strings.Contains(s, "CATEGORY_MAIN:") {
+		t.Errorf("EntryBody should beat MainBody in static output; body:\n%s", s)
+	}
+}
+
+// TestBuildEntryFallsBackToActiveTmplWhenNoCategoryPin confirms that entries
+// in a category without a template pin are rendered with the active template.
+func TestBuildEntryFallsBackToActiveTmplWhenNoCategoryPin(t *testing.T) {
+	a := newSeededApp(t)
+	ctx := context.Background()
+
+	if _, err := a.DB.ExecContext(ctx, `UPDATE templates SET
+		main_body = '<!-- BEGIN entry -->'||char(10)||'ACTIVE:{entry_title}'||char(10)||'<!-- END entry -->'||char(10),
+		entry_body = ''
+		WHERE is_active = 1`); err != nil {
+		t.Fatal(err)
+	}
+
+	out := filepath.Join(t.TempDir(), "public")
+	if _, err := rebuild.Build(ctx, a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	page, err := os.ReadFile(filepath.Join(out, "entry/1/index.html"))
+	if err != nil {
+		t.Fatalf("read entry page: %v", err)
+	}
+	if !strings.Contains(string(page), "ACTIVE:") {
+		t.Errorf("expected active template for unpinned category; body:\n%s", string(page))
+	}
+}
+
 // silence unused import lint when test-only helpers drift
 var _ = sql.Open
