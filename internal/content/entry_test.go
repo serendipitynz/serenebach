@@ -111,3 +111,48 @@ func TestEntryViewEscapesNavTitles(t *testing.T) {
 		t.Errorf("expected escaped <script> in output: %q", out)
 	}
 }
+
+func TestEntryViewPrefersEntryBodyOverMainBody(t *testing.T) {
+	t.Parallel()
+
+	tmpl := &domain.Template{
+		MainBody: "<!-- BEGIN entry -->\nMAIN:{entry_title}\n<!-- END entry -->\n",
+		EntryBody: "<!-- BEGIN entry -->\nENTRY:{entry_title}\n<!-- END entry -->\n",
+	}
+	v := EntryView{
+		Site:     NewSite(domain.Weblog{Lang: "ja"}),
+		Template: tmpl,
+		Entry:    domain.Entry{ID: 1, Title: "Hello", Status: domain.EntryPublished, PostedAt: time.Unix(0, 0)},
+	}
+	out, err := v.Render()
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if !strings.Contains(out, "ENTRY:Hello") {
+		t.Errorf("expected EntryBody to be used; got %q", out)
+	}
+	if strings.Contains(out, "MAIN:") {
+		t.Errorf("MainBody must not appear when EntryBody is set; got %q", out)
+	}
+}
+
+func TestEntryViewFallsBackToMainBodyWhenEntryBodyEmpty(t *testing.T) {
+	t.Parallel()
+
+	tmpl := &domain.Template{
+		MainBody:  "<!-- BEGIN entry -->\nMAIN:{entry_title}\n<!-- END entry -->\n",
+		EntryBody: "",
+	}
+	v := EntryView{
+		Site:     NewSite(domain.Weblog{Lang: "ja"}),
+		Template: tmpl,
+		Entry:    domain.Entry{ID: 1, Title: "Hello", Status: domain.EntryPublished, PostedAt: time.Unix(0, 0)},
+	}
+	out, err := v.Render()
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if !strings.Contains(out, "MAIN:Hello") {
+		t.Errorf("expected MainBody fallback; got %q", out)
+	}
+}
