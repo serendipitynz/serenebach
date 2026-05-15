@@ -115,3 +115,11 @@ linters:
       - path: docs/help/embed\.go
         linters:
           - gochecknoinits
+
+# Formatters are a v2 concept distinct from linters. Listing gofmt here
+# folds the previous standalone `gofmt -l .` CI step into
+# `golangci-lint run ./...` so a single command covers both lint and
+# formatting.
+formatters:
+  enable:
+    - gofmt

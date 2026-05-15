@@ -18,24 +18,15 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: gofmt
-        run: |
-          out=$(gofmt -l .)
-          if [ -n "$out" ]; then
-            echo "::error::gofmt found unformatted files:"
-            echo "$out"
-            echo "Run 'gofmt -w .' locally and commit."
-            exit 1
-          fi
-
       - name: go vet
         run: go vet ./...
 
       # golangci-lint covers the standard set (errcheck / govet /
       # ineffassign / staticcheck / unused) plus the project linters
-      # enabled in .golangci.yml — notably gocyclo at min-complexity 15.
-      # Without this step the config file would not be read and the
-      # gocyclo guard would silently no-op.
+      # enabled in .golangci.yml — notably gocyclo at min-complexity 15
+      # and gofmt (declared under `formatters:` in v2). Without this
+      # step the config file would not be read and the gocyclo / gofmt
+      # guards would silently no-op.
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
