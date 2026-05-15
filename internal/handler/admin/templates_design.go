@@ -107,13 +107,17 @@ func (h *Handler) templatesSettingsSave(w http.ResponseWriter, r *http.Request) 
 	}
 	// Date-format strings live in the same form on the same page; save
 	// them alongside the template pins. Empty values are stored as-is
-	// and resolved to package defaults at render time.
+	// and resolved to package defaults at render time. Leading and
+	// trailing whitespace is preserved verbatim — SB3 ships
+	// conf_dateinlist as " (%Mon%/%Day%)" (leading space + parens) so
+	// authors typing the same shape into the form must round-trip
+	// without the renderer eating the space.
 	if err := h.Store.UpdateWeblogDateFormats(r.Context(), h.wid(),
-		strings.TrimSpace(r.PostFormValue("date_format_entry")),
-		strings.TrimSpace(r.PostFormValue("time_format_entry")),
-		strings.TrimSpace(r.PostFormValue("date_format_comment")),
-		strings.TrimSpace(r.PostFormValue("date_format_list")),
-		strings.TrimSpace(r.PostFormValue("date_format_archive")),
+		r.PostFormValue("date_format_entry"),
+		r.PostFormValue("time_format_entry"),
+		r.PostFormValue("date_format_comment"),
+		r.PostFormValue("date_format_list"),
+		r.PostFormValue("date_format_archive"),
 	); err != nil {
 		log.Printf("admin.templatesSettingsSave: date formats: %v", err)
 		h.renderTemplateSettings(w, r, tr(r, "templates.settings.error.dateFormatSaveFailed"), "")

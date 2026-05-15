@@ -198,13 +198,24 @@ func TestSB3CompatSidebarBlocks(t *testing.T) {
 			t.Errorf("missing sidebar marker %q\nbody snippet: %s", marker, body)
 		}
 	}
-	// Latest entry block should link to a seed entry.
-	if !strings.Contains(body, `ようこそ Serene Bach へ</a>`) {
-		t.Errorf("latest_entry_list does not link to seeded entry")
+	// Latest entry block should link to a seed entry and follow the
+	// title with the SB3 _latest inline date, i.e. `<a>Title</a>Date`.
+	// DefaultListDate ships with the leading space + parens so the
+	// substring "</a> (" pins the shape without depending on the
+	// concrete MM/DD render.
+	if !strings.Contains(body, `ようこそ Serene Bach へ</a> (`) {
+		t.Errorf("latest_entry_list missing SB3 inline-date shape; body:\n%s", body)
 	}
-	// Recent comment block should carry the planted author name.
-	if !strings.Contains(body, `Visitor</li>`) {
-		t.Errorf("recent_comment_list does not show planted comment")
+	// Recent comment block should follow the SB3 _comment shape:
+	// `<li>EntryTitle<br />=&gt; <a href="...">AuthorDate</a></li>`.
+	// We pin the literal arrow + the author-name precedes the
+	// closing </a> (with the inline date in between), instead of the
+	// previous em-dash form.
+	if !strings.Contains(body, `<br />=&gt; <a `) {
+		t.Errorf("recent_comment_list missing SB3 arrow shape; body:\n%s", body)
+	}
+	if !strings.Contains(body, `Visitor (`) || !strings.Contains(body, `)</a></li>`) {
+		t.Errorf("recent_comment_list missing SB3 inline-date shape; body:\n%s", body)
 	}
 }
 
