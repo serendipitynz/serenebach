@@ -67,6 +67,28 @@ func TestDateFormatSettingsRoundtripAndApply(t *testing.T) {
 	if !strings.Contains(body, "年") || !strings.Contains(body, "月") || !strings.Contains(body, "日") {
 		t.Errorf("Japanese era markers missing from rendered entry date\nbody snippet: %s", body[:min(len(body), 400)])
 	}
+
+	// SB3 parity regression guard: {entry_date} must render via the
+	// same DateFormatEntry pattern on list pages (home / category /
+	// archive). Previously list views used FormatListDate, so the
+	// admin's "記事日付" setting silently dropped on every page except
+	// the permalink — see fix(content): use DateFormatEntry for
+	// {entry_date} on lists.
+	for _, path := range []string{"/", "/category/news"} {
+		req = httptest.NewRequest("GET", path, nil)
+		w = httptest.NewRecorder()
+		a.Handler().ServeHTTP(w, req)
+		if w.Code != 200 {
+			t.Fatalf("GET %s status = %d", path, w.Code)
+		}
+		body := w.Body.String()
+		if strings.Contains(body, "%Year%") || strings.Contains(body, "%MonNum%") {
+			t.Errorf("GET %s: pattern tokens leaked unexpanded", path)
+		}
+		if !strings.Contains(body, "年") || !strings.Contains(body, "月") || !strings.Contains(body, "日") {
+			t.Errorf("GET %s: DateFormatEntry not applied to {entry_date}\nbody snippet: %s", path, body[:min(len(body), 400)])
+		}
+	}
 }
 
 // TestDateFormatSettingsPageRendersPreview sanity-checks that the form

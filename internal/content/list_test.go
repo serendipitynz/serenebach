@@ -57,11 +57,13 @@ func TestListViewRendersEntriesAndSiteVars(t *testing.T) {
 		`<a href="https://example.com/entry/101/">World</a>`,
 		`<p>one</p>`,
 		`<p>two</p>`,
-		// Default list-date pattern is "%Mon%/%Day%" (SB3 convention)
-		// when no weblog-level override is configured.
+		// SB3 parity: {entry_date} renders via DateFormatEntry on both
+		// permalink and list pages. Default entry-date pattern is
+		// "%Year%-%Mon%-%Day% (%Week%)" when no weblog override is set;
+		// 2026-04-19 is a Sunday so %Week% (ja short form) -> "日".
 		// SB3 semantics: {user_disp_name} = display, {user_name} = login.
 		// SB3 semantics: {category_name} is a link to the category page.
-		`by Admin (admin) in <a href="https://example.com/category/10/">news</a> on 04/19`,
+		`by Admin (admin) in <a href="https://example.com/category/10/">news</a> on 2026-04-19 (日)`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q\nfull output:\n%s", want, out)

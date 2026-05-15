@@ -137,7 +137,12 @@ func (v ListView) applyEntry(c *sbtemplate.Context, i int, e domain.Entry) {
 	c.Tag("entry_id", strconv.FormatInt(e.ID, 10))
 	c.Tag("entry_permalink", v.Site.EntryPermalink(e))
 	c.Tag("entry_title", e.Title)
-	c.Tag("entry_date", v.Site.FormatListDate(e.PostedAt))
+	// SB3 parity: {entry_date} expands via conf_entry_date on both
+	// permalink and list pages (sb::Content::Entry::_date_time).
+	// conf_dateinlist (DateFormatList) is reserved for inline dates
+	// inside sidebar widgets like {latest_entry_list}, not for the
+	// {entry_date} tag itself.
+	c.Tag("entry_date", v.Site.FormatEntryDate(e.PostedAt))
 	permalink := html.EscapeString(v.Site.EntryPermalink(e))
 	timeStr := v.Site.FormatEntryTime(e.PostedAt)
 	c.TagHTML("entry_time", `<a href="`+permalink+`">`+html.EscapeString(timeStr)+`</a>`)
