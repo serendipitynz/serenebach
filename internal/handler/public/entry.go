@@ -45,7 +45,8 @@ func (h *Handler) entry(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "site not configured", http.StatusInternalServerError)
 		return
 	}
-	tmpl, ok := h.resolveEntryTemplate(ctx, preview)
+	data := h.loadEntryViewData(ctx, entry, weblog)
+	tmpl, ok := h.resolveEntryTemplate(ctx, preview, data.category)
 	if !ok {
 		http.Error(w, "no active template", http.StatusInternalServerError)
 		return
@@ -53,8 +54,6 @@ func (h *Handler) entry(w http.ResponseWriter, r *http.Request) {
 	if preview.Active() {
 		markPreviewResponse(w)
 	}
-
-	data := h.loadEntryViewData(ctx, entry, weblog)
 
 	view := content.EntryView{
 		Site:          h.buildSite(ctx, *weblog).WithBasePath(root(r)),
@@ -143,17 +142,28 @@ func entryStatusVisible(w http.ResponseWriter, r *http.Request, status domain.En
 	}
 }
 
-// resolveEntryTemplate honours the preview template selector when set
-// (and reachable), falling back to the weblog's active template.
-// Returns ok=false only when neither is loadable — the caller surfaces
-// that as a 500.
-func (h *Handler) resolveEntryTemplate(ctx context.Context, preview previewOverride) (*domain.Template, bool) {
+// resolveEntryTemplate picks the template for a single-entry permalink.
+// Priority mirrors SB3:
+//  1. preview override (admin-only; equivalent to SB3's tid param)
+//  2. entry's main category template pin
+//  3. active template
+//
+// Stale / missing pins log and fall through rather than erroring out.
+// Returns ok=false only when the active template is also unloadable.
+func (h *Handler) resolveEntryTemplate(ctx context.Context, preview previewOverride, cat *domain.Category) (*domain.Template, bool) {
 	if preview.TemplateID > 0 {
 		t, err := h.Store.TemplateByID(ctx, h.WID, preview.TemplateID)
 		if err == nil {
 			return t, true
 		}
 		log.Printf("public.entry: preview template %d missing, falling back: %v", preview.TemplateID, err)
+	}
+	if cat != nil && cat.TemplateID != 0 {
+		if t, err := h.Store.TemplateByID(ctx, h.WID, cat.TemplateID); err == nil {
+			return t, true
+		} else {
+			log.Printf("public.entry: category template pin %d missing, falling back: %v", cat.TemplateID, err)
+		}
 	}
 	t, err := h.Store.ActiveTemplate(ctx, h.WID)
 	if err != nil {

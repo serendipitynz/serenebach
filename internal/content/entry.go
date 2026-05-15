@@ -62,7 +62,16 @@ func (v EntryView) Render() (string, error) {
 		return "", fmt.Errorf("content.EntryView: no template main body")
 	}
 
-	tmpl, err := cachedParse(v.Template, "main", v.Template.MainBody)
+	// Entry template priority mirrors SB3:
+	// preview override (dynamic only) -> entry's main category template -> active template.
+	// Within the selected template prefer EntryBody; fall back to MainBody when empty.
+	bodyField := "entry"
+	bodyTmpl := v.Template.EntryBody
+	if bodyTmpl == "" {
+		bodyField = "main"
+		bodyTmpl = v.Template.MainBody
+	}
+	tmpl, err := cachedParse(v.Template, bodyField, bodyTmpl)
 	if err != nil {
 		return "", fmt.Errorf("content.EntryView: parse: %w", err)
 	}

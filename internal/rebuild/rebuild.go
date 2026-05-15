@@ -550,6 +550,9 @@ func adjacentEntries(ctx context.Context, store *repo.Store, wid int64, e domain
 }
 
 func writeEntries(ctx context.Context, store *repo.Store, opts Options, site content.Site, tmpl *domain.Template, weblog *domain.Weblog, all []domain.Entry, cats map[int64]domain.Category, users map[int64]domain.User, profileUsers []domain.User, sidebar content.SidebarData, rep *Report) error {
+	// Entry template priority mirrors SB3:
+	// entry's main category template -> active template.
+	templateCache := map[int64]*domain.Template{}
 	for i := range all {
 		e := all[i]
 		var catPtr *domain.Category
@@ -582,8 +585,20 @@ func writeEntries(ctx context.Context, store *repo.Store, opts Options, site con
 			return fmt.Errorf("rebuild: tags entry %d: %w", e.ID, err)
 		}
 
+		entryTmpl := tmpl
+		if catPtr != nil && catPtr.TemplateID != 0 {
+			if cached, ok := templateCache[catPtr.TemplateID]; ok {
+				entryTmpl = cached
+			} else if t, err := store.TemplateByID(ctx, opts.WID, catPtr.TemplateID); err == nil {
+				templateCache[catPtr.TemplateID] = t
+				entryTmpl = t
+			} else {
+				log.Printf("rebuild: category template pin %d missing, falling back: %v", catPtr.TemplateID, err)
+			}
+		}
+
 		body, err := (content.EntryView{
-			Site: site, Template: tmpl, Entry: e,
+			Site: site, Template: entryTmpl, Entry: e,
 			Category: catPtr, Author: authorPtr, Prev: prev, Next: next,
 			Messages:     msgs,
 			CommentMode:  weblog.CommentMode,
