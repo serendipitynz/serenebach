@@ -285,13 +285,13 @@ HTML テンプレートは基本的に HTML の要素で構成されます。内
 
 | タグ | 内容 |
 |---|---|
-| `{recent_comment_list}` | 最近のコメントリストの `<ul><li><a href="...">EntryTitle</a> — Name</li>...</ul>` HTML フラグメント |
+| `{recent_comment_list}` | 最近のコメントリストの `<ul><li>EntryTitle<br />=&gt; <a href="...">NameDate</a></li>...</ul>` HTML フラグメント（SB3 `_comment` 互換）。`Date` は「デザイン設定 > 設定 > 時刻表記設定 > リスト」の書式（既定: ` (%Mon%/%Day%)`）。 |
 
 ### `latest_entry` ブロック内のタグ
 
 | タグ | 内容 |
 |---|---|
-| `{latest_entry_list}` | 最新記事リストの `<ul><li><a href="...">Title</a></li>...</ul>` HTML フラグメント |
+| `{latest_entry_list}` | 最新記事リストの `<ul><li><a href="...">Title</a>Date</li>...</ul>` HTML フラグメント（SB3 `_latest` 互換）。`Date` は「デザイン設定 > 設定 > 時刻表記設定 > リスト」の書式（既定: ` (%Mon%/%Day%)`）。 |
 
 ### `link` ブロック内のタグ
 

@@ -627,7 +627,7 @@
   "templates.settings.date.entryTime": "Entry time",
   "templates.settings.date.comment": "Comment",
   "templates.settings.date.list": "List",
-  "templates.settings.date.listUnusedNote": "Currently not reflected in public output (reserved for inline dates inside sidebar list blocks such as {latest_entry_list} in a future change). The list-page <code>{entry_date}</code> tag is formatted by the &ldquo;Entry date&rdquo; setting above.",
+  "templates.settings.date.listUnusedNote": "Inline date appended to each <code>&lt;li&gt;</code> inside the sidebar list widgets (<code>{latest_entry_list}</code> / <code>{recent_comment_list}</code>). SB3 default is <code> (%Mon%/%Day%)</code> with the leading space + parens included. The <code>{entry_date}</code> tag on list pages is governed by the &ldquo;Entry date&rdquo; setting above.",
   "templates.settings.date.archive": "Archive",
   "templates.settings.displayHeading": "Count & order",
   "templates.settings.display.perPage": "Entries per page",

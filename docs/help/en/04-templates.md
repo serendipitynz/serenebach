@@ -283,13 +283,13 @@ Per-kind stamp counts are available as `{entry_stamps_heart}`, `{entry_stamps_la
 
 | Tag | Value |
 |---|---|
-| `{recent_comment_list}` | Recent comments `<ul><li><a href="...">EntryTitle</a> — Name</li>...</ul>` HTML fragment |
+| `{recent_comment_list}` | Recent comments `<ul><li>EntryTitle<br />=&gt; <a href="...">NameDate</a></li>...</ul>` HTML fragment (SB3 `_comment` compatible). `Date` follows "Design settings > Settings > Date/time formats > List" (default: ` (%Mon%/%Day%)`). |
 
 ### Tags inside the `latest_entry` block
 
 | Tag | Value |
 |---|---|
-| `{latest_entry_list}` | Recent entries `<ul><li><a href="...">Title</a></li>...</ul>` HTML fragment |
+| `{latest_entry_list}` | Recent entries `<ul><li><a href="...">Title</a>Date</li>...</ul>` HTML fragment (SB3 `_latest` compatible). `Date` follows "Design settings > Settings > Date/time formats > List" (default: ` (%Mon%/%Day%)`). |
 
 ### Tags inside the `link` block
 
