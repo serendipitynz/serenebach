@@ -116,7 +116,7 @@ func TestEntryViewPrefersEntryBodyOverMainBody(t *testing.T) {
 	t.Parallel()
 
 	tmpl := &domain.Template{
-		MainBody: "<!-- BEGIN entry -->\nMAIN:{entry_title}\n<!-- END entry -->\n",
+		MainBody:  "<!-- BEGIN entry -->\nMAIN:{entry_title}\n<!-- END entry -->\n",
 		EntryBody: "<!-- BEGIN entry -->\nENTRY:{entry_title}\n<!-- END entry -->\n",
 	}
 	v := EntryView{
