@@ -234,8 +234,11 @@ const (
 	pageTemplateImport   = "template_import"
 	pageTemplateSettings = "template_settings"
 	pageTemplateOG       = "template_og"
-	pageCustomTags       = "custom_tags"
-	pageHelp             = "help"
+	pageCustomTags        = "custom_tags"
+	pageWebhooksList      = "webhooks_list"
+	pageWebhookForm       = "webhook_form"
+	pageWebhookDeliveries = "webhook_deliveries"
+	pageHelp              = "help"
 )
 
 // DevMode disables template and i18n caching. When true, every request
@@ -297,7 +300,7 @@ func loadI18nBundle() *i18n.Bundle {
 
 func loadMainTemplates() map[string]*template.Template {
 	out := map[string]*template.Template{}
-	for _, p := range []string{pageHome, pageEntriesList, pageEntryForm, pagePagesList, pagePageForm, pageImages, pageCategoriesList, pageCategoryForm, pageLinksList, pageLinkForm, pageTagsList, pageUsersList, pageUserForm, pageProfileForm, pageCommentsList, pageCommentSettings, pageAnalytics, pageRebuild, pageSettings, pageSettingsBasic, pageSettingsAI, pageTemplatesList, pageTemplateForm, pageTemplateImport, pageTemplateSettings, pageTemplateOG, pageCustomTags, pageHelp} {
+	for _, p := range []string{pageHome, pageEntriesList, pageEntryForm, pagePagesList, pagePageForm, pageImages, pageCategoriesList, pageCategoryForm, pageLinksList, pageLinkForm, pageTagsList, pageUsersList, pageUserForm, pageProfileForm, pageCommentsList, pageCommentSettings, pageAnalytics, pageRebuild, pageSettings, pageSettingsBasic, pageSettingsAI, pageTemplatesList, pageTemplateForm, pageTemplateImport, pageTemplateSettings, pageTemplateOG, pageCustomTags, pageWebhooksList, pageWebhookForm, pageWebhookDeliveries, pageHelp} {
 		t, err := template.New("").Funcs(tmplFuncs).ParseFS(admintpl.FS(), "layout.html", p+".html")
 		if err != nil {
 			panic("admin: parse " + p + ": " + err.Error())

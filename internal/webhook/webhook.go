@@ -183,6 +183,26 @@ func (s *Service) Dispatch(ctx context.Context, wid int64, event string, payload
 	return nil
 }
 
+// DispatchOne pushes a payload at a single, explicit webhook regardless
+// of the active-events filter. Used by the "send test event" admin
+// affordance so an operator can verify a brand-new subscription
+// without first subscribing it to a real event.
+func (s *Service) DispatchOne(ctx context.Context, hook domain.Webhook, event string, payload Payload) error {
+	if s == nil || s.Disabled || s.Repo == nil {
+		return nil
+	}
+	body, err := encodePayload(payload)
+	if err != nil {
+		return fmt.Errorf("webhook: encode payload: %w", err)
+	}
+	if s.Sync {
+		s.deliverOne(ctx, hook, event, payload.ID, body)
+		return nil
+	}
+	go s.deliverOne(context.Background(), hook, event, payload.ID, body)
+	return nil
+}
+
 // deliverOne logs a pending delivery row, performs the POST, then
 // updates the row with the outcome. Errors are swallowed: the row's
 // `error` column is the audit trail.

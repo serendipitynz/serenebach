@@ -157,6 +157,7 @@ func (h *Handler) MountProtected(r chi.Router) {
 	h.mountAnalytics(r)
 	h.mountRebuild(r)
 	h.mountSettings(r)
+	h.mountWebhooks(r)
 	h.mountMCPTokens(r)
 	h.mountTemplatesDesign(r)
 	h.mountTemplateAssets(r)
