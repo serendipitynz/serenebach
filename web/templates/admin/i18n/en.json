@@ -450,6 +450,8 @@
   "profile.ai.enabled": "Enabled",
   "profile.ai.enabled.label": "Turn AI features on",
   "profile.ai.provider": "Provider",
+  "profile.ai.provider.openaiCompat": "OpenAI-compat (OpenAI / LM Studio / Ollama)",
+  "profile.ai.provider.claude": "Claude (Anthropic API)",
   "profile.ai.providerHint": "OpenAI-compat covers OpenAI itself plus LM Studio / Ollama in compat mode.",
   "profile.ai.baseURL": "Endpoint URL",
   "profile.ai.model": "Model",

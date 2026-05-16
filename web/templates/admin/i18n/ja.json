@@ -450,6 +450,8 @@
   "profile.ai.enabled": "有効化",
   "profile.ai.enabled.label": "AI 機能を有効にする",
   "profile.ai.provider": "プロバイダ",
+  "profile.ai.provider.openaiCompat": "OpenAI 互換 (OpenAI / LM Studio / Ollama)",
+  "profile.ai.provider.claude": "Claude (Anthropic API)",
   "profile.ai.providerHint": "OpenAI 互換は OpenAI 公式 API に加えて LM Studio / Ollama の compat モードもカバーします。",
   "profile.ai.baseURL": "エンドポイント URL",
   "profile.ai.model": "モデル",
