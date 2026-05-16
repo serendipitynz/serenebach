@@ -53,8 +53,8 @@
           <div class="label">{{T "profile.ai.provider"}}</div>
           <div>
             <select name="ai_kind" data-ai-provider-select>
-              <option value="openai-compat"{{if or (eq .Target.AIKind "openai-compat") (not .Target.AIKind)}} selected{{end}}>OpenAI 互換 (OpenAI / LM Studio / Ollama)</option>
-              <option value="claude"{{if eq .Target.AIKind "claude"}} selected{{end}}>Claude (Anthropic API)</option>
+              <option value="openai-compat"{{if or (eq .Target.AIKind "openai-compat") (not .Target.AIKind)}} selected{{end}}>{{T "profile.ai.provider.openaiCompat"}}</option>
+              <option value="claude"{{if eq .Target.AIKind "claude"}} selected{{end}}>{{T "profile.ai.provider.claude"}}</option>
             </select>
             <p class="hint">{{T "profile.ai.providerHint"}}</p>
           </div>
