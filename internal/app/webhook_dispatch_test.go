@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -88,6 +89,18 @@ func TestFlatPayloadFormatDispatch(t *testing.T) {
 	}
 	if _, hasWeblog := p["weblog"].(map[string]any); hasWeblog {
 		t.Errorf("flat payload should not contain nested \"weblog\" object: %v", p["weblog"])
+	}
+	// text / content carry the one-line summary so a direct Slack /
+	// Discord Incoming Webhook subscription can pick it up.
+	for _, key := range []string{"text", "content"} {
+		v, ok := p[key].(string)
+		if !ok || v == "" {
+			t.Errorf("flat payload should include %q summary, got %v", key, p[key])
+			continue
+		}
+		if !strings.Contains(v, "Hello, World!") {
+			t.Errorf("%s summary should mention the entry title, got %q", key, v)
+		}
 	}
 }
 

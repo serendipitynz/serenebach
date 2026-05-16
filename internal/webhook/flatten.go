@@ -77,6 +77,17 @@ func flattenPayload(p Payload) (map[string]any, error) {
 	}
 	out := map[string]any{}
 	flattenInto("", tree, out)
+	// Inject a human-readable one-liner under the "text" key (used by
+	// Slack Incoming Webhooks) and "content" (Discord). Both services
+	// silently ignore unknown extra keys, so the same single payload
+	// is consumable by either, as well as by Slack Workflow Builder
+	// which reads each flat key as a trigger variable. Set last so a
+	// future data field literally named "text" or "content" can't
+	// shadow the summary.
+	if summary := summarise(p); summary != "" {
+		out["text"] = summary
+		out["content"] = summary
+	}
 	return out, nil
 }
 

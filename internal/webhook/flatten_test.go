@@ -58,16 +58,25 @@ func TestFlattenPayloadEntryShape(t *testing.T) {
 	}
 
 	// Round-trip through JSON: the result must remain a single-level
-	// object (no nested values).
+	// object (no nested values). We can't sniff "[" / "{" naively
+	// because the injected text/content summary may legitimately
+	// contain those characters ("[My Blog]"). Instead, decode the
+	// JSON and assert every value is a scalar.
 	b, err := json.Marshal(got)
 	if err != nil {
 		t.Fatalf("marshal flat: %v", err)
 	}
-	if strings.Contains(string(b), "{\"") && strings.Count(string(b), "{") > 1 {
-		t.Errorf("flat JSON contains a nested object: %s", b)
+	var decoded map[string]any
+	if err := json.Unmarshal(b, &decoded); err != nil {
+		t.Fatalf("re-unmarshal flat: %v", err)
 	}
-	if strings.Contains(string(b), "[") {
-		t.Errorf("flat JSON contains an array: %s", b)
+	for k, v := range decoded {
+		switch v.(type) {
+		case nil, bool, float64, string:
+			// Scalar — OK.
+		default:
+			t.Errorf("flat key %q has non-scalar value %T: %v", k, v, v)
+		}
 	}
 }
 
