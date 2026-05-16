@@ -12,9 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/serendipitynz/serenebach/internal/csrf"
 	"github.com/serendipitynz/serenebach/internal/domain"
-	"github.com/serendipitynz/serenebach/internal/session"
 	"github.com/serendipitynz/serenebach/internal/storage/repo"
 	"github.com/serendipitynz/serenebach/internal/webhook"
 )
@@ -55,7 +53,7 @@ type webhookRow struct {
 }
 
 type webhookListPageData struct {
-	pageBase
+	settingsPageBase
 	Rows  []webhookRow
 	Flash string
 	Error string
@@ -92,21 +90,16 @@ func (h *Handler) webhookList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := webhookListPageData{
-		pageBase: pageBase{
-			Title:      tr(r, "webhooks.title"),
-			ActiveMenu: "settings",
-			CSRFToken:  csrf.Token(r.Context()),
-			User:       session.UserFrom(r.Context()),
-		},
-		Rows:  rows,
-		Flash: r.URL.Query().Get("ok"),
-		Error: r.URL.Query().Get("err"),
+		settingsPageBase: h.newSettingsBase(r, tr(r, "webhooks.title"), "webhooks"),
+		Rows:             rows,
+		Flash:            r.URL.Query().Get("ok"),
+		Error:            r.URL.Query().Get("err"),
 	}
 	renderMain(w, r, pageWebhooksList, data)
 }
 
 type webhookFormPageData struct {
-	pageBase
+	settingsPageBase
 	Action          string
 	Webhook         domain.Webhook
 	EventOptions    []webhookEventOption
@@ -168,19 +161,14 @@ func (h *Handler) renderWebhookForm(w http.ResponseWriter, r *http.Request, hw d
 		})
 	}
 	data := webhookFormPageData{
-		pageBase: pageBase{
-			Title:      tr(r, "webhooks.title"),
-			ActiveMenu: "settings",
-			CSRFToken:  csrf.Token(r.Context()),
-			User:       session.UserFrom(r.Context()),
-		},
-		Action:          action,
-		Webhook:         hw,
-		EventOptions:    options,
-		FormatOptions:   formatOptions,
-		IsEdit:          isEdit,
-		Error:           errMsg,
-		HasSecretStored: hw.Secret != "",
+		settingsPageBase: h.newSettingsBase(r, tr(r, "webhooks.title"), "webhooks"),
+		Action:           action,
+		Webhook:          hw,
+		EventOptions:     options,
+		FormatOptions:    formatOptions,
+		IsEdit:           isEdit,
+		Error:            errMsg,
+		HasSecretStored:  hw.Secret != "",
 	}
 	renderMain(w, r, pageWebhookForm, data)
 }
@@ -308,7 +296,7 @@ func (h *Handler) webhookTest(w http.ResponseWriter, r *http.Request) {
 }
 
 type webhookDeliveriesPageData struct {
-	pageBase
+	settingsPageBase
 	Webhook    domain.Webhook
 	URLShort   string
 	Deliveries []webhookDeliveryRow
@@ -357,16 +345,11 @@ func (h *Handler) webhookDeliveries(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	data := webhookDeliveriesPageData{
-		pageBase: pageBase{
-			Title:      tr(r, "webhooks.deliveries.title"),
-			ActiveMenu: "settings",
-			CSRFToken:  csrf.Token(r.Context()),
-			User:       session.UserFrom(r.Context()),
-		},
-		Webhook:    *hw,
-		URLShort:   shortenURL(hw.URL, 60),
-		Deliveries: view,
-		Flash:      r.URL.Query().Get("ok"),
+		settingsPageBase: h.newSettingsBase(r, tr(r, "webhooks.deliveries.title"), "webhooks"),
+		Webhook:          *hw,
+		URLShort:         shortenURL(hw.URL, 60),
+		Deliveries:       view,
+		Flash:            r.URL.Query().Get("ok"),
 	}
 	renderMain(w, r, pageWebhookDeliveries, data)
 }

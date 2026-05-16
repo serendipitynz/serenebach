@@ -89,7 +89,7 @@ type mcpAuditRow struct {
 // this so templates can resolve `.ActiveTab` uniformly.
 type settingsPageBase struct {
 	pageBase
-	ActiveTab       string // "screen" | "basic" | "ai"
+	ActiveTab       string // "screen" | "basic" | "ai" | "webhooks"
 	CanManageDesign bool   // drives visibility of the 基本設定 tab
 	CanManageUsers  bool   // drives visibility of MCP panel on the AI tab
 }
