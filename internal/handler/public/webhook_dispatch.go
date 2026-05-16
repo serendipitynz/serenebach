@@ -10,7 +10,6 @@ import (
 	"github.com/serendipitynz/serenebach/internal/webhook"
 )
 
-
 // dispatchCommentEvent fires the given comment.* event for a freshly
 // stored or moderated comment. weblog is passed in because the caller
 // already loaded it; entry is needed to build a click-through URL.

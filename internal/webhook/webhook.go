@@ -100,6 +100,10 @@ type Service struct {
 	// every helper. Production callers leave it nil and the service
 	// uses time.Now directly.
 	Now func() time.Time
+	// AllowLoopback bypasses the SSRF guard's loopback / private-net
+	// rejection. Intended exclusively for tests using httptest.NewServer
+	// (which always binds to 127.0.0.1). Never set in production.
+	AllowLoopback bool
 
 	clientOnce sync.Once
 	client     *http.Client
@@ -136,13 +140,6 @@ func (s *Service) httpClient() *http.Client {
 	return s.client
 }
 
-func (s *Service) now() time.Time {
-	if s.Now != nil {
-		return s.Now()
-	}
-	return time.Now().UTC()
-}
-
 // Dispatch fans out a payload to every active webhook subscribed to
 // `event`. In async mode (HTTP server) the actual POSTs run in a
 // goroutine; in sync mode (CGI) they run inline. The returned error
@@ -174,11 +171,9 @@ func (s *Service) Dispatch(ctx context.Context, wid int64, event string, payload
 	}
 	// Detach from the request context — the caller's ctx is cancelled
 	// as soon as it returns its HTTP response, but we need the goroutine
-	// to outlive that. The context is purely for cancellation here, so
-	// using a fresh background context preserves any deadline the HTTP
-	// client itself enforces.
+	// to outlive that. http.Client.Timeout caps the actual blocking work.
 	for _, h := range hooks {
-		go s.deliverOne(context.Background(), h, event, payload.ID, body)
+		go s.deliverOne(context.Background(), h, event, payload.ID, body) //nolint:contextcheck // intentional detach (request ctx is cancelled at response time).
 	}
 	return nil
 }
@@ -199,7 +194,10 @@ func (s *Service) DispatchOne(ctx context.Context, hook domain.Webhook, event st
 		s.deliverOne(ctx, hook, event, payload.ID, body)
 		return nil
 	}
-	go s.deliverOne(context.Background(), hook, event, payload.ID, body)
+	// Detach from ctx: the caller's request context is cancelled as
+	// soon as the HTTP response returns, but we want the delivery to
+	// outlive that. http.Client.Timeout caps the actual blocking work.
+	go s.deliverOne(context.Background(), hook, event, payload.ID, body) //nolint:contextcheck // intentional detach (request ctx is cancelled at response time).
 	return nil
 }
 
@@ -235,8 +233,10 @@ func (s *Service) deliverOne(ctx context.Context, hook domain.Webhook, event, de
 // send performs a single POST. Returns the HTTP status code (0 when no
 // response was received) and the transport error, if any.
 func (s *Service) send(ctx context.Context, hook domain.Webhook, event, deliveryID string, body []byte) (int, error) {
-	if err := ValidateURL(hook.URL); err != nil {
-		return 0, err
+	if !s.AllowLoopback {
+		if err := ValidateURL(hook.URL); err != nil {
+			return 0, err
+		}
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, hook.URL, bytes.NewReader(body))
 	if err != nil {

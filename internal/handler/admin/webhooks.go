@@ -405,13 +405,13 @@ func parseWebhookForm(r *http.Request, base domain.Webhook) (domain.Webhook, str
 	return base, ""
 }
 
-// shortenURL truncates a URL to at most `max` characters, suffixing "…"
-// when it had to cut.
-func shortenURL(raw string, max int) string {
-	if max <= 0 || len(raw) <= max {
+// shortenURL truncates a URL to at most `maxLen` characters, suffixing
+// "…" when it had to cut.
+func shortenURL(raw string, maxLen int) string {
+	if maxLen <= 0 || len(raw) <= maxLen {
 		return raw
 	}
-	return raw[:max] + "…"
+	return raw[:maxLen] + "…"
 }
 
 // deliveryStatusLabel renders the delivery row's outcome as a stable
