@@ -123,9 +123,9 @@ New reader-facing POSTs go under `public.MountMutations`. **Admin POSTs stay ins
 
 The same-origin allow-list is the union of `SB_PUBLIC_ALLOWED_ORIGINS` (CSV) and the `weblogs.base_url` value loaded at startup. Empty means fail-closed.
 
-### `/admin/templates` is labelled "デザイン設定" in the UI
+### `/admin/templates` is labelled "デザイン" in the UI
 
-The URL/label mismatch is **deliberate**. The page started as a simple template list, then accumulated design settings (archive template, profile template, date formats, OG defaults, …). The URL was kept for compatibility while the UI label evolved to reflect the broader scope. Code symbols stay `templates*`; human-facing docs use "デザイン設定".
+The URL/label mismatch is **deliberate**. The page started as a simple template list, then accumulated design settings (archive template, profile template, date formats, OG defaults, …). The URL was kept for compatibility while the UI label evolved to reflect the broader scope. Code symbols stay `templates*`; human-facing docs use "デザイン" (previously "デザイン設定").
 
 The sibling menu "テンプレート編集" (`/admin/templates/active/edit`) is a separate shortcut that edits the currently active template directly.
 

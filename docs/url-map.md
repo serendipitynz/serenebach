@@ -66,10 +66,10 @@ Every route the running server exposes, split between the public surface and the
 | `/admin/comments/{id}/hide` | Soft-hide (POST) |
 | `/admin/comments/{id}/delete` | Hard delete (POST) |
 | `/admin/analytics` | First-party analytics dashboard (`?days=7|30|90`) |
-| `/admin/templates` | Design Settings — list (drag-drop reorder, activate, delete, export) |
-| `/admin/templates/settings` | Design Settings — pin archive / profile template (GET + POST) |
-| `/admin/templates/og` | Design Settings — OG card defaults (background image + text colour) (GET + POST) |
-| `/admin/templates/import` | Design Settings — import an SB3-format `template.txt` bundle. Legacy Shift_JIS / EUC-JP / ISO-2022-JP sources are auto-converted to UTF-8 (GET + POST) |
+| `/admin/templates` | Design — list (drag-drop reorder, activate, delete, export) |
+| `/admin/templates/settings` | Design — pin archive / profile template (GET + POST) |
+| `/admin/templates/og` | Design — OG card defaults (background image + text colour) (GET + POST) |
+| `/admin/templates/import` | Design — import an SB3-format `template.txt` bundle. Legacy Shift_JIS / EUC-JP / ISO-2022-JP sources are auto-converted to UTF-8 (GET + POST) |
 | `/admin/templates/active/edit` | Shortcut — redirects to the edit form for the currently-active template |
 | `/admin/templates/{id}/edit` | Template editor — base HTML / CSS / optional entry HTML / assets (GET + POST + `/save-as`) |
 | `/admin/templates/{id}/activate` | Flip this template to "in use" (POST) |

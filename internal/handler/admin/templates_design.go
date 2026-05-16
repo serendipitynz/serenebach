@@ -23,9 +23,9 @@ import (
 )
 
 // mountTemplatesDesign registers the `/admin/templates/*` routes — the
-// "デザイン設定" area in the SB3 wording. RequireUser wraps the outer
-// group already; requireDesign further blocks regular-tier users —
-// they can't touch templates or design settings.
+// "デザイン" area (historically "デザイン設定" / SB3 wording). RequireUser
+// wraps the outer group already; requireDesign further blocks
+// regular-tier users — they can't touch templates or design settings.
 func (h *Handler) mountTemplatesDesign(r chi.Router) {
 	r.Group(func(gr chi.Router) {
 		gr.Use(h.requireDesign)

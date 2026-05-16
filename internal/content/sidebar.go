@@ -125,7 +125,7 @@ func applyArchivesBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Template
 
 // archiveLabelFor picks a month label for the archive sidebar —
 // uses the weblog's `DateFormatArchive` so the label matches whatever
-// the author configured in デザイン設定 > 時刻表記設定.
+// the author configured in デザイン > 時刻表記設定.
 func archiveLabelFor(s Site, year, month int) string {
 	// Fabricate a "first of the month" time so dateformat tokens
 	// render correctly. The specific day doesn't matter — archive

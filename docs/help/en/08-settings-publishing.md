@@ -31,7 +31,7 @@ Basic settings cover blog-wide values that affect the public site. Available to 
 
 For a public blog, set the base URL. Without it, feed and social-share URLs may not resolve correctly.
 
-The OG card defaults (background image and text colour) live under **Design Settings > OG Card**. See [OG cards](#og-cards) below.
+The OG card defaults (background image and text colour) live under **Design > OG Card**. See [OG cards](#og-cards) below.
 
 ## llms.txt
 
@@ -46,12 +46,12 @@ Leave it disabled if you don't want this. Both URLs return 404 in that case.
 
 OG cards are the images social platforms show when someone shares an entry URL. Serene Bach generates a 1200 x 630 image per entry.
 
-The blog-wide defaults (background image and text colour) are edited under **Design Settings > OG Card** in the left sidebar. Per-entry overrides are set on the entry editor.
+The blog-wide defaults (background image and text colour) are edited under **Design > OG Card** in the left sidebar. Per-entry overrides are set on the entry editor.
 
 The background is resolved in this order:
 
 1. Entry-level OG background (set in the entry editor)
-2. Blog-wide OG background (Design Settings > OG Card)
+2. Blog-wide OG background (Design > OG Card)
 3. The bundled default
 
 Backgrounds are picked from the image library. Off-aspect images are centre-cropped.
@@ -68,7 +68,7 @@ Admin users can also issue and revoke MCP access tokens from this screen.
 
 ## Design settings
 
-The **Design Settings** screen carries cross-template rendering knobs:
+The **Design** screen carries cross-template rendering knobs:
 
 - Templates used for archive / category / tag listings
 - Template used for the profile page

@@ -20,7 +20,7 @@ func TestAdminTemplateSettingsFormRenders(t *testing.T) {
 	for _, want := range []string{
 		`name="archive_template_id"`,
 		`name="profile_template_id"`,
-		"デザイン設定",
+		"デザイン",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("settings page missing %q", want)
