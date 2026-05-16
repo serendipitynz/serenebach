@@ -38,6 +38,56 @@ func (h *Handler) mountEntries(r chi.Router) {
 	r.Delete("/entries/{id}/pin", h.entryPin)
 }
 
+// loadEntryForEdit reads the entry pointed to by the {id} URL param,
+// enforces the "can edit this entry" permission, and writes the
+// appropriate HTTP error response on failure. Returns (entry, user, true)
+// on success; on failure it has already written to w and the caller
+// must return immediately.
+//
+// Permission rule mirrors u.CanEditEntry: power+admin tier can edit any
+// entry, regular tier can edit only their own.
+func (h *Handler) loadEntryForEdit(w http.ResponseWriter, r *http.Request) (*domain.Entry, *domain.User, bool) {
+	return h.loadEntryWith(w, r, func(u *domain.User, authorID int64) bool {
+		return u.CanEditEntry(authorID)
+	})
+}
+
+// loadEntryForDelete is loadEntryForEdit with CanDeleteEntry. Delete
+// keeps its own helper because the permission check is the only thing
+// that differs and a flag-style API would obscure the intent at the
+// call sites.
+func (h *Handler) loadEntryForDelete(w http.ResponseWriter, r *http.Request) (*domain.Entry, *domain.User, bool) {
+	return h.loadEntryWith(w, r, func(u *domain.User, authorID int64) bool {
+		return u.CanDeleteEntry(authorID)
+	})
+}
+
+// loadEntryWith is the shared body of loadEntryForEdit / loadEntryForDelete.
+// Kept private so callers stick to the named edit/delete variants.
+func (h *Handler) loadEntryWith(w http.ResponseWriter, r *http.Request, allow func(*domain.User, int64) bool) (*domain.Entry, *domain.User, bool) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || id <= 0 {
+		http.NotFound(w, r)
+		return nil, nil, false
+	}
+	e, err := h.Store.EntryByID(r.Context(), h.wid(), id)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			http.NotFound(w, r)
+			return nil, nil, false
+		}
+		log.Printf("admin.loadEntry: %v", err)
+		http.Error(w, "failed to load entry", http.StatusInternalServerError)
+		return nil, nil, false
+	}
+	u := session.UserFrom(r.Context())
+	if !allow(u, e.AuthorID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return nil, nil, false
+	}
+	return e, u, true
+}
+
 // ---- list ---------------------------------------------------------------
 
 // entryRow pairs a domain.Entry with its category name so the admin
@@ -162,24 +212,8 @@ func (h *Handler) entryNewForm(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) entryEditForm(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
-		http.NotFound(w, r)
-		return
-	}
-	u := session.UserFrom(r.Context())
-	e, err := h.Store.EntryByID(r.Context(), h.wid(), id)
-	if err != nil {
-		if errors.Is(err, repo.ErrNotFound) {
-			http.NotFound(w, r)
-			return
-		}
-		log.Printf("admin.entryEditForm: %v", err)
-		http.Error(w, "failed to load entry", http.StatusInternalServerError)
-		return
-	}
-	if !u.CanEditEntry(e.AuthorID) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	e, _, ok := h.loadEntryForEdit(w, r)
+	if !ok {
 		return
 	}
 	// Pre-fill the tag input with the entry's current tags. Failure to
@@ -196,7 +230,7 @@ func (h *Handler) entryEditForm(w http.ResponseWriter, r *http.Request) {
 			ogCardTS = info.ModTime().Unix()
 		}
 	}
-	h.renderEntryForm(w, r, fmt.Sprintf("/admin/entries/%d/edit", id), *e, tagsToCSV(tags), "", tr(r, "entries.form.titleEditPlain"), "entries", ogCardTS)
+	h.renderEntryForm(w, r, fmt.Sprintf("/admin/entries/%d/edit", e.ID), *e, tagsToCSV(tags), "", tr(r, "entries.form.titleEditPlain"), "entries", ogCardTS)
 }
 
 // tagsToCSV renders a tag slice as the comma-separated input value used
@@ -446,26 +480,11 @@ func (h *Handler) syncEntryTags(ctx context.Context, entryID int64, names []stri
 }
 
 func (h *Handler) entryUpdate(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
-		http.NotFound(w, r)
+	existing, _, ok := h.loadEntryForEdit(w, r)
+	if !ok {
 		return
 	}
-	u := session.UserFrom(r.Context())
-	existing, err := h.Store.EntryByID(r.Context(), h.wid(), id)
-	if err != nil {
-		if errors.Is(err, repo.ErrNotFound) {
-			http.NotFound(w, r)
-			return
-		}
-		log.Printf("admin.entryUpdate: load: %v", err)
-		http.Error(w, "failed to load entry", http.StatusInternalServerError)
-		return
-	}
-	if !u.CanEditEntry(existing.AuthorID) {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
+	id := existing.ID
 	entry, errMsg := h.parseEntryForm(r, *existing)
 	tagNames, tagsCSV := parseTagNames(r.PostFormValue("tags"))
 	if errMsg != "" {
@@ -490,29 +509,14 @@ func (h *Handler) entryUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) entryDelete(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
-		http.NotFound(w, r)
-		return
-	}
-	u := session.UserFrom(r.Context())
 	// Regular-tier authors may only remove their own work; power +
 	// admin can delete any entry. Loading the row first lets us
 	// compare authorship before we commit to the destructive SQL.
-	existing, err := h.Store.EntryByID(r.Context(), h.wid(), id)
-	if err != nil {
-		if errors.Is(err, repo.ErrNotFound) {
-			http.NotFound(w, r)
-			return
-		}
-		log.Printf("admin.entryDelete: load: %v", err)
-		http.Error(w, "failed to load entry", http.StatusInternalServerError)
+	existing, _, ok := h.loadEntryForDelete(w, r)
+	if !ok {
 		return
 	}
-	if !u.CanDeleteEntry(existing.AuthorID) {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
+	id := existing.ID
 	if err := h.Store.DeleteEntry(r.Context(), h.wid(), id); err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
 			http.NotFound(w, r)
