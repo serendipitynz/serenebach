@@ -646,6 +646,7 @@
   "templates.import.panelHeading": "Upload template.txt",
   "templates.import.hint": "Accepts the SB3 template export format (multipart/mixed <code>template.txt</code>). <code>base.html</code> is required; <code>style.css</code> / <code>entry.html</code> / image assets are optional.",
   "templates.import.fileLabel": "File",
+  "templates.import.dropZone": "Drop template.txt here or click to select",
   "templates.import.submit": "Import",
   "templates.import.title": "Import template",
   "templates.og.title": "Design: OG card",

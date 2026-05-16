@@ -20,7 +20,10 @@
       <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
       <div class="form-row">
         <div class="label">{{T "templates.import.fileLabel"}}</div>
-        <input type="file" name="file" accept=".txt,application/x-sb-template" required>
+        <label class="drop-zone" data-drop-to-input>
+          <span class="drop-zone-text" data-drop-placeholder>{{T "templates.import.dropZone"}}</span>
+          <input type="file" name="file" accept=".txt,application/x-sb-template" required data-drop-input>
+        </label>
       </div>
       <div class="form-actions">
         <button type="submit" class="primary">{{T "templates.import.submit"}}</button>
