@@ -88,6 +88,14 @@ Every route the running server exposes, split between the public surface and the
 | `/admin/settings/ai/test` | POST — smoke-test the saved AI provider with a canned prompt. Used by the 疎通テスト button |
 | `/admin/settings/mcp/new` | POST — mint a new MCP bearer token (admin only) |
 | `/admin/settings/mcp/{id}/revoke` | POST — revoke an MCP bearer token (admin only) |
+| `/admin/settings/webhooks` | Outbound webhook list (`power_user` only). GET shows registered subscriptions + last-delivery status; POST creates one |
+| `/admin/settings/webhooks/new` | New-webhook form |
+| `/admin/settings/webhooks/{id}/edit` | Edit-webhook form |
+| `/admin/settings/webhooks/{id}` | POST — update one webhook |
+| `/admin/settings/webhooks/{id}/delete` | POST — delete one webhook + its delivery rows |
+| `/admin/settings/webhooks/{id}/toggle` | POST — flip the active flag |
+| `/admin/settings/webhooks/{id}/test` | POST — fire a synthetic `ping` payload at the subscription so the operator can verify connectivity |
+| `/admin/settings/webhooks/{id}/deliveries` | Per-subscription delivery log (last 50 attempts) |
 | `/admin/logout` | Logout (POST) |
 | `/admin/ai/compose` | POST (JSON) — AI writing assists: rewrite / continue / summarise (Ace toolbar) + title / tags / keywords (entry-form ✨ buttons) |
 | `/mcp` | MCP HTTP transport. Accepts JSON-RPC 2.0 under `Authorization: Bearer <token>`; no CSRF, no session — tokens are the only gate. Read tools (`list_entries`, `get_entry`, `search_entries`, `list_categories`, `list_tags`, `get_analytics`, `list_images`) plus write tools (`create_entry`, `update_entry`, `publish_entry`, `upload_image`) gated behind write-scope tokens |
