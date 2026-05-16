@@ -13,7 +13,7 @@ import (
 
 // webhookColumns is the canonical column list for the webhooks table.
 // Order must match the Scan call sites below.
-const webhookColumns = `id, wid, url, secret, events, active, created_at, updated_at`
+const webhookColumns = `id, wid, url, secret, events, active, payload_format, created_at, updated_at`
 
 // webhookDeliveryColumns is the canonical column list for
 // webhook_deliveries. Same contract as the webhooks list.
@@ -99,9 +99,9 @@ func (s *Store) CreateWebhook(ctx context.Context, w domain.Webhook) (int64, err
 	}
 	now := time.Now().Unix()
 	res, err := s.db.ExecContext(ctx, `
-		INSERT INTO webhooks (wid, url, secret, events, active, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		w.WID, w.URL, w.Secret, eventsJSON, active, now, now)
+		INSERT INTO webhooks (wid, url, secret, events, active, payload_format, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		w.WID, w.URL, w.Secret, eventsJSON, active, normaliseFormat(w.PayloadFormat), now, now)
 	if err != nil {
 		return 0, fmt.Errorf("repo: CreateWebhook: %w", err)
 	}
@@ -125,9 +125,9 @@ func (s *Store) UpdateWebhook(ctx context.Context, w domain.Webhook) error {
 	}
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE webhooks SET
-			url = ?, secret = ?, events = ?, active = ?, updated_at = ?
+			url = ?, secret = ?, events = ?, active = ?, payload_format = ?, updated_at = ?
 		WHERE wid = ? AND id = ?`,
-		w.URL, w.Secret, eventsJSON, active, time.Now().Unix(), w.WID, w.ID)
+		w.URL, w.Secret, eventsJSON, active, normaliseFormat(w.PayloadFormat), time.Now().Unix(), w.WID, w.ID)
 	if err != nil {
 		return fmt.Errorf("repo: UpdateWebhook: %w", err)
 	}
@@ -295,9 +295,10 @@ func scanWebhook(sc rowScanner) (domain.Webhook, error) {
 		w                    domain.Webhook
 		eventsJSON           string
 		activeInt            int64
+		payloadFormat        string
 		createdAt, updatedAt int64
 	)
-	if err := sc.Scan(&w.ID, &w.WID, &w.URL, &w.Secret, &eventsJSON, &activeInt, &createdAt, &updatedAt); err != nil {
+	if err := sc.Scan(&w.ID, &w.WID, &w.URL, &w.Secret, &eventsJSON, &activeInt, &payloadFormat, &createdAt, &updatedAt); err != nil {
 		return domain.Webhook{}, err
 	}
 	events, err := decodeEvents(eventsJSON)
@@ -306,9 +307,24 @@ func scanWebhook(sc rowScanner) (domain.Webhook, error) {
 	}
 	w.Events = events
 	w.Active = activeInt != 0
+	w.PayloadFormat = normaliseFormat(payloadFormat)
 	w.CreatedAt = time.Unix(createdAt, 0)
 	w.UpdatedAt = time.Unix(updatedAt, 0)
 	return w, nil
+}
+
+// normaliseFormat collapses unknown / empty payload_format values back
+// to the safe default. The DB constraint is loose (just TEXT) so a
+// future code path that introduces a third format never crashes older
+// readers — they treat it as "envelope" and the operator can re-pick
+// from the admin UI.
+func normaliseFormat(s string) string {
+	switch s {
+	case "envelope", "flat":
+		return s
+	default:
+		return "envelope"
+	}
 }
 
 func scanWebhookDelivery(sc rowScanner) (domain.WebhookDelivery, error) {

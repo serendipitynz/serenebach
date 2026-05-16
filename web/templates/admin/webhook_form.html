@@ -48,6 +48,22 @@
       </div>
 
       <div class="form-row">
+        <div class="label">{{T "webhooks.form.payloadFormat"}}</div>
+        <div>
+          <select name="payload_format">
+            {{range .FormatOptions}}
+              <option value="{{.ID}}"{{if .Selected}} selected{{end}}>{{T .LabelK}}</option>
+            {{end}}
+          </select>
+          <ul class="webhook-format-hints">
+            {{range .FormatOptions}}
+              <li><code>{{.ID}}</code> — {{T .HintK}}</li>
+            {{end}}
+          </ul>
+        </div>
+      </div>
+
+      <div class="form-row">
         <div class="label">{{T "webhooks.form.active"}}</div>
         <div>
           <label class="checkbox-label">

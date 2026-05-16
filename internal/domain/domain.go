@@ -579,14 +579,15 @@ type Message struct {
 // array of subscribed event ids as stored in the DB; callers translate
 // to []string via webhook.DecodeEvents.
 type Webhook struct {
-	ID        int64
-	WID       int64
-	URL       string
-	Secret    string
-	Events    []string // decoded from the events JSON column
-	Active    bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID            int64
+	WID           int64
+	URL           string
+	Secret        string
+	Events        []string // decoded from the events JSON column
+	Active        bool
+	PayloadFormat string // "envelope" (default, nested) or "flat" (single-level)
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 // WebhookDelivery is one attempt to POST a payload to a webhook URL.

@@ -604,6 +604,20 @@ table.listing td.actions { white-space: nowrap; }
   font-size: 0.8rem;
 }
 
+/* Payload-format selector hint list under the <select>. Each format
+   gets a one-liner so the operator can scan envelope vs flat without
+   leaving the form. List markers are stripped because the <code>
+   leader already plays that role visually. */
+.webhook-format-hints {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.webhook-format-hints li + li { margin-top: 0.2rem; }
+
 .panel-subhead {
   margin: 1.25rem 0 0.5rem;
   font-size: 0.95rem;

@@ -110,6 +110,7 @@ type webhookFormPageData struct {
 	Action          string
 	Webhook         domain.Webhook
 	EventOptions    []webhookEventOption
+	FormatOptions   []webhookFormatOption
 	IsEdit          bool
 	Error           string
 	HasSecretStored bool // edit mode: true when the row already has a non-empty secret
@@ -121,8 +122,15 @@ type webhookEventOption struct {
 	LabelK  string // i18n key
 }
 
+type webhookFormatOption struct {
+	ID       string
+	Selected bool
+	LabelK   string // i18n key for the option label
+	HintK    string // i18n key for the per-option help text shown beneath
+}
+
 func (h *Handler) webhookNewForm(w http.ResponseWriter, r *http.Request) {
-	h.renderWebhookForm(w, r, domain.Webhook{Active: true}, "", false)
+	h.renderWebhookForm(w, r, domain.Webhook{Active: true, PayloadFormat: webhook.PayloadFormatEnvelope}, "", false)
 }
 
 func (h *Handler) webhookEditForm(w http.ResponseWriter, r *http.Request) {
@@ -146,6 +154,19 @@ func (h *Handler) renderWebhookForm(w http.ResponseWriter, r *http.Request, hw d
 			LabelK:  "webhooks.event." + ev,
 		})
 	}
+	currentFormat := hw.PayloadFormat
+	if !webhook.IsKnownPayloadFormat(currentFormat) {
+		currentFormat = webhook.PayloadFormatEnvelope
+	}
+	formatOptions := make([]webhookFormatOption, 0, len(webhook.AllPayloadFormats))
+	for _, f := range webhook.AllPayloadFormats {
+		formatOptions = append(formatOptions, webhookFormatOption{
+			ID:       f,
+			Selected: f == currentFormat,
+			LabelK:   "webhooks.format." + f,
+			HintK:    "webhooks.format." + f + ".hint",
+		})
+	}
 	data := webhookFormPageData{
 		pageBase: pageBase{
 			Title:      tr(r, "webhooks.title"),
@@ -156,6 +177,7 @@ func (h *Handler) renderWebhookForm(w http.ResponseWriter, r *http.Request, hw d
 		Action:          action,
 		Webhook:         hw,
 		EventOptions:    options,
+		FormatOptions:   formatOptions,
 		IsEdit:          isEdit,
 		Error:           errMsg,
 		HasSecretStored: hw.Secret != "",
@@ -178,7 +200,7 @@ func (h *Handler) webhookCreate(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, root(r)+"/admin/settings/webhooks?err=limit", http.StatusFound)
 		return
 	}
-	hw, errMsg := parseWebhookForm(r, domain.Webhook{WID: h.wid(), Active: true})
+	hw, errMsg := parseWebhookForm(r, domain.Webhook{WID: h.wid(), Active: true, PayloadFormat: webhook.PayloadFormatEnvelope})
 	if errMsg != "" {
 		h.renderWebhookForm(w, r, hw, errMsg, false)
 		return
@@ -398,6 +420,15 @@ func parseWebhookForm(r *http.Request, base domain.Webhook) (domain.Webhook, str
 		return base, "webhooks.error.eventsRequired"
 	}
 	base.Events = events
+
+	if f := strings.TrimSpace(r.PostFormValue("payload_format")); f != "" {
+		if !webhook.IsKnownPayloadFormat(f) {
+			return base, "webhooks.error.formatInvalid"
+		}
+		base.PayloadFormat = f
+	} else if base.PayloadFormat == "" {
+		base.PayloadFormat = webhook.PayloadFormatEnvelope
+	}
 
 	base.Active = r.PostFormValue("active") == "1"
 	return base, ""

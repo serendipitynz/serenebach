@@ -12,6 +12,85 @@ import (
 	"time"
 )
 
+// TestFlatPayloadFormatDispatch confirms that a webhook subscription
+// configured with payload_format='flat' receives the slack.dev-shaped
+// single-level JSON body, while envelope subscriptions on the same
+// event continue to receive the nested JSON. This guards the per-
+// subscription encoding path in webhook.Service.deliverOne.
+func TestFlatPayloadFormatDispatch(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	a.Webhooks.AllowLoopback = true
+
+	var (
+		mu       sync.Mutex
+		received []map[string]any
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var payload map[string]any
+		if err := json.Unmarshal(body, &payload); err == nil {
+			mu.Lock()
+			received = append(received, payload)
+			mu.Unlock()
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	if _, err := a.DB.Exec(`INSERT INTO webhooks (wid, url, events, active, payload_format, created_at, updated_at)
+		VALUES (1, ?, '["entry.published"]', 1, 'flat', strftime('%s','now'), strftime('%s','now'))`, srv.URL); err != nil {
+		t.Fatalf("insert webhook: %v", err)
+	}
+
+	cookies := login(t, a.Handler(), "admin", "changeme")
+	form := url.Values{
+		"title":  {"Hello, World!"},
+		"body":   {"first post"},
+		"status": {"1"},
+	}
+	w := authedPOSTForm(t, a.Handler(), "/admin/entries/new", form, cookies)
+	if w.Code != http.StatusFound {
+		t.Fatalf("create entry status = %d; body:\n%s", w.Code, w.Body.String())
+	}
+
+	// Async dispatch — poll briefly for the delivery to land.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		mu.Lock()
+		n := len(received)
+		mu.Unlock()
+		if n > 0 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(received) == 0 {
+		t.Fatalf("no webhook payload received")
+	}
+	p := received[0]
+	// Flat shape: nested keys land on top level joined with "_".
+	if got := p["event"]; got != "entry.published" {
+		t.Errorf("event = %v, want entry.published", got)
+	}
+	if got := p["data_title"]; got != "Hello, World!" {
+		t.Errorf("data_title = %v, want \"Hello, World!\"", got)
+	}
+	if got := p["weblog_id"]; got != float64(1) {
+		t.Errorf("weblog_id = %v (%T), want 1", got, got)
+	}
+	// Envelope-only keys should NOT appear as nested objects.
+	if _, hasData := p["data"].(map[string]any); hasData {
+		t.Errorf("flat payload should not contain nested \"data\" object: %v", p["data"])
+	}
+	if _, hasWeblog := p["weblog"].(map[string]any); hasWeblog {
+		t.Errorf("flat payload should not contain nested \"weblog\" object: %v", p["weblog"])
+	}
+}
+
 // TestCommentApproveDispatchUsesApprovedStatus regression-tests the
 // PR #88 review finding (P2 #3): when an admin approves a waiting
 // comment, the `comment.approved` payload must reflect the post-

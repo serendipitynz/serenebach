@@ -236,13 +236,12 @@ func (s *Service) Dispatch(ctx context.Context, wid int64, event string, payload
 	if len(hooks) == 0 {
 		return nil
 	}
-	body, err := encodePayload(payload)
-	if err != nil {
-		return fmt.Errorf("webhook: encode payload: %w", err)
-	}
+	// Encoding is per-subscription because PayloadFormat is per-row
+	// (envelope vs flat). deliverOne owns the marshal step so a bad
+	// payload for one subscriber doesn't fail every other delivery.
 	if s.Sync {
 		for _, h := range hooks {
-			s.deliverOne(ctx, h, event, payload.ID, body)
+			s.deliverOne(ctx, h, event, payload)
 		}
 		return nil
 	}
@@ -250,7 +249,7 @@ func (s *Service) Dispatch(ctx context.Context, wid int64, event string, payload
 	// as soon as it returns its HTTP response, but we need the goroutine
 	// to outlive that. http.Client.Timeout caps the actual blocking work.
 	for _, h := range hooks {
-		go s.deliverOne(context.Background(), h, event, payload.ID, body) //nolint:contextcheck // intentional detach (request ctx is cancelled at response time).
+		go s.deliverOne(context.Background(), h, event, payload) //nolint:contextcheck // intentional detach (request ctx is cancelled at response time).
 	}
 	return nil
 }
@@ -272,29 +271,44 @@ func (s *Service) DispatchOne(ctx context.Context, hook domain.Webhook, event st
 	if s == nil || s.Disabled || s.Repo == nil {
 		return nil
 	}
-	body, err := encodePayload(payload)
-	if err != nil {
-		return fmt.Errorf("webhook: encode payload: %w", err)
-	}
-	s.deliverOne(ctx, hook, event, payload.ID, body)
+	s.deliverOne(ctx, hook, event, payload)
 	return nil
 }
 
 // deliverOne logs a pending delivery row, performs the POST, then
 // updates the row with the outcome. Errors are swallowed: the row's
 // `error` column is the audit trail.
-func (s *Service) deliverOne(ctx context.Context, hook domain.Webhook, event, deliveryID string, body []byte) {
+//
+// Encoding happens here (not in Dispatch) because PayloadFormat is
+// per-subscription — flat and envelope subscribers receive different
+// bytes for the same logical event. A marshal failure for one
+// subscriber records the error against that row and does not affect
+// any other subscriber for the same event.
+func (s *Service) deliverOne(ctx context.Context, hook domain.Webhook, event string, payload Payload) {
+	body, encErr := encodeForFormat(payload, hook.PayloadFormat)
+	if encErr != nil {
+		// Record the failed attempt so the admin can see why nothing
+		// arrived. delivery_id and payload stay populated so the row
+		// is still useful for diagnosis.
+		body = []byte("")
+	}
 	rowID, err := s.Repo.CreateWebhookDelivery(ctx, domain.WebhookDelivery{
 		WebhookID:  hook.ID,
 		Event:      event,
-		DeliveryID: deliveryID,
+		DeliveryID: payload.ID,
 		Payload:    string(body),
 	})
 	if err != nil {
 		log.Printf("webhook: persist delivery: %v", err)
 		return
 	}
-	statusCode, sendErr := s.send(ctx, hook, event, deliveryID, body)
+	if encErr != nil {
+		if err := s.Repo.UpdateWebhookDeliveryResult(ctx, rowID, 0, encErr.Error()); err != nil {
+			log.Printf("webhook: update delivery %d: %v", rowID, err)
+		}
+		return
+	}
+	statusCode, sendErr := s.send(ctx, hook, event, payload.ID, body)
 	errMsg := ""
 	if sendErr != nil {
 		errMsg = sendErr.Error()
