@@ -228,6 +228,28 @@ func TestDialContextAllowLoopbackBypass(t *testing.T) {
 	}
 }
 
+// TestTransportIgnoresProxyEnv documents that the webhook client must
+// not honour HTTP_PROXY / HTTPS_PROXY. If it did, the proxy would
+// resolve the destination on our behalf and the DialContext SSRF
+// guard would only see the proxy address — letting a public-looking
+// hostname that secretly resolves to an internal address slip through
+// via the proxy's resolver. See PR #88 follow-up review.
+func TestTransportIgnoresProxyEnv(t *testing.T) {
+	t.Setenv("HTTP_PROXY", "http://203.0.113.1:8080")
+	t.Setenv("HTTPS_PROXY", "http://203.0.113.1:8080")
+	svc := New(newFakeRepo(), true, false)
+	client := svc.httpClient()
+	tr, ok := client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("client transport = %T, want *http.Transport", client.Transport)
+	}
+	if tr.Proxy != nil {
+		// Anything non-nil here means we are honouring some proxy
+		// source, which bypasses our DialContext IP guard.
+		t.Errorf("transport.Proxy is set; expected nil to keep DialContext as the SSRF authority")
+	}
+}
+
 func TestValidateURL(t *testing.T) {
 	cases := []struct {
 		raw     string

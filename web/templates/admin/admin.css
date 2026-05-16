@@ -572,6 +572,22 @@ table.listing td.actions { white-space: nowrap; }
 .mcp-token-list th:nth-child(3),
 .mcp-token-list td:nth-child(3) { width: auto; word-break: break-all; }
 
+/* Webhook list: same problem as the MCP token list — without fixed
+   table-layout the long Slack/Discord URLs (no break points) stretch
+   the URL column and crush the date / status / actions columns to
+   single-character widths. table-layout:fixed forces the smaller
+   columns to honour their .col-* widths and lets the URL cell pick
+   up the remainder with ellipsis truncation. col-webhook-events caps
+   the badge column so a webhook subscribed to every event doesn't
+   monopolise the row. */
+.webhook-list { table-layout: fixed; }
+.col-webhook-events { width: 18rem; }
+.webhook-list .col-webhook-events {
+  white-space: normal;
+  line-height: 1.6;
+}
+.webhook-list .col-webhook-events .badge + .badge { margin-left: 0.25rem; }
+
 .panel-subhead {
   margin: 1.25rem 0 0.5rem;
   font-size: 0.95rem;
@@ -1499,11 +1515,40 @@ table.listing td.cell-clamp-host {
   gap: 1rem;
   margin: 0.5rem 0;
 }
-.entry-form-flags .checkbox-label {
+/* checkbox-label is a generic "checkbox + adjacent text" pattern used
+   anywhere a labelled toggle needs to sit inline with its caption
+   (entry form flags, webhook event list, secret-clear toggle, ...).
+   Defined at top-level (no parent scoping) so any form can adopt it
+   without re-styling. The entry-form-flags row keeps nowrap so badges
+   stay on one line; the webhook event list overrides that to allow
+   wrap on narrow screens. */
+.checkbox-label {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
+}
+.entry-form-flags .checkbox-label {
   white-space: nowrap;
+}
+
+/* Vertical list of event checkboxes on /admin/settings/webhooks form.
+   Stacks each row, removes the bullet, and keeps the checkbox + label
+   on the same baseline. align-items: flex-start lets long descriptions
+   wrap below the checkbox without re-centring on the first line. */
+.webhook-event-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.webhook-event-list .checkbox-label {
+  align-items: flex-start;
+}
+.webhook-event-list .checkbox-label input[type="checkbox"] {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
 }
 
 /* Input prefix: keeps the leading “/” and the text field on one line. */

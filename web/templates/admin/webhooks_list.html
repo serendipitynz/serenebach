@@ -16,28 +16,28 @@
   </div>
   <div class="panel-body">
     {{if .Rows}}
-    <table class="listing">
+    <table class="listing webhook-list">
       <thead><tr>
-        <th class="col-flex-wide">{{T "webhooks.col.url"}}</th>
-        <th>{{T "webhooks.col.events"}}</th>
-        <th>{{T "webhooks.col.active"}}</th>
-        <th>{{T "webhooks.col.lastDelivery"}}</th>
-        <th>{{T "webhooks.col.lastStatus"}}</th>
+        <th class="col-flex">{{T "webhooks.col.url"}}</th>
+        <th class="col-webhook-events">{{T "webhooks.col.events"}}</th>
+        <th class="col-status">{{T "webhooks.col.active"}}</th>
+        <th class="col-datetime">{{T "webhooks.col.lastDelivery"}}</th>
+        <th class="col-status">{{T "webhooks.col.lastStatus"}}</th>
         <th class="col-actions">{{T "common.col.action"}}</th>
       </tr></thead>
       <tbody>
       {{range .Rows}}
         <tr>
-          <td class="col-flex-wide">
-            <a href="{{Root}}/admin/settings/webhooks/{{.Webhook.ID}}/deliveries"><code>{{.URLShort}}</code></a>
+          <td class="col-flex">
+            <a href="{{Root}}/admin/settings/webhooks/{{.Webhook.ID}}/deliveries" title="{{.Webhook.URL}}"><code>{{.URLShort}}</code></a>
             {{if .HasSecret}}<span class="badge">HMAC</span>{{end}}
           </td>
-          <td>
+          <td class="col-webhook-events">
             {{range .Webhook.Events}}
               <span class="badge">{{.}}</span>
             {{end}}
           </td>
-          <td>
+          <td class="col-status">
             <form method="post" action="{{Root}}/admin/settings/webhooks/{{.Webhook.ID}}/toggle" class="inline">
               <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
               {{if .Webhook.Active}}
@@ -47,8 +47,8 @@
               {{end}}
             </form>
           </td>
-          <td>{{if not .LastAt.IsZero}}{{.LastAt.Format "2006-01-02 15:04"}}{{else}}—{{end}}</td>
-          <td>
+          <td class="col-datetime">{{if not .LastAt.IsZero}}{{.LastAt.Format "2006-01-02 15:04"}}{{else}}—{{end}}</td>
+          <td class="col-status">
             {{if eq .LastStatusCode 0}}
               {{if .LastError}}<span class="status-bad">error</span>{{else}}—{{end}}
             {{else if and (ge .LastStatusCode 200) (lt .LastStatusCode 300)}}

@@ -138,7 +138,17 @@ func (s *Service) httpClient() *http.Client {
 		}
 		dialer := &net.Dialer{Timeout: timeout, KeepAlive: 30 * time.Second}
 		transport := &http.Transport{
-			Proxy:                 http.ProxyFromEnvironment,
+			// Proxy is intentionally nil — not http.ProxyFromEnvironment.
+			// An upstream HTTP proxy hides the destination hostname from
+			// our DialContext (the dialer sees the proxy address, not the
+			// webhook target), so HTTP_PROXY / HTTPS_PROXY would let a
+			// hostname that secretly resolves to an internal address slip
+			// past the SSRF guard via the proxy's own resolver. If a
+			// deployment ever needs proxy support, add a dedicated
+			// SB_WEBHOOK_PROXY env var that opts in explicitly and
+			// front-runs the SSRF check on the request URL hostname
+			// before handing the request to the proxy.
+			Proxy:                 nil,
 			DialContext:           s.makeDialContext(dialer),
 			ForceAttemptHTTP2:     true,
 			MaxIdleConns:          16,

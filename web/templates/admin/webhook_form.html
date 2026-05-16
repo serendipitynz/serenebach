@@ -12,7 +12,7 @@
     <div class="panel-head"><h2>{{if .IsEdit}}{{T "webhooks.edit.heading"}}{{else}}{{T "webhooks.new.heading"}}{{end}}</h2></div>
     <div class="panel-body form-stack">
       <div class="form-row">
-        <label>{{T "webhooks.form.url"}}</label>
+        <div class="label">{{T "webhooks.form.url"}}</div>
         <div>
           <input type="url" name="url" value="{{.Webhook.URL}}" placeholder="https://hooks.example.com/sb" required>
           <p class="hint">{{T "webhooks.form.urlHint"}}</p>
@@ -20,13 +20,13 @@
       </div>
 
       <div class="form-row">
-        <label>{{T "webhooks.form.secret"}}</label>
+        <div class="label">{{T "webhooks.form.secret"}}</div>
         <div>
           <input type="password" name="secret" autocomplete="new-password" placeholder="{{if .HasSecretStored}}{{T `webhooks.form.secret.kept`}}{{else}}{{T `webhooks.form.secret.optional`}}{{end}}">
           {{if .HasSecretStored}}
-            <label class="inline-checkbox">
+            <label class="checkbox-label">
               <input type="checkbox" name="clear_secret" value="1">
-              {{T "webhooks.form.secret.clear"}}
+              <span>{{T "webhooks.form.secret.clear"}}</span>
             </label>
           {{end}}
           <p class="hint">{{T "webhooks.form.secret.hint"}}</p>
@@ -35,23 +35,24 @@
 
       <div class="form-row">
         <div class="label">{{T "webhooks.form.events"}}</div>
-        <div>
+        <ul class="webhook-event-list">
           {{range .EventOptions}}
-            <label class="inline-checkbox">
-              <input type="checkbox" name="event_{{.ID}}" value="1" {{if .Checked}}checked{{end}}>
-              <code>{{.ID}}</code>
-              <span class="muted"> — {{T .LabelK}}</span>
-            </label><br>
+            <li>
+              <label class="checkbox-label">
+                <input type="checkbox" name="event_{{.ID}}" value="1" {{if .Checked}}checked{{end}}>
+                <span><code>{{.ID}}</code> <span class="muted">— {{T .LabelK}}</span></span>
+              </label>
+            </li>
           {{end}}
-        </div>
+        </ul>
       </div>
 
       <div class="form-row">
-        <label>{{T "webhooks.form.active"}}</label>
+        <div class="label">{{T "webhooks.form.active"}}</div>
         <div>
-          <label class="inline-checkbox">
+          <label class="checkbox-label">
             <input type="checkbox" name="active" value="1" {{if .Webhook.Active}}checked{{end}}>
-            {{T "webhooks.form.active.enabled"}}
+            <span>{{T "webhooks.form.active.enabled"}}</span>
           </label>
         </div>
       </div>
