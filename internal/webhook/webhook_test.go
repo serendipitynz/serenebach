@@ -3,6 +3,7 @@ package webhook
 import (
 	"context"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -181,6 +182,49 @@ func TestDispatchDisabledIsNoop(t *testing.T) {
 	}
 	if len(repo.created) != 0 {
 		t.Errorf("disabled service must not create delivery rows, got %d", len(repo.created))
+	}
+}
+
+// TestDialContextRejectsResolvedLoopback covers the SSRF
+// "public hostname resolving to private IP" path from PR #88 review.
+// ValidateURL only inspects the literal URL string, so the second-
+// layer defence lives in the transport's DialContext. We exercise it
+// directly with an IP-literal addr — the same code path runs for
+// resolved hostnames once net.DefaultResolver returns.
+func TestDialContextRejectsBlockedIPs(t *testing.T) {
+	svc := New(newFakeRepo(), true, false)
+	dial := svc.makeDialContext(&net.Dialer{Timeout: 1 * time.Second})
+	for _, addr := range []string{
+		"127.0.0.1:9", // loopback
+		"10.0.0.5:9",  // RFC1918
+		"169.254.0.1:9",
+		"192.168.1.1:9",
+		"[::1]:9",
+	} {
+		_, err := dial(context.Background(), "tcp", addr)
+		if err == nil {
+			t.Errorf("dial(%q) returned no error, want blocked", addr)
+			continue
+		}
+		if !strings.Contains(err.Error(), "blocked") {
+			t.Errorf("dial(%q) error = %v, want \"blocked\" substring", addr, err)
+		}
+	}
+}
+
+// TestDialContextAllowLoopbackBypass confirms the test-only flag does
+// what it says: an explicitly loopback addr dials through (and the
+// connection refusal from a dead port surfaces, not a guard error).
+func TestDialContextAllowLoopbackBypass(t *testing.T) {
+	svc := New(newFakeRepo(), true, false)
+	svc.AllowLoopback = true
+	dial := svc.makeDialContext(&net.Dialer{Timeout: 1 * time.Second})
+	_, err := dial(context.Background(), "tcp", "127.0.0.1:1") // port 1 is closed
+	if err == nil {
+		t.Fatalf("expected dial failure on closed port, got nil")
+	}
+	if strings.Contains(err.Error(), "blocked") {
+		t.Errorf("AllowLoopback should bypass guard, but got: %v", err)
 	}
 }
 

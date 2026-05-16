@@ -166,7 +166,15 @@ func (h *Handler) commentSetStatus(w http.ResponseWriter, r *http.Request, statu
 		return
 	}
 	if prevErr == nil && prev != nil && status == domain.MessageApproved && prev.Status != domain.MessageApproved {
-		h.dispatchCommentApproved(r.Context(), *prev)
+		// The dispatch payload must reflect the post-transition state
+		// ("approved"), not the pre-update snapshot — otherwise the
+		// payload would report status "waiting" or "hidden" for an
+		// approve event, inconsistent with the public auto-approval
+		// path. Copy first so we don't mutate the snapshot that
+		// other code paths might read later.
+		approved := *prev
+		approved.Status = domain.MessageApproved
+		h.dispatchCommentApproved(r.Context(), approved)
 	}
 	redirectBackToCommentList(w, r)
 }

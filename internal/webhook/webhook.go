@@ -118,6 +118,15 @@ func New(repo Repository, cgi bool, disabled bool) *Service {
 // httpClient returns the shared *http.Client, lazily constructed with
 // the per-mode timeout. Returning a cached client keeps connection
 // pooling effective across many dispatches.
+//
+// The transport's DialContext resolves the destination hostname and
+// rejects every name that points at a non-routable address (loopback,
+// link-local, multicast, RFC1918, ...). This is the load-bearing SSRF
+// defence: the URL-string check in ValidateURL only catches IP literals
+// and "localhost", so a public-looking hostname that resolves to
+// 127.0.0.1 / 10.x / 169.254.x would otherwise pass form validation
+// and reach an internal service. Dialing only the vetted IP also
+// closes the DNS-rebinding window between resolve and connect.
 func (s *Service) httpClient() *http.Client {
 	if s.HTTPClient != nil {
 		return s.HTTPClient
@@ -127,8 +136,19 @@ func (s *Service) httpClient() *http.Client {
 		if s.Sync {
 			timeout = cgiTimeout
 		}
+		dialer := &net.Dialer{Timeout: timeout, KeepAlive: 30 * time.Second}
+		transport := &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			DialContext:           s.makeDialContext(dialer),
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          16,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		}
 		s.client = &http.Client{
-			Timeout: timeout,
+			Timeout:   timeout,
+			Transport: transport,
 			// Stop the client from chasing redirects — a webhook URL
 			// that suddenly 301s to an internal host would defeat the
 			// SSRF guard otherwise.
@@ -138,6 +158,53 @@ func (s *Service) httpClient() *http.Client {
 		}
 	})
 	return s.client
+}
+
+// makeDialContext returns a DialContext function that resolves the
+// destination hostname, rejects the request if any resolved IP is
+// non-routable, then dials by IP literal (not the original hostname)
+// to prevent a DNS-rebinding race between validation and connect.
+//
+// AllowLoopback short-circuits the IP check so test suites running
+// against httptest.NewServer (always 127.0.0.1) keep working.
+func (s *Service) makeDialContext(dialer *net.Dialer) func(context.Context, string, string) (net.Conn, error) {
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+		// IP literal: skip DNS, validate directly. ValidateURL already
+		// rejected obvious literals at form time, but we re-check here
+		// so the transport stays defensive against callers that
+		// constructed a *http.Request directly.
+		if ip := net.ParseIP(host); ip != nil {
+			if !s.AllowLoopback && isBlockedIP(ip) {
+				return nil, fmt.Errorf("webhook: blocked address %s", ip)
+			}
+			return dialer.DialContext(ctx, network, addr)
+		}
+		ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+		if err != nil {
+			return nil, err
+		}
+		if len(ips) == 0 {
+			return nil, fmt.Errorf("webhook: no addresses for %s", host)
+		}
+		if !s.AllowLoopback {
+			for _, ip := range ips {
+				if isBlockedIP(ip.IP) {
+					return nil, fmt.Errorf("webhook: %s resolves to blocked address %s", host, ip.IP)
+				}
+			}
+		}
+		// Dial the first resolved IP by literal so a racing DNS update
+		// can't slip a blocked address past the check above.
+		first := ips[0].IP.String()
+		if ips[0].IP.To4() == nil {
+			first = "[" + first + "]"
+		}
+		return dialer.DialContext(ctx, network, first+":"+port)
+	}
 }
 
 // Dispatch fans out a payload to every active webhook subscribed to
@@ -179,9 +246,18 @@ func (s *Service) Dispatch(ctx context.Context, wid int64, event string, payload
 }
 
 // DispatchOne pushes a payload at a single, explicit webhook regardless
-// of the active-events filter. Used by the "send test event" admin
+// of the active-events filter, and blocks until the delivery row is
+// updated with the outcome. Used by the "send test event" admin
 // affordance so an operator can verify a brand-new subscription
-// without first subscribing it to a real event.
+// without first subscribing it to a real event — the admin handler
+// then redirects to the delivery log where the row is already final.
+//
+// Always synchronous regardless of Service.Sync: callers want the
+// result before returning HTTP. We deliberately do not flip the
+// shared Service.Sync because the *http.Client cached by httpClient()
+// is built once from that field, and a concurrent flip would either
+// permanently shrink the server-mode timeout or leave the test using
+// the wrong one.
 func (s *Service) DispatchOne(ctx context.Context, hook domain.Webhook, event string, payload Payload) error {
 	if s == nil || s.Disabled || s.Repo == nil {
 		return nil
@@ -190,14 +266,7 @@ func (s *Service) DispatchOne(ctx context.Context, hook domain.Webhook, event st
 	if err != nil {
 		return fmt.Errorf("webhook: encode payload: %w", err)
 	}
-	if s.Sync {
-		s.deliverOne(ctx, hook, event, payload.ID, body)
-		return nil
-	}
-	// Detach from ctx: the caller's request context is cancelled as
-	// soon as the HTTP response returns, but we want the delivery to
-	// outlive that. http.Client.Timeout caps the actual blocking work.
-	go s.deliverOne(context.Background(), hook, event, payload.ID, body) //nolint:contextcheck // intentional detach (request ctx is cancelled at response time).
+	s.deliverOne(ctx, hook, event, payload.ID, body)
 	return nil
 }
 
@@ -317,9 +386,10 @@ func ValidateURL(raw string) error {
 
 // isBlockedHost reports whether the hostname / literal IP resolves to a
 // non-routable destination we refuse to call. Hostnames that resolve via
-// DNS are checked at request time by the HTTP client; this catches the
-// common "set the URL to 127.0.0.1" case at validation time without
-// triggering DNS during admin form submission.
+// DNS are not inspected here — that check lives in makeDialContext so
+// hostnames that point at internal addresses are caught at connect time.
+// This function catches the literal "127.0.0.1" / "[::1]" / "localhost"
+// cases at form-validation time without triggering DNS during admin save.
 func isBlockedHost(host string) bool {
 	lower := strings.ToLower(host)
 	if lower == "localhost" || strings.HasSuffix(lower, ".localhost") {
@@ -328,6 +398,18 @@ func isBlockedHost(host string) bool {
 	ip := net.ParseIP(host)
 	if ip == nil {
 		return false
+	}
+	return isBlockedIP(ip)
+}
+
+// isBlockedIP reports whether the resolved address is one we refuse to
+// dial. The set covers IETF "do not route" ranges relevant for SSRF:
+// loopback, link-local (v4 169.254/16 and v6 fe80::/10), multicast,
+// the IPv4/IPv6 unspecified address, and RFC1918 private space (plus
+// the IPv6 ULA fc00::/7 that net.IP.IsPrivate also covers).
+func isBlockedIP(ip net.IP) bool {
+	if ip == nil {
+		return true
 	}
 	return ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
 		ip.IsInterfaceLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() ||

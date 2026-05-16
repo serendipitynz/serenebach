@@ -276,13 +276,11 @@ func (h *Handler) webhookTest(w http.ResponseWriter, r *http.Request) {
 		Weblog:    webhook.WeblogRef{ID: weblog.ID, Title: weblog.Title, URL: weblog.BaseURL},
 		Data:      map[string]any{"message": "serenebach webhook test"},
 	}
-	// Force synchronous so the admin gets immediate feedback even when
-	// the process would otherwise schedule on a goroutine.
-	prev := h.Webhooks.Sync
-	h.Webhooks.Sync = true
-	defer func() { h.Webhooks.Sync = prev }()
-	// Bypass the active-events filter: dispatch directly against the
-	// chosen webhook.
+	// DispatchOne is always synchronous regardless of Service.Sync, so
+	// we never need to mutate the shared service's Sync flag (which
+	// would race against normal admin/public dispatches sharing the
+	// same *Service). The redirect lands on the deliveries page where
+	// the row has already been recorded with its final status.
 	h.fireTestDelivery(r.Context(), hw, payload)
 	http.Redirect(w, r, root(r)+"/admin/settings/webhooks/"+strconv.FormatInt(hw.ID, 10)+"/deliveries?ok=tested", http.StatusSeeOther)
 }

@@ -53,8 +53,12 @@ type App struct {
 	Audit     *mcpaudit.Store
 	// Public is the public-side handler. Exposed so tests (and future
 	// features that want to swap out dependencies at runtime) can reach in.
-	Public  *public.Handler
-	handler http.Handler
+	Public *public.Handler
+	// Webhooks is the outbound-webhook dispatcher shared by both
+	// handler surfaces. Exposed so tests can toggle AllowLoopback
+	// without spinning up an alternate App.
+	Webhooks *webhook.Service
+	handler  http.Handler
 }
 
 // New opens the database, applies migrations, and builds the HTTP handler
@@ -99,6 +103,7 @@ func New(cfg *config.Config) (*App, error) {
 		Analytics: analyticsStore,
 		Audit:     auditStore,
 		Public:    publicH,
+		Webhooks:  webhookSvc,
 	}
 	adminH.Setup = a.makeSetupCallback(store, adminH)
 
