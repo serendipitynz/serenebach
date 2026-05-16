@@ -4,8 +4,8 @@
 <nav class="tabbar">
   {{if .CanManageDesign}}<a href="{{Root}}/admin/settings/basic"{{if eq .ActiveTab "basic"}} class="active"{{end}}>{{T "settings.tab.basic"}}</a>{{end}}
   <a href="{{Root}}/admin/settings/ai"{{if eq .ActiveTab "ai"}} class="active"{{end}}>{{T "settings.tab.ai"}}</a>
-  <a href="{{Root}}/admin/settings/screen"{{if eq .ActiveTab "screen"}} class="active"{{end}}>{{T "settings.tab.screen"}}</a>
   {{if .CanManageDesign}}<a href="{{Root}}/admin/settings/webhooks"{{if eq .ActiveTab "webhooks"}} class="active"{{end}}>{{T "webhooks.title"}}</a>{{end}}
+  <a href="{{Root}}/admin/settings/screen"{{if eq .ActiveTab "screen"}} class="active"{{end}}>{{T "settings.tab.screen"}}</a>
 </nav>
 
 {{if .AIFlash}}<p class="alert success">{{T (printf "profile.ai.flash.%s" .AIFlash)}}</p>{{end}}
