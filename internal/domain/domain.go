@@ -574,3 +574,32 @@ type Message struct {
 	IPAddress   string
 	UserAgent   string
 }
+
+// Webhook is a single outbound webhook subscription. Events is the JSON
+// array of subscribed event ids as stored in the DB; callers translate
+// to []string via webhook.DecodeEvents.
+type Webhook struct {
+	ID        int64
+	WID       int64
+	URL       string
+	Secret    string
+	Events    []string // decoded from the events JSON column
+	Active    bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+// WebhookDelivery is one attempt to POST a payload to a webhook URL.
+// StatusCode is nil while in flight and is filled in once the request
+// finishes; DeliveredAt mirrors that — non-nil only on completion.
+type WebhookDelivery struct {
+	ID          int64
+	WebhookID   int64
+	Event       string
+	DeliveryID  string
+	Payload     string
+	StatusCode  *int
+	Error       string
+	DeliveredAt *time.Time
+	CreatedAt   time.Time
+}

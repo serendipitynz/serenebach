@@ -105,6 +105,13 @@ type Config struct {
 	// in-flight requests to drain after SIGINT/SIGTERM before the
 	// process exits.
 	ShutdownTimeout time.Duration
+	// WebhooksDisabled cuts the outbound-webhook dispatcher to a
+	// no-op. Configured via SB_WEBHOOKS_DISABLED=1 — operators reach
+	// for it when a misbehaving subscriber is hammering an upstream
+	// and removing rows from /admin/settings/webhooks isn't fast
+	// enough. Per-row enable/disable lives in the admin UI for
+	// non-emergency cases.
+	WebhooksDisabled bool
 	// TZ is the timezone used to render entry dates and to interpret
 	// archive month/year boundaries and admin form posted_at input.
 	// Defaults to time.Local so a fresh deploy keeps the historical
@@ -157,6 +164,7 @@ func Load(args []string) (*Config, string, []string, error) {
 		IdleTimeout:            parseDurationEnv(os.Getenv("SB_IDLE_TIMEOUT"), DefaultIdleTimeout),
 		MaxHeaderBytes:         parseMaxHeaderBytesEnv(os.Getenv("SB_MAX_HEADER_BYTES"), DefaultMaxHeaderBytes),
 		ShutdownTimeout:        parseDurationEnv(os.Getenv("SB_SHUTDOWN_TIMEOUT"), DefaultShutdownTimeout),
+		WebhooksDisabled:       os.Getenv("SB_WEBHOOKS_DISABLED") == "1",
 		TZ:                     parseTZEnv(os.Getenv("SB_TZ")),
 	}
 
