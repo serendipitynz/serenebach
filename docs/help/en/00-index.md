@@ -24,6 +24,7 @@ This help focuses on the day-to-day admin operations — writing entries, dialli
 - [Image uploads](images)
 - [Users and roles](users-roles)
 - [Static rebuild and publishing](rebuild-publishing)
+- [Webhooks (outbound notifications)](webhooks)
 - [Appendix](appendix)
 
 ## About this help

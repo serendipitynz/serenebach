@@ -186,6 +186,50 @@ func TestAdminWebhookDeliveriesPageRenders(t *testing.T) {
 	}
 }
 
+// TestAdminWebhookDeliveryErrorIsHTMLEscaped guards against a hostile
+// or buggy receiver returning HTML / JS in its response body — the
+// captured excerpt lands in webhook_deliveries.error verbatim, and
+// the admin UI must escape it instead of rendering it as live markup.
+func TestAdminWebhookDeliveryErrorIsHTMLEscaped(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	cookies := login(t, a.Handler(), "admin", "changeme")
+
+	res, err := a.DB.Exec(`INSERT INTO webhooks (wid, url, events, active, created_at, updated_at)
+		VALUES (1, 'https://hooks.example.com/sb', '["entry.published"]', 1,
+		        strftime('%s','now'), strftime('%s','now'))`)
+	if err != nil {
+		t.Fatalf("insert webhook: %v", err)
+	}
+	id, _ := res.LastInsertId()
+
+	// Simulate a receiver that returned an HTML/script body. The
+	// real path stores this via Service.send -> UpdateWebhookDeliveryResult.
+	// We insert the row directly with the hostile payload as the error.
+	hostile := `<script>alert("xss")</script> & "quoted" <b>bold</b>`
+	if _, err := a.DB.Exec(`INSERT INTO webhook_deliveries
+		(webhook_id, event, delivery_id, payload, status_code, error, delivered_at, created_at)
+		VALUES (?, 'entry.published', 'd1', '{}', 400, ?, strftime('%s','now'), strftime('%s','now'))`, id, hostile); err != nil {
+		t.Fatalf("insert delivery: %v", err)
+	}
+
+	w := authedGET(t, a.Handler(), "/admin/settings/webhooks/"+strconv.FormatInt(id, 10)+"/deliveries", cookies)
+	if w.Code != http.StatusOK {
+		t.Fatalf("deliveries page status = %d; body:\n%s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	// The literal hostile string must not appear unescaped.
+	if strings.Contains(body, hostile) {
+		t.Errorf("hostile body rendered unescaped; substring %q present", hostile)
+	}
+	// The escaped form should be present.
+	for _, want := range []string{"&lt;script&gt;", "&amp;", "&#34;", "&lt;b&gt;"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("expected escaped fragment %q in body, missing", want)
+		}
+	}
+}
+
 // TestAdminWebhooksRequiresAtLeastOneEvent confirms the empty-events
 // branch of the validator.
 func TestAdminWebhooksRequiresAtLeastOneEvent(t *testing.T) {
