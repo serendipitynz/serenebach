@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -261,6 +262,71 @@ func TestDialContextRejectsBlockedIPs(t *testing.T) {
 		if !strings.Contains(err.Error(), "blocked") {
 			t.Errorf("dial(%q) error = %v, want \"blocked\" substring", addr, err)
 		}
+	}
+}
+
+// TestDialIPsFallsBackOnConnectionFailure regression-tests PR #88
+// follow-up review (dual-stack fallback): a hostname whose AAAA and A
+// records both pass the SSRF block check should still deliver when
+// the first resolved address is unreachable. We simulate this by
+// pointing dialIPs at [::1, 127.0.0.1] for an httptest listener
+// (which httptest.NewServer binds to 127.0.0.1 only — nothing
+// answers on the same port via ::1), and assert the dial succeeds
+// via the IPv4 fallback rather than failing fast on the IPv6 attempt.
+func TestDialIPsFallsBackOnConnectionFailure(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	host, port, err := net.SplitHostPort(strings.TrimPrefix(srv.URL, "http://"))
+	if err != nil {
+		t.Fatalf("split URL: %v", err)
+	}
+	if host != "127.0.0.1" {
+		t.Skipf("httptest bound to %q, dual-stack fallback test assumes 127.0.0.1", host)
+	}
+
+	svc := New(newFakeRepo(), true, false)
+	svc.AllowLoopback = true // both ::1 and 127.0.0.1 pass the block check
+	dialer := &net.Dialer{Timeout: 2 * time.Second}
+
+	ips := []net.IPAddr{
+		{IP: net.ParseIP("::1")},       // no listener on this port — should fail
+		{IP: net.ParseIP("127.0.0.1")}, // httptest listener — should succeed
+	}
+	conn, err := svc.dialIPs(context.Background(), dialer, "tcp", ips, port)
+	if err != nil {
+		t.Fatalf("dialIPs should fall back to IPv4, got error: %v", err)
+	}
+	_ = conn.Close()
+}
+
+// TestDialIPsReturnsLastErrorWhenAllFail keeps the failure mode
+// well-defined: if every IP in the list errors, dialIPs surfaces the
+// last underlying error (callers see a real dial error rather than a
+// generic "no dialable addresses" if one was available).
+func TestDialIPsReturnsLastErrorWhenAllFail(t *testing.T) {
+	svc := New(newFakeRepo(), true, false)
+	svc.AllowLoopback = true
+	dialer := &net.Dialer{Timeout: 500 * time.Millisecond}
+	// Reserve an OS-allocated port that is closed by the time we dial.
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	addr := l.Addr().(*net.TCPAddr)
+	_ = l.Close() // ensure subsequent dials are refused
+	port := strconv.Itoa(addr.Port)
+
+	ips := []net.IPAddr{
+		{IP: net.ParseIP("127.0.0.1")},
+		{IP: net.ParseIP("127.0.0.1")},
+	}
+	conn, err := svc.dialIPs(context.Background(), dialer, "tcp", ips, port)
+	if err == nil {
+		_ = conn.Close()
+		t.Fatalf("expected dial failure, got connection")
 	}
 }
 

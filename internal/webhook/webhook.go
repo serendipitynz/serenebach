@@ -208,14 +208,52 @@ func (s *Service) makeDialContext(dialer *net.Dialer) func(context.Context, stri
 				}
 			}
 		}
-		// Dial the first resolved IP by literal so a racing DNS update
-		// can't slip a blocked address past the check above.
-		first := ips[0].IP.String()
-		if ips[0].IP.To4() == nil {
-			first = "[" + first + "]"
-		}
-		return dialer.DialContext(ctx, network, first+":"+port)
+		return s.dialIPs(ctx, dialer, network, ips, port)
 	}
+}
+
+// dialIPs walks the validated address list in order and returns the
+// first successful connection. Falling back to subsequent IPs lets a
+// dual-stack hostname (AAAA + A) reach the IPv4 record from a host
+// without working IPv6 egress — common on shared hosting (Sakura
+// レンタルサーバ など) and some VPS images. Without the fallback, the
+// resolver's AAAA-first ordering caused "network is unreachable" to
+// short-circuit delivery even when an IPv4 path existed.
+//
+// The block-list check has already run on every IP before we get here
+// (see makeDialContext), so the loop only iterates over destinations
+// the operator is allowed to reach.
+func (s *Service) dialIPs(ctx context.Context, dialer *net.Dialer, network string, ips []net.IPAddr, port string) (net.Conn, error) {
+	var lastErr error
+	for _, ipa := range ips {
+		addr := joinIPPort(ipa.IP, port)
+		conn, err := dialer.DialContext(ctx, network, addr)
+		if err == nil {
+			return conn, nil
+		}
+		lastErr = err
+		// Respect ctx cancellation / deadline — don't keep trying
+		// further IPs after the caller has given up.
+		if ctx.Err() != nil {
+			break
+		}
+	}
+	if lastErr == nil {
+		return nil, fmt.Errorf("webhook: no dialable addresses")
+	}
+	return nil, lastErr
+}
+
+// joinIPPort renders an IP + port pair into the "host:port" /
+// "[v6]:port" form net.Dialer expects, dialing by literal so DNS
+// re-resolution can't slip a blocked address through after the
+// validation pass.
+func joinIPPort(ip net.IP, port string) string {
+	host := ip.String()
+	if ip.To4() == nil {
+		host = "[" + host + "]"
+	}
+	return host + ":" + port
 }
 
 // Dispatch fans out a payload to every active webhook subscribed to
