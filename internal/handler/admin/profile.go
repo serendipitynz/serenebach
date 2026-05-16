@@ -34,10 +34,6 @@ type profileFormPageData struct {
 
 func (h *Handler) profileForm(w http.ResponseWriter, r *http.Request) {
 	u := session.UserFrom(r.Context())
-	if u == nil {
-		http.Redirect(w, r, root(r)+"/admin/login", http.StatusFound)
-		return
-	}
 	// Reload from DB so a freshly-saved description / name shows up
 	// even if the session snapshot is stale.
 	fresh, err := h.Store.UserByID(r.Context(), u.ID)
