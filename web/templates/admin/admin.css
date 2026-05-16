@@ -588,6 +588,22 @@ table.listing td.actions { white-space: nowrap; }
 }
 .webhook-list .col-webhook-events .badge + .badge { margin-left: 0.25rem; }
 
+/* Webhook delivery log — same auto-layout pathology as the list view.
+   Without fixed widths the 詳細 / detail column (delivery id, error
+   text) stretches and the timestamp wraps to three lines. Pin the
+   metadata columns and let the detail cell absorb the remainder. */
+.webhook-delivery-list { table-layout: fixed; }
+.col-webhook-event-name { width: 11rem; }
+.webhook-delivery-list .col-flex-wide {
+  white-space: normal;
+}
+.webhook-delivery-list pre.muted {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.8rem;
+}
+
 .panel-subhead {
   margin: 1.25rem 0 0.5rem;
   font-size: 0.95rem;

@@ -11,19 +11,19 @@
   <div class="panel-body">
     {{if eq .Flash "tested"}}<p class="alert success">{{T "webhooks.tested"}}</p>{{end}}
     {{if .Deliveries}}
-    <table class="listing">
+    <table class="listing webhook-delivery-list">
       <thead><tr>
-        <th>{{T "webhooks.deliveries.col.when"}}</th>
-        <th>{{T "webhooks.deliveries.col.event"}}</th>
-        <th>{{T "webhooks.deliveries.col.status"}}</th>
+        <th class="col-datetime">{{T "webhooks.deliveries.col.when"}}</th>
+        <th class="col-webhook-event-name">{{T "webhooks.deliveries.col.event"}}</th>
+        <th class="col-status">{{T "webhooks.deliveries.col.status"}}</th>
         <th class="col-flex-wide">{{T "webhooks.deliveries.col.detail"}}</th>
       </tr></thead>
       <tbody>
       {{range .Deliveries}}
         <tr>
-          <td><code>{{.WhenLabel}}</code></td>
-          <td><code>{{.Event}}</code></td>
-          <td>
+          <td class="col-datetime"><code>{{.WhenLabel}}</code></td>
+          <td class="col-webhook-event-name"><code>{{.Event}}</code></td>
+          <td class="col-status">
             {{$sc := 0}}
             {{if .StatusCode}}{{$sc = .StatusCode}}{{end}}
             {{if eq $sc 0}}
