@@ -645,7 +645,6 @@
   "templates.import.heading": "テンプレートのインポート",
   "templates.import.panelHeading": "template.txt をアップロード",
   "templates.import.hint": "SB3 のテンプレート書き出し形式 (multipart/mixed の <code>template.txt</code>) を受け付けます。<code>base.html</code> は必須、<code>style.css</code> / <code>entry.html</code> / 画像アセットは任意です。",
-  "templates.import.fileLabel": "ファイル",
   "templates.import.dropZone": "ここに template.txt をドラッグ または クリックで選択",
   "templates.import.submit": "インポート",
   "templates.import.title": "テンプレートインポート",
