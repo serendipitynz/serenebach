@@ -52,6 +52,7 @@ const (
 	cgiTimeout            = 3 * time.Second
 	deliveriesRetention   = 200
 	maxPayloadBytes       = 64 * 1024
+	maxRespBodyBytes      = 2 * 1024 // captured from non-2xx responses for diagnostics
 	headerEvent           = "X-SB-Event"
 	headerDeliveryID      = "X-SB-Delivery"
 	headerSignature       = "X-SB-Signature"
@@ -347,13 +348,20 @@ func (s *Service) send(ctx context.Context, hook domain.Webhook, event, delivery
 		return 0, err
 	}
 	defer resp.Body.Close()
-	// Drain a bounded number of bytes so the connection can be reused
-	// by keep-alive without us caring about the body content.
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+	// Capture up to maxRespBodyBytes of the response body so non-2xx
+	// rows can show the receiver's diagnostic message in the admin UI
+	// (Slack returns "invalid_payload" etc., Discord returns the
+	// validation error JSON). Limiting the read also lets us reuse the
+	// connection via keep-alive without unbounded buffering.
+	bodyExcerpt, _ := io.ReadAll(io.LimitReader(resp.Body, maxRespBodyBytes))
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return resp.StatusCode, nil
 	}
-	return resp.StatusCode, fmt.Errorf("webhook: non-2xx response %d", resp.StatusCode)
+	excerpt := strings.TrimSpace(string(bodyExcerpt))
+	if excerpt == "" {
+		return resp.StatusCode, fmt.Errorf("webhook: non-2xx response %d (empty body)", resp.StatusCode)
+	}
+	return resp.StatusCode, fmt.Errorf("webhook: non-2xx response %d: %s", resp.StatusCode, excerpt)
 }
 
 // encodePayload marshals the payload struct and enforces the byte cap.

@@ -174,6 +174,58 @@ func TestDispatchRecordsNon2xx(t *testing.T) {
 	}
 }
 
+// TestDispatchCapturesResponseBodyOnNon2xx ensures the diagnostic
+// payload returned by services like Slack ("invalid_payload") makes
+// it into the recorded delivery row, not just the bare status code.
+func TestDispatchCapturesResponseBodyOnNon2xx(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("invalid_payload"))
+	}))
+	defer srv.Close()
+	repo := newFakeRepo(domain.Webhook{
+		ID: 1, WID: 1, URL: srv.URL, Events: []string{EventEntryPublished}, Active: true,
+	})
+	svc := New(repo, true, false)
+	svc.AllowLoopback = true
+	if err := svc.Dispatch(context.Background(), 1, EventEntryPublished, Payload{ID: "d3", Event: EventEntryPublished}); err != nil {
+		t.Fatalf("Dispatch: %v", err)
+	}
+	rec, ok := repo.updated[1]
+	if !ok {
+		t.Fatalf("no update recorded")
+	}
+	if rec.status != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", rec.status)
+	}
+	if !strings.Contains(rec.errMsg, "400") {
+		t.Errorf("error should mention status code: %q", rec.errMsg)
+	}
+	if !strings.Contains(rec.errMsg, "invalid_payload") {
+		t.Errorf("error should include response body excerpt, got %q", rec.errMsg)
+	}
+}
+
+// TestDispatchNotesEmptyBodyOnNon2xx documents the empty-body branch
+// so future readers know we deliberately surface that distinction
+// instead of silently dropping the body entirely.
+func TestDispatchNotesEmptyBodyOnNon2xx(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer srv.Close()
+	repo := newFakeRepo(domain.Webhook{
+		ID: 1, WID: 1, URL: srv.URL, Events: []string{EventEntryPublished}, Active: true,
+	})
+	svc := New(repo, true, false)
+	svc.AllowLoopback = true
+	_ = svc.Dispatch(context.Background(), 1, EventEntryPublished, Payload{ID: "d4", Event: EventEntryPublished})
+	rec := repo.updated[1]
+	if !strings.Contains(rec.errMsg, "empty body") {
+		t.Errorf("error should note empty body, got %q", rec.errMsg)
+	}
+}
+
 func TestDispatchDisabledIsNoop(t *testing.T) {
 	repo := newFakeRepo(domain.Webhook{ID: 1, WID: 1, URL: "https://example.com", Events: []string{EventEntryPublished}, Active: true})
 	svc := New(repo, true, true /*disabled*/)
