@@ -23,6 +23,7 @@ import (
 	"github.com/serendipitynz/serenebach/internal/i18n"
 	"github.com/serendipitynz/serenebach/internal/storage/repo"
 	"github.com/serendipitynz/serenebach/internal/turnstile"
+	"github.com/serendipitynz/serenebach/internal/webhook"
 )
 
 // publicBundle carries reader-facing engine strings (comment
@@ -114,6 +115,10 @@ type Handler struct {
 	// backwards compatibility; app.New always sets this from
 	// config.Config.TZ so the deployed behaviour is host-independent.
 	TZ *time.Location
+	// Webhooks dispatches outbound webhook events fired from the
+	// public path (comment.received, comment.approved when auto-
+	// approved). Nil disables dispatch.
+	Webhooks *webhook.Service
 }
 
 // tz returns the handler's configured timezone, falling back to

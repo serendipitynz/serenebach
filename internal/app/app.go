@@ -33,6 +33,7 @@ import (
 	"github.com/serendipitynz/serenebach/internal/storage/repo"
 	"github.com/serendipitynz/serenebach/internal/storage/sqlite"
 	"github.com/serendipitynz/serenebach/internal/turnstile"
+	"github.com/serendipitynz/serenebach/internal/webhook"
 	admintpl "github.com/serendipitynz/serenebach/web/templates/admin"
 )
 
@@ -79,8 +80,11 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	applyDevMode(cfg.DevMode)
+	webhookSvc := webhook.New(store, cfg.Mode == config.ModeCGI, cfg.WebhooksDisabled)
 	adminH := buildAdminHandler(cfg, store, sessions, analyticsStore, auditStore)
+	adminH.Webhooks = webhookSvc
 	publicH := buildPublicHandler(cfg, store)
+	publicH.Webhooks = webhookSvc
 	publicMutationGuard := buildPublicMutationGuard(cfg, store)
 	mcpSrv := buildMCPServer(cfg, store, analyticsStore, auditStore)
 

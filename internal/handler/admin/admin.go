@@ -31,6 +31,7 @@ import (
 	"github.com/serendipitynz/serenebach/internal/og"
 	"github.com/serendipitynz/serenebach/internal/session"
 	"github.com/serendipitynz/serenebach/internal/storage/repo"
+	"github.com/serendipitynz/serenebach/internal/webhook"
 	admintpl "github.com/serendipitynz/serenebach/web/templates/admin"
 )
 
@@ -89,6 +90,10 @@ type Handler struct {
 	// back to time.Local so test callers keep working without
 	// extra wiring; app.New always sets this from config.Config.TZ.
 	TZ *time.Location
+	// Webhooks dispatches outbound webhook events (entry.published,
+	// comment.received, ...). Nil disables the feature entirely; the
+	// dispatch helpers check for nil before invoking.
+	Webhooks *webhook.Service
 }
 
 // tz returns the handler's configured timezone, falling back to
