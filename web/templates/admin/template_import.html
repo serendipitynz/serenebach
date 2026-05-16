@@ -18,12 +18,10 @@
     <p class="hint">{{THTML "templates.import.hint"}}</p>
     <form method="post" action="{{Root}}/admin/templates/import" enctype="multipart/form-data" class="form-stack">
       <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-      <div class="form-row">
-        <label class="drop-zone" data-drop-to-input>
-          <span class="drop-zone-text" data-drop-placeholder>{{T "templates.import.dropZone"}}</span>
-          <input type="file" name="file" accept=".txt,application/x-sb-template" required data-drop-input>
-        </label>
-      </div>
+      <label class="drop-zone" data-drop-to-input>
+        <span class="drop-zone-text" data-drop-placeholder>{{T "templates.import.dropZone"}}</span>
+        <input type="file" name="file" accept=".txt,application/x-sb-template" required data-drop-input>
+      </label>
       <div class="form-actions">
         <button type="submit" class="primary">{{T "templates.import.submit"}}</button>
       </div>
