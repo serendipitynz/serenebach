@@ -24,14 +24,12 @@
           <td class="col-datetime"><code>{{.WhenLabel}}</code></td>
           <td class="col-webhook-event-name"><code>{{.Event}}</code></td>
           <td class="col-status">
-            {{$sc := 0}}
-            {{if .StatusCode}}{{$sc = .StatusCode}}{{end}}
-            {{if eq $sc 0}}
+            {{if eq .StatusCode 0}}
               {{if .Error}}<span class="status-bad">error</span>{{else}}<span class="muted">pending</span>{{end}}
-            {{else if and (ge $sc 200) (lt $sc 300)}}
-              <span class="status-ok">{{$sc}}</span>
+            {{else if and (ge .StatusCode 200) (lt .StatusCode 300)}}
+              <span class="status-ok">{{.StatusCode}}</span>
             {{else}}
-              <span class="status-bad">{{$sc}}</span>
+              <span class="status-bad">{{.StatusCode}}</span>
             {{end}}
           </td>
           <td class="col-flex-wide">

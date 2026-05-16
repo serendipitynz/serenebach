@@ -139,6 +139,53 @@ func TestAdminWebhooksRejectsSSRFTargets(t *testing.T) {
 	}
 }
 
+// TestAdminWebhookDeliveriesPageRenders regression-tests that the
+// per-subscription delivery log renders without a template runtime
+// error. The original implementation embedded domain.WebhookDelivery
+// directly, so the *int StatusCode field tripped html/template's
+// `eq` helper ("incompatible types for comparison: *int and int") as
+// soon as any delivery row landed. We insert two rows — one pending
+// (status_code NULL), one completed (status_code 200) — and assert
+// the response is 200 with both statuses rendered in the body.
+func TestAdminWebhookDeliveriesPageRenders(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	cookies := login(t, a.Handler(), "admin", "changeme")
+
+	// Insert webhook + two delivery rows directly. The form correctly
+	// rejects example.com is fine for storage; no actual HTTP fires.
+	res, err := a.DB.Exec(`INSERT INTO webhooks (wid, url, events, active, created_at, updated_at)
+		VALUES (1, 'https://hooks.example.com/sb', '["entry.published"]', 1,
+		        strftime('%s','now'), strftime('%s','now'))`)
+	if err != nil {
+		t.Fatalf("insert webhook: %v", err)
+	}
+	id, _ := res.LastInsertId()
+
+	if _, err := a.DB.Exec(`INSERT INTO webhook_deliveries
+		(webhook_id, event, delivery_id, payload, status_code, error, delivered_at, created_at)
+		VALUES (?, 'entry.published', 'd1', '{}', 200, '', strftime('%s','now'), strftime('%s','now'))`, id); err != nil {
+		t.Fatalf("insert delivery 1: %v", err)
+	}
+	if _, err := a.DB.Exec(`INSERT INTO webhook_deliveries
+		(webhook_id, event, delivery_id, payload, status_code, error, delivered_at, created_at)
+		VALUES (?, 'entry.published', 'd2', '{}', NULL, '', NULL, strftime('%s','now'))`, id); err != nil {
+		t.Fatalf("insert delivery 2: %v", err)
+	}
+
+	w := authedGET(t, a.Handler(), "/admin/settings/webhooks/"+strconv.FormatInt(id, 10)+"/deliveries", cookies)
+	if w.Code != http.StatusOK {
+		t.Fatalf("deliveries page status = %d; body:\n%s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "200") {
+		t.Errorf("page should render the 200 status: body excerpt:\n%s", body)
+	}
+	if !strings.Contains(body, "pending") {
+		t.Errorf("page should render the pending status: body excerpt:\n%s", body)
+	}
+}
+
 // TestAdminWebhooksRequiresAtLeastOneEvent confirms the empty-events
 // branch of the validator.
 func TestAdminWebhooksRequiresAtLeastOneEvent(t *testing.T) {

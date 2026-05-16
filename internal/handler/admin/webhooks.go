@@ -315,10 +315,19 @@ type webhookDeliveriesPageData struct {
 	Flash      string
 }
 
+// webhookDeliveryRow is a flat view-model for the deliveries template.
+// We deliberately do NOT embed domain.WebhookDelivery: its StatusCode
+// is *int (so a NULL DB value can round-trip) and html/template's `eq`
+// helper refuses to compare *int with an int literal, which broke the
+// template at runtime. Surfacing the integer (0 = no response yet)
+// keeps the template free of pointer-handling syntax.
 type webhookDeliveryRow struct {
-	domain.WebhookDelivery
-	StatusLabel string
-	WhenLabel   string
+	ID         int64
+	Event      string
+	DeliveryID string
+	StatusCode int // 0 = pending / no response received
+	Error      string
+	WhenLabel  string
 }
 
 func (h *Handler) webhookDeliveries(w http.ResponseWriter, r *http.Request) {
@@ -334,10 +343,17 @@ func (h *Handler) webhookDeliveries(w http.ResponseWriter, r *http.Request) {
 	}
 	view := make([]webhookDeliveryRow, 0, len(rows))
 	for _, d := range rows {
+		status := 0
+		if d.StatusCode != nil {
+			status = *d.StatusCode
+		}
 		view = append(view, webhookDeliveryRow{
-			WebhookDelivery: d,
-			StatusLabel:     deliveryStatusLabel(d),
-			WhenLabel:       deliveryWhenLabel(d, h.tz()),
+			ID:         d.ID,
+			Event:      d.Event,
+			DeliveryID: d.DeliveryID,
+			StatusCode: status,
+			Error:      d.Error,
+			WhenLabel:  deliveryWhenLabel(d, h.tz()),
 		})
 	}
 	data := webhookDeliveriesPageData{
@@ -441,18 +457,6 @@ func shortenURL(raw string, maxLen int) string {
 		return raw
 	}
 	return raw[:maxLen] + "…"
-}
-
-// deliveryStatusLabel renders the delivery row's outcome as a stable
-// string for the table. "200" / "5xx" / "error" / "pending".
-func deliveryStatusLabel(d domain.WebhookDelivery) string {
-	if d.StatusCode == nil || *d.StatusCode == 0 {
-		if d.Error != "" {
-			return "error"
-		}
-		return "pending"
-	}
-	return strconv.Itoa(*d.StatusCode)
 }
 
 // deliveryWhenLabel formats either DeliveredAt or CreatedAt in the
