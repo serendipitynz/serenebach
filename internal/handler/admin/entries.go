@@ -461,6 +461,9 @@ func (h *Handler) entryCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	h.regenerateOGCard(r.Context(), entry)
 	h.maybeAutoRebuild(r.Context())
+	if entry.Status == domain.EntryPublished {
+		h.dispatchEntryEvent(r.Context(), "entry.published", entry)
+	}
 	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/entries/%d/edit?ok=saved", id), http.StatusFound)
 }
 
@@ -491,6 +494,7 @@ func (h *Handler) entryUpdate(w http.ResponseWriter, r *http.Request) {
 		h.renderEntryForm(w, r, fmt.Sprintf("/admin/entries/%d/edit", id), entry, tagsCSV, errMsg, tr(r, "entries.form.titleEditPlain"), "entries", 0)
 		return
 	}
+	wasPublished := existing.Status == domain.EntryPublished
 	if err := h.Store.UpdateEntry(r.Context(), entry); err != nil {
 		if errors.Is(err, repo.ErrSlugInUse) {
 			h.renderEntryForm(w, r, fmt.Sprintf("/admin/entries/%d/edit", id), entry, tagsCSV, tr(r, "entries.form.error.slugInUse"), tr(r, "entries.form.titleEditPlain"), "entries", 0)
@@ -505,6 +509,12 @@ func (h *Handler) entryUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	h.regenerateOGCard(r.Context(), entry)
 	h.maybeAutoRebuild(r.Context())
+	switch {
+	case entry.Status == domain.EntryPublished && !wasPublished:
+		h.dispatchEntryEvent(r.Context(), "entry.published", entry)
+	case entry.Status == domain.EntryPublished && wasPublished:
+		h.dispatchEntryEvent(r.Context(), "entry.updated", entry)
+	}
 	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/entries/%d/edit?ok=saved", id), http.StatusFound)
 }
 
@@ -528,6 +538,7 @@ func (h *Handler) entryDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	h.removeOGCard(id)
 	h.maybeAutoRebuild(r.Context())
+	h.dispatchEntryEvent(r.Context(), "entry.deleted", *existing)
 	http.Redirect(w, r, root(r)+"/admin/entries?ok=deleted", http.StatusFound)
 }
 

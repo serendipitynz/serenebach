@@ -1,0 +1,83 @@
+{{define "content"}}
+<h1>{{T "webhooks.title"}}</h1>
+
+<p><a href="{{Root}}/admin/settings/webhooks">{{T "action.back"}}</a></p>
+
+{{if .Error}}<p class="alert error">{{T .Error}}</p>{{end}}
+
+<form method="post" action="{{.Action}}" class="form-stack">
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+  <div class="panel">
+    <div class="panel-head"><h2>{{if .IsEdit}}{{T "webhooks.edit.heading"}}{{else}}{{T "webhooks.new.heading"}}{{end}}</h2></div>
+    <div class="panel-body form-stack">
+      <div class="form-row">
+        <div class="label">{{T "webhooks.form.url"}}</div>
+        <div>
+          <input type="url" name="url" value="{{.Webhook.URL}}" placeholder="https://hooks.example.com/sb" required>
+          <p class="hint">{{T "webhooks.form.urlHint"}}</p>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="label">{{T "webhooks.form.secret"}}</div>
+        <div>
+          <input type="password" name="secret" autocomplete="new-password" placeholder="{{if .HasSecretStored}}{{T `webhooks.form.secret.kept`}}{{else}}{{T `webhooks.form.secret.optional`}}{{end}}">
+          {{if .HasSecretStored}}
+            <label class="checkbox-label">
+              <input type="checkbox" name="clear_secret" value="1">
+              <span>{{T "webhooks.form.secret.clear"}}</span>
+            </label>
+          {{end}}
+          <p class="hint">{{T "webhooks.form.secret.hint"}}</p>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="label">{{T "webhooks.form.events"}}</div>
+        <ul class="webhook-event-list">
+          {{range .EventOptions}}
+            <li>
+              <label class="checkbox-label">
+                <input type="checkbox" name="event_{{.ID}}" value="1" {{if .Checked}}checked{{end}}>
+                <span><code>{{.ID}}</code> <span class="muted">— {{T .LabelK}}</span></span>
+              </label>
+            </li>
+          {{end}}
+        </ul>
+      </div>
+
+      <div class="form-row">
+        <div class="label">{{T "webhooks.form.payloadFormat"}}</div>
+        <div>
+          <select name="payload_format">
+            {{range .FormatOptions}}
+              <option value="{{.ID}}"{{if .Selected}} selected{{end}}>{{T .LabelK}}</option>
+            {{end}}
+          </select>
+          <ul class="webhook-format-hints">
+            {{range .FormatOptions}}
+              <li><code>{{.ID}}</code> — {{T .HintK}}</li>
+            {{end}}
+          </ul>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="label">{{T "webhooks.form.active"}}</div>
+        <div>
+          <label class="checkbox-label">
+            <input type="checkbox" name="active" value="1" {{if .Webhook.Active}}checked{{end}}>
+            <span>{{T "webhooks.form.active.enabled"}}</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <a href="{{Root}}/admin/settings/webhooks">{{T "action.cancel"}}</a>
+    <button type="submit" class="primary">{{T "action.save"}}</button>
+  </div>
+</form>
+{{end}}

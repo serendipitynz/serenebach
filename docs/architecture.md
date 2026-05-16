@@ -185,3 +185,17 @@ Tools:
 - **Write** (write-scope tokens only): `create_entry`, `update_entry`, `publish_entry`, `upload_image`.
 
 Every write operation lands in an audit log (`mcp_audit_log` in the main DB; redirect to a separate file via `SB_MCP_AUDIT_DB`). The admin AI 設定 tab surfaces recent rows with the calling token, acting user, tool name, target, and timestamp.
+
+## Outbound webhooks
+
+Serene Bach can POST a JSON payload to operator-specified URLs when domain events fire — entry publish / update / delete, comment received / approved, image uploaded. Designed as the cheapest integration surface: a single binary still, no queue, no daemon.
+
+- **Configuration** — `/admin/settings/webhooks` (requires `power_user` role). Each subscription has a URL, an optional HMAC-SHA256 secret, a per-event checkbox grid, a payload-format selector, and an active toggle. Up to 50 subscriptions per weblog.
+- **Payload formats** — `envelope` (default) sends the full nested JSON (`id` / `event` / `timestamp` / `weblog` / `data`). `flat` applies the [slack.dev recommendation](https://slack.dev/flatten-json-for-workflow-builder/): nested keys are joined with `_` and array indices participate in the path (`data.title` → `data_title`, `data.tags[0]` → `data_tags_0`). The flat payload additionally embeds a one-line human-readable summary under `text` (Slack Incoming Webhooks) and `content` (Discord Incoming Webhooks), so a single subscription works as a direct Slack / Discord channel post and as a Slack Workflow Builder trigger (which reads each flat key as a variable). Slack and Discord both silently ignore unknown top-level keys, so the same body satisfies all three receivers.
+- **Dispatch mode** — server mode fans out per delivery on a goroutine (10 s `http.Client` timeout). CGI mode dispatches synchronously inside the request with a 3 s timeout, because goroutines die with the process. `SB_WEBHOOKS_DISABLED=1` cuts every dispatch to a no-op.
+- **Signing** — when `secret` is set, payloads ship with `X-SB-Signature: sha256=<hex>`, the HMAC-SHA256 of the request body. Helpers `webhook.Sign` / `webhook.Verify` use constant-time comparison.
+- **SSRF guard** — `webhook.ValidateURL` rejects non-http(s) schemes, loopback (`127.x`, `::1`, `localhost`), link-local, multicast, and RFC1918 private ranges before the HTTP client opens a connection. Redirects are not followed.
+- **Persistence** — `webhooks` and `webhook_deliveries` (migration `0046_webhooks.sql`). Each attempt logs one delivery row with status code, transport error, and timestamps; the dispatcher prunes anything past the most recent 200 entries per subscription.
+- **Privacy** — comment payloads carry `commenter` name and a 240-rune `body_excerpt` only. Email and IP are intentionally omitted.
+
+Static rebuild does not fire webhooks — the design treats `entry.published` as "an admin pressed save with status=published", which is the dynamic path. A subsequent `task build-site` re-emits HTML but is not itself a publication event.

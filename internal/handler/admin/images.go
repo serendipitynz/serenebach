@@ -261,6 +261,20 @@ func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	uploadedImage := domain.Image{
+		ID:         id,
+		WID:        h.wid(),
+		UploadedBy: u.ID,
+		Filename:   stored.Filename,
+		StoredPath: stored.StoredPath,
+		ThumbPath:  stored.ThumbPath,
+		MimeType:   mime,
+		SizeBytes:  stored.SizeBytes,
+		Width:      stored.Width,
+		Height:     stored.Height,
+	}
+	h.dispatchImageUploaded(r.Context(), uploadedImage, imagesPathPrefix+stored.StoredPath)
+
 	if wantsJSON {
 		// When the uploader opted into auto-alt and has a usable AI
 		// provider wired up, flag it so the client can immediately

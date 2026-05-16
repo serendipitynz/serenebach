@@ -236,6 +236,28 @@ func (s *Store) CountRecentCommentsFromIP(ctx context.Context, ip string, since 
 	return n, nil
 }
 
+// MessageByID fetches one comment row by primary key. ErrNotFound on miss.
+// Used by callers (webhook dispatch, future audit hooks) that need the
+// full row after an UpdateMessageStatus / CreateMessage.
+func (s *Store) MessageByID(ctx context.Context, wid, id int64) (*domain.Message, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT `+messageColumns+`
+		FROM messages
+		WHERE wid = ? AND id = ?`, wid, id)
+	var m domain.Message
+	var postedAt int64
+	if err := row.Scan(&m.ID, &m.WID, &m.EntryID, &m.Status, &postedAt,
+		&m.AuthorName, &m.AuthorEmail, &m.AuthorURL, &m.Body,
+		&m.IPAddress, &m.UserAgent); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("repo: MessageByID: %w", err)
+	}
+	m.PostedAt = time.Unix(postedAt, 0)
+	return &m, nil
+}
+
 func scanMessages(rows *sql.Rows) ([]domain.Message, error) {
 	var out []domain.Message
 	for rows.Next() {

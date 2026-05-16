@@ -152,6 +152,10 @@ func (h *Handler) commentSetStatus(w http.ResponseWriter, r *http.Request, statu
 		http.NotFound(w, r)
 		return
 	}
+	// Snapshot the previous status before flipping so the webhook
+	// dispatcher only fires on transitions into "approved" (not, say,
+	// when an already-approved comment is re-saved).
+	prev, prevErr := h.Store.MessageByID(r.Context(), h.wid(), id)
 	if err := h.Store.UpdateMessageStatus(r.Context(), h.wid(), id, status); err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
 			http.NotFound(w, r)
@@ -160,6 +164,17 @@ func (h *Handler) commentSetStatus(w http.ResponseWriter, r *http.Request, statu
 		log.Printf("admin.commentSetStatus: %v", err)
 		http.Error(w, "failed to update comment", http.StatusInternalServerError)
 		return
+	}
+	if prevErr == nil && prev != nil && status == domain.MessageApproved && prev.Status != domain.MessageApproved {
+		// The dispatch payload must reflect the post-transition state
+		// ("approved"), not the pre-update snapshot — otherwise the
+		// payload would report status "waiting" or "hidden" for an
+		// approve event, inconsistent with the public auto-approval
+		// path. Copy first so we don't mutate the snapshot that
+		// other code paths might read later.
+		approved := *prev
+		approved.Status = domain.MessageApproved
+		h.dispatchCommentApproved(r.Context(), approved)
 	}
 	redirectBackToCommentList(w, r)
 }

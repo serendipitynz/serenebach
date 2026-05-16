@@ -20,6 +20,7 @@
 - 管理画面 UI / MCP サーバ / 管理画面ヘルプ もすべてバイナリに同梱
 - ハイブリッド配信向けの静的サイト生成 (CDN 前段 + 動的管理画面)
 - 旧 Serene Bach v2 (テキストファイル) / v3 (SQLite) (Perl 版) からのインポートに対応
+- Outbound Webhooks: 記事公開 / コメント受信 / 画像アップロード で Slack / Discord / Zapier / n8n に通知
 
 ## クイックスタート
 

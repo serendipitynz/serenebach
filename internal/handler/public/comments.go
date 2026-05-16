@@ -69,10 +69,16 @@ func (h *Handler) commentSubmit(w http.ResponseWriter, r *http.Request) {
 		IPAddress:   ip,
 		UserAgent:   r.UserAgent(),
 	}
-	if _, err := h.Store.CreateMessage(ctx, msg); err != nil {
+	msgID, err := h.Store.CreateMessage(ctx, msg)
+	if err != nil {
 		log.Printf("public.commentSubmit: create: %v", err)
 		http.Error(w, "failed to save comment", http.StatusInternalServerError)
 		return
+	}
+	msg.ID = msgID
+	h.dispatchCommentEvent(ctx, "comment.received", *weblog, *entry, msg)
+	if msg.Status == domain.MessageApproved {
+		h.dispatchCommentEvent(ctx, "comment.approved", *weblog, *entry, msg)
 	}
 
 	applyCommenterCookies(w, r, fields)

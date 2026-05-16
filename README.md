@@ -20,6 +20,7 @@ A self-hostable Go weblog engine — a lighter path between WordPress and Hugo. 
 - Embedded admin UI, MCP server, and end-user help — nothing extra to deploy
 - Static rebuild for hybrid hosting (CDN / static front, dynamic admin behind)
 - Imports content from legacy Serene Bach v2 (flat-file) and v3 (SQLite) installations
+- Outbound webhooks (entry / comment / image events) for Slack / Discord / Zapier / n8n
 
 ## Quick start
 

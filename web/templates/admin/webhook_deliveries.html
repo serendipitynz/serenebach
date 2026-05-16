@@ -1,0 +1,52 @@
+{{define "content"}}
+<h1>{{T "webhooks.deliveries.title"}}</h1>
+
+<p><a href="{{Root}}/admin/settings/webhooks">{{T "action.back"}}</a></p>
+
+<div class="panel">
+  <div class="panel-head">
+    <h2><code>{{.URLShort}}</code></h2>
+    <a href="{{Root}}/admin/settings/webhooks/{{.Webhook.ID}}/edit" class="btn">{{T "action.edit"}}</a>
+  </div>
+  <div class="panel-body">
+    {{if eq .Flash "tested"}}<p class="alert success">{{T "webhooks.tested"}}</p>{{end}}
+    {{if .Deliveries}}
+    <table class="listing webhook-delivery-list">
+      <thead><tr>
+        <th class="col-datetime">{{T "webhooks.deliveries.col.when"}}</th>
+        <th class="col-webhook-event-name">{{T "webhooks.deliveries.col.event"}}</th>
+        <th class="col-status">{{T "webhooks.deliveries.col.status"}}</th>
+        <th class="col-flex-wide">{{T "webhooks.deliveries.col.detail"}}</th>
+      </tr></thead>
+      <tbody>
+      {{range .Deliveries}}
+        <tr>
+          <td class="col-datetime"><code>{{.WhenLabel}}</code></td>
+          <td class="col-webhook-event-name"><code>{{.Event}}</code></td>
+          <td class="col-status">
+            {{if eq .StatusCode 0}}
+              {{if .Error}}<span class="status-bad">error</span>{{else}}<span class="muted">pending</span>{{end}}
+            {{else if and (ge .StatusCode 200) (lt .StatusCode 300)}}
+              <span class="status-ok">{{.StatusCode}}</span>
+            {{else}}
+              <span class="status-bad">{{.StatusCode}}</span>
+            {{end}}
+          </td>
+          <td class="col-flex-wide">
+            {{if .Error}}
+              <pre class="muted">{{.Error}}</pre>
+            {{else}}
+              <code class="muted">id={{.DeliveryID}}</code>
+            {{end}}
+          </td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    <p class="hint">{{T "webhooks.deliveries.retention"}}</p>
+    {{else}}
+      <p class="hint">{{T "webhooks.deliveries.empty"}}</p>
+    {{end}}
+  </div>
+</div>
+{{end}}

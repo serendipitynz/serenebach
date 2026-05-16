@@ -208,34 +208,37 @@ func messageStatusClass(s domain.MessageStatus) string {
 // Page template names. Each dashboard page is a layout + content pair;
 // login is a standalone template without the shell.
 const (
-	pageHome             = "home"
-	pageEntriesList      = "entries_list"
-	pageEntryForm        = "entry_form"
-	pagePagesList        = "pages_list"
-	pagePageForm         = "page_form"
-	pageImages           = "images"
-	pageCategoriesList   = "categories_list"
-	pageCategoryForm     = "category_form"
-	pageLinksList        = "links_list"
-	pageLinkForm         = "link_form"
-	pageTagsList         = "tags_list"
-	pageUsersList        = "users_list"
-	pageUserForm         = "user_form"
-	pageProfileForm      = "profile_form"
-	pageCommentsList     = "comments_list"
-	pageCommentSettings  = "comment_settings"
-	pageAnalytics        = "analytics"
-	pageRebuild          = "rebuild"
-	pageSettings         = "settings"
-	pageSettingsBasic    = "settings_basic"
-	pageSettingsAI       = "settings_ai"
-	pageTemplatesList    = "templates_list"
-	pageTemplateForm     = "template_form"
-	pageTemplateImport   = "template_import"
-	pageTemplateSettings = "template_settings"
-	pageTemplateOG       = "template_og"
-	pageCustomTags       = "custom_tags"
-	pageHelp             = "help"
+	pageHome              = "home"
+	pageEntriesList       = "entries_list"
+	pageEntryForm         = "entry_form"
+	pagePagesList         = "pages_list"
+	pagePageForm          = "page_form"
+	pageImages            = "images"
+	pageCategoriesList    = "categories_list"
+	pageCategoryForm      = "category_form"
+	pageLinksList         = "links_list"
+	pageLinkForm          = "link_form"
+	pageTagsList          = "tags_list"
+	pageUsersList         = "users_list"
+	pageUserForm          = "user_form"
+	pageProfileForm       = "profile_form"
+	pageCommentsList      = "comments_list"
+	pageCommentSettings   = "comment_settings"
+	pageAnalytics         = "analytics"
+	pageRebuild           = "rebuild"
+	pageSettings          = "settings"
+	pageSettingsBasic     = "settings_basic"
+	pageSettingsAI        = "settings_ai"
+	pageTemplatesList     = "templates_list"
+	pageTemplateForm      = "template_form"
+	pageTemplateImport    = "template_import"
+	pageTemplateSettings  = "template_settings"
+	pageTemplateOG        = "template_og"
+	pageCustomTags        = "custom_tags"
+	pageWebhooksList      = "webhooks_list"
+	pageWebhookForm       = "webhook_form"
+	pageWebhookDeliveries = "webhook_deliveries"
+	pageHelp              = "help"
 )
 
 // DevMode disables template and i18n caching. When true, every request
@@ -297,7 +300,7 @@ func loadI18nBundle() *i18n.Bundle {
 
 func loadMainTemplates() map[string]*template.Template {
 	out := map[string]*template.Template{}
-	for _, p := range []string{pageHome, pageEntriesList, pageEntryForm, pagePagesList, pagePageForm, pageImages, pageCategoriesList, pageCategoryForm, pageLinksList, pageLinkForm, pageTagsList, pageUsersList, pageUserForm, pageProfileForm, pageCommentsList, pageCommentSettings, pageAnalytics, pageRebuild, pageSettings, pageSettingsBasic, pageSettingsAI, pageTemplatesList, pageTemplateForm, pageTemplateImport, pageTemplateSettings, pageTemplateOG, pageCustomTags, pageHelp} {
+	for _, p := range []string{pageHome, pageEntriesList, pageEntryForm, pagePagesList, pagePageForm, pageImages, pageCategoriesList, pageCategoryForm, pageLinksList, pageLinkForm, pageTagsList, pageUsersList, pageUserForm, pageProfileForm, pageCommentsList, pageCommentSettings, pageAnalytics, pageRebuild, pageSettings, pageSettingsBasic, pageSettingsAI, pageTemplatesList, pageTemplateForm, pageTemplateImport, pageTemplateSettings, pageTemplateOG, pageCustomTags, pageWebhooksList, pageWebhookForm, pageWebhookDeliveries, pageHelp} {
 		t, err := template.New("").Funcs(tmplFuncs).ParseFS(admintpl.FS(), "layout.html", p+".html")
 		if err != nil {
 			panic("admin: parse " + p + ": " + err.Error())

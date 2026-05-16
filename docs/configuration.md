@@ -33,6 +33,7 @@ Every knob the running binary respects, plus the `task` shortcuts the dev workfl
 | `SB_MAX_HEADER_BYTES` | Maximum size, in bytes, of the request line + headers (default `1048576`, i.e. 1 MiB; server mode only) |
 | `SB_SHUTDOWN_TIMEOUT` | `time.ParseDuration` value bounding how long graceful shutdown waits for in-flight requests after `SIGINT`/`SIGTERM` before exiting (default `15s`, server mode only) |
 | `SB_TZ` | IANA timezone name (e.g. `Asia/Tokyo`, `UTC`) used for archive year/month boundaries, the admin `posted_at` form input, and rendered entry/list/archive dates. Default is the host clock (`time.Local`). Set this when the binary moves between hosts whose local clocks differ (Docker UTC vs Sakura JST) so the static rebuild and the dynamic site agree on which entries fall in which month |
+| `SB_WEBHOOKS_DISABLED` | Set to `1` to cut every outbound-webhook dispatch to a no-op. Operators reach for this when a misbehaving subscriber needs to be silenced faster than the admin UI's per-row toggle can be visited. Per-row enable/disable lives on `/admin/settings/webhooks` |
 
 ### MCP OAuth proxy env vars
 
