@@ -168,10 +168,6 @@ func (h *Handler) entryEditForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u := session.UserFrom(r.Context())
-	if u == nil {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
 	e, err := h.Store.EntryByID(r.Context(), h.wid(), id)
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
@@ -456,10 +452,6 @@ func (h *Handler) entryUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u := session.UserFrom(r.Context())
-	if u == nil {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
 	existing, err := h.Store.EntryByID(r.Context(), h.wid(), id)
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
@@ -504,10 +496,6 @@ func (h *Handler) entryDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u := session.UserFrom(r.Context())
-	if u == nil {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
 	// Regular-tier authors may only remove their own work; power +
 	// admin can delete any entry. Loading the row first lets us
 	// compare authorship before we commit to the destructive SQL.
@@ -689,10 +677,6 @@ func (h *Handler) entryPin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u := session.UserFrom(r.Context())
-	if u == nil {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
 	existing, err := h.Store.EntryByID(r.Context(), h.wid(), id)
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {

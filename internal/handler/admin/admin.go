@@ -333,10 +333,6 @@ type homePageData struct {
 
 func (h *Handler) home(w http.ResponseWriter, r *http.Request) {
 	u := session.UserFrom(r.Context())
-	if u == nil {
-		http.Redirect(w, r, root(r)+"/admin/login", http.StatusFound)
-		return
-	}
 	name := u.DisplayName
 	if name == "" {
 		name = u.Name

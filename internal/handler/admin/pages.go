@@ -124,10 +124,6 @@ func (h *Handler) pageEditForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u := session.UserFrom(r.Context())
-	if u == nil {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
 	p, err := h.Store.PageByID(r.Context(), h.wid(), id)
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
@@ -379,10 +375,6 @@ func (h *Handler) pageUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u := session.UserFrom(r.Context())
-	if u == nil {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
 	existing, err := h.Store.PageByID(r.Context(), h.wid(), id)
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
@@ -438,10 +430,6 @@ func (h *Handler) pageDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u := session.UserFrom(r.Context())
-	if u == nil {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
 	existing, err := h.Store.PageByID(r.Context(), h.wid(), id)
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {

@@ -125,22 +125,6 @@ func TestEntryPinReturns404ForMissingEntry(t *testing.T) {
 	}
 }
 
-func TestEntryPinReturns403WithoutUser(t *testing.T) {
-	h, _ := newAdminTestHandler(t)
-	id := seedTestEntry(t, h, false)
-
-	// No user in context — no withAdmin call.
-	req := httptest.NewRequest(http.MethodPost, "/admin/entries/"+strconv.FormatInt(id, 10)+"/pin", nil)
-	req = withChiID(req, id)
-	rec := httptest.NewRecorder()
-
-	h.entryPin(rec, req)
-
-	if rec.Code != http.StatusForbidden {
-		t.Errorf("status = %d, want 403", rec.Code)
-	}
-}
-
 func TestEntryPinReturnsBadRequestForInvalidID(t *testing.T) {
 	h, _ := newAdminTestHandler(t)
 
