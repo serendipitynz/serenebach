@@ -729,17 +729,13 @@
             renameBtn.setAttribute('data-current-name', newName);
             var span = document.querySelector('[data-template-name]');
             if (span) span.textContent = newName;
-            // Page <title> is "<prefix>: <oldName> | <site>". Swap just
-            // the name token between the prefix separator and the site
-            // suffix so the " | Serene Bach" tail is preserved.
-            var sep = ': ';
-            var idx = document.title.lastIndexOf(sep);
-            if (idx >= 0) {
-              var head = document.title.slice(0, idx + sep.length);
-              var rest = document.title.slice(idx + sep.length);
-              var suffixAt = rest.indexOf(' | ');
-              var suffix = suffixAt >= 0 ? rest.slice(suffixAt) : '';
-              document.title = head + newName + suffix;
+            // Rebuild document.title from server-supplied prefix/suffix
+            // attributes rather than parsing the current title — a name
+            // containing ": " or " | " would otherwise be split mid-name.
+            var titlePrefix = renameBtn.getAttribute('data-page-title-prefix');
+            var titleSuffix = renameBtn.getAttribute('data-page-title-suffix') || '';
+            if (titlePrefix !== null) {
+              document.title = titlePrefix + newName + titleSuffix;
             }
             // Keep the save-as / export buttons' pre-fill in sync.
             var saveAsBtn = document.querySelector('[data-template-save-as]');
