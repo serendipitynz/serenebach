@@ -27,41 +27,40 @@ func TestFlattenPayloadEntryShape(t *testing.T) {
 		t.Fatalf("flattenPayload: %v", err)
 	}
 
-	// Top-level scalars carry over unchanged.
-	if got["event"] != "entry.published" {
-		t.Errorf("event = %v, want \"entry.published\"", got["event"])
+	// Spot-check the key shapes the flat format promises:
+	//   - top-level scalars survive,
+	//   - nested objects collapse with "_" joins,
+	//   - arrays use numeric indices in the same join.
+	wantKV := map[string]any{
+		"event":             "entry.published",
+		"weblog_title":      "My Blog",
+		"weblog_url":        "https://example.com/",
+		"data_url":          "https://example.com/entry/hello/",
+		"data_status":       "published",
+		"data_author_name":  "Admin",
+		"data_categories_0": "雑記",
+		"data_categories_1": "技術",
+		"data_tags_0":       "go",
+		"data_tags_1":       "serenebach",
 	}
-	// Nested object keys are joined with "_".
-	if got["weblog_title"] != "My Blog" {
-		t.Errorf("weblog_title = %v, want \"My Blog\"", got["weblog_title"])
-	}
-	if got["weblog_url"] != "https://example.com/" {
-		t.Errorf("weblog_url = %v", got["weblog_url"])
-	}
-	// data.* nests another layer.
-	if got["data_url"] != "https://example.com/entry/hello/" {
-		t.Errorf("data_url = %v", got["data_url"])
-	}
-	if got["data_status"] != "published" {
-		t.Errorf("data_status = %v", got["data_status"])
-	}
-	// data.author is an object → data_author_id / data_author_name.
-	if got["data_author_name"] != "Admin" {
-		t.Errorf("data_author_name = %v", got["data_author_name"])
-	}
-	// Arrays use numeric indices joined with "_".
-	if got["data_categories_0"] != "雑記" || got["data_categories_1"] != "技術" {
-		t.Errorf("categories not flattened: %v / %v", got["data_categories_0"], got["data_categories_1"])
-	}
-	if got["data_tags_0"] != "go" || got["data_tags_1"] != "serenebach" {
-		t.Errorf("tags not flattened: %v / %v", got["data_tags_0"], got["data_tags_1"])
+	for k, want := range wantKV {
+		if got[k] != want {
+			t.Errorf("%s = %v, want %v", k, got[k], want)
+		}
 	}
 
-	// Round-trip through JSON: the result must remain a single-level
-	// object (no nested values). We can't sniff "[" / "{" naively
-	// because the injected text/content summary may legitimately
-	// contain those characters ("[My Blog]"). Instead, decode the
-	// JSON and assert every value is a scalar.
+	assertFlatPayloadScalarsOnly(t, got)
+}
+
+// assertFlatPayloadScalarsOnly round-trips the map through JSON and
+// asserts every decoded value is a scalar (nil/bool/float64/string),
+// proving the flatten step removed every nested object or array.
+//
+// We can't sniff "[" / "{" against the encoded bytes naively, because
+// the injected text/content summary may legitimately contain those
+// characters ("[My Blog]"). Decoding gives a clean per-value check.
+func assertFlatPayloadScalarsOnly(t *testing.T, got map[string]any) {
+	t.Helper()
 	b, err := json.Marshal(got)
 	if err != nil {
 		t.Fatalf("marshal flat: %v", err)
