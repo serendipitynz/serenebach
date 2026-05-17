@@ -57,6 +57,7 @@ These are read by `cmd/mcp-oauth-proxy`, not the main binary. Set them when runn
 | `--addr` | HTTP listen address (default `:8080`) |
 | `--db` | SQLite path (overrides `SB_DB`) |
 | `--mode` | `server` or `cgi` (auto-detected if empty) |
+| `--version` | Print `vX.Y.Z (build abcdef1)` and exit |
 
 ## `.env` loading
 

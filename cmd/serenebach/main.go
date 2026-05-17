@@ -87,6 +87,14 @@ func main() {
 		fatal("config: %v", err)
 	}
 
+	// -version short-circuits before any subcommand dispatch or app
+	// setup so the flag works on a freshly-unpacked binary with no DB
+	// or config in place.
+	if cfg.ShowVersion {
+		fmt.Println(version.Full())
+		return
+	}
+
 	// extract-assets is a pure file-extraction command: it never
 	// touches the database, so dispatch it before newApp to avoid
 	// creating / migrating a DB that the operator doesn't need.

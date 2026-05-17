@@ -125,6 +125,11 @@ type Config struct {
 	// toward restoring that granularity (the per-weblog and per-entry
 	// columns are not yet implemented).
 	TZ *time.Location
+	// ShowVersion is set when the operator passed `-version` /
+	// `--version` on the command line. main reads it and prints
+	// version.Full() to stdout before any DB or server setup so the
+	// flag works even on a freshly-unpacked binary without a config.
+	ShowVersion bool
 }
 
 // Load parses top-level flags and returns the resulting Config, the name of
@@ -135,9 +140,10 @@ func Load(args []string) (*Config, string, []string, error) {
 	fs := flag.NewFlagSet("serenebach", flag.ContinueOnError)
 
 	var (
-		mode   = fs.String("mode", "", "run mode: server|cgi (auto-detected if empty)")
-		addr   = fs.String("addr", ":8080", "HTTP listen address (server mode only)")
-		dbPath = fs.String("db", envOr("SB_DB", "./data/dev.db"), "path to SQLite database file")
+		mode        = fs.String("mode", "", "run mode: server|cgi (auto-detected if empty)")
+		addr        = fs.String("addr", ":8080", "HTTP listen address (server mode only)")
+		dbPath      = fs.String("db", envOr("SB_DB", "./data/dev.db"), "path to SQLite database file")
+		showVersion = fs.Bool("version", false, "print version and exit")
 	)
 
 	if err := fs.Parse(args); err != nil {
@@ -166,6 +172,7 @@ func Load(args []string) (*Config, string, []string, error) {
 		ShutdownTimeout:        parseDurationEnv(os.Getenv("SB_SHUTDOWN_TIMEOUT"), DefaultShutdownTimeout),
 		WebhooksDisabled:       os.Getenv("SB_WEBHOOKS_DISABLED") == "1",
 		TZ:                     parseTZEnv(os.Getenv("SB_TZ")),
+		ShowVersion:            *showVersion,
 	}
 
 	resolver, err := clientip.Parse(os.Getenv("SB_TRUSTED_PROXIES"))
