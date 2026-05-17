@@ -43,6 +43,7 @@ func (h *Handler) mountTemplatesDesign(r chi.Router) {
 		gr.Post("/templates/{id}/edit", h.templatesSave)
 		gr.Post("/templates/{id}/recheck", h.templatesRecheck)
 		gr.Post("/templates/{id}/save-as", h.templatesSaveAs)
+		gr.Post("/templates/{id}/rename", h.templatesRename)
 		gr.Post("/templates/{id}/activate", h.templatesActivate)
 		gr.Post("/templates/{id}/delete", h.templatesDelete)
 		gr.Post("/templates/reorder", h.templatesReorder)
@@ -586,6 +587,57 @@ func (h *Handler) templatesSaveAs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, root(r)+fmt.Sprintf("/admin/templates/%d/edit?ok=cloned", newID), http.StatusFound)
+}
+
+// ---- rename (name-only update) -----------------------------------------
+
+// templatesRename updates only the template name. The edit page exposes
+// an inline rename modal so authors can fix the display name without
+// going through save-as (which clones) or worrying about the editor's
+// unsaved-changes state — other editable fields are preserved by
+// re-reading the row before writing back. Responds with JSON so the
+// browser can update the page header in place.
+func (h *Handler) templatesRename(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || id <= 0 {
+		writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "not_found"})
+		return
+	}
+	current, err := h.Store.TemplateByID(r.Context(), h.wid(), id)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "not_found"})
+			return
+		}
+		log.Printf("admin.templatesRename: load: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "load_failed"})
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bad_form"})
+		return
+	}
+	newName := strings.TrimSpace(r.PostFormValue("name"))
+	if newName == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": tr(r, "templates.form.error.nameEmpty")})
+		return
+	}
+	if len([]rune(newName)) > 200 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": tr(r, "templates.form.error.nameTooLong")})
+		return
+	}
+	if newName == current.Name {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "name": newName})
+		return
+	}
+	updated := *current
+	updated.Name = newName
+	if err := h.Store.UpdateTemplate(r.Context(), updated); err != nil {
+		log.Printf("admin.templatesRename: save: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "save_failed"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "name": newName})
 }
 
 // ---- list --------------------------------------------------------------
