@@ -150,6 +150,15 @@ func Load(args []string) (*Config, string, []string, error) {
 		return nil, "", nil, err
 	}
 
+	// -version must work even when SB_* environment variables are
+	// malformed or the DB / config is missing, so short-circuit
+	// before reading any environment variables. main reads
+	// ShowVersion and prints the version string before any further
+	// setup.
+	if *showVersion {
+		return &Config{ShowVersion: true}, "", nil, nil
+	}
+
 	cfg := &Config{
 		Addr:                   *addr,
 		DBPath:                 *dbPath,
@@ -172,7 +181,6 @@ func Load(args []string) (*Config, string, []string, error) {
 		ShutdownTimeout:        parseDurationEnv(os.Getenv("SB_SHUTDOWN_TIMEOUT"), DefaultShutdownTimeout),
 		WebhooksDisabled:       os.Getenv("SB_WEBHOOKS_DISABLED") == "1",
 		TZ:                     parseTZEnv(os.Getenv("SB_TZ")),
-		ShowVersion:            *showVersion,
 	}
 
 	resolver, err := clientip.Parse(os.Getenv("SB_TRUSTED_PROXIES"))
