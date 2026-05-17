@@ -1,5 +1,10 @@
 {{define "content"}}
-<h1>{{Tf "templates.form.titleEdit" .Template.Name}}</h1>
+<h1 class="template-edit-title">{{T "templates.form.titleEditPrefix"}}<span data-template-name>{{.Template.Name}}</span><button type="button" class="btn-icon"
+        data-template-rename
+        data-template-id="{{.Template.ID}}"
+        data-current-name="{{.Template.Name}}"
+        aria-label="{{T `templates.form.renameTitle`}}"
+        title="{{T `templates.form.renameTitle`}}">{{iconEdit}}</button></h1>
 
 {{if eq .Flash "saved"}}<p class="alert success">{{T "templates.form.flash.saved"}}</p>{{end}}
 {{if eq .Flash "cloned"}}<p class="alert success">{{T "templates.form.flash.cloned"}}</p>{{end}}

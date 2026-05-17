@@ -583,6 +583,7 @@
   "templates.action.infoTitle": "テンプレート情報",
   "templates.heading": "テンプレート (%d)",
   "templates.form.titleEdit": "テンプレート編集: %s",
+  "templates.form.titleEditPrefix": "テンプレート編集: ",
   "templates.form.flash.saved": "保存しました。",
   "templates.form.flash.cloned": "別名で保存しました。",
   "templates.form.flash.imported": "テンプレートを取り込みました。",

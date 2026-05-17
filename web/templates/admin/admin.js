@@ -659,6 +659,107 @@
     });
   }
 
+  // Rename: inline edit of just the template name. POSTs to a dedicated
+  // /rename endpoint and patches the page header in place — the main
+  // editor's unsaved-changes state is left alone, so authors can fix a
+  // typo without losing in-flight body edits.
+  var renameBtn = document.querySelector('[data-template-rename]');
+  if (renameBtn) {
+    renameBtn.addEventListener('click', function () {
+      var tplID = renameBtn.getAttribute('data-template-id');
+      var currentName = renameBtn.getAttribute('data-current-name') || '';
+
+      var wrap = document.createElement('div');
+      wrap.className = 'form-stack';
+      var label = document.createElement('label');
+      label.textContent = sbT('js.modal.rename.nameLabel');
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.value = currentName;
+      input.maxLength = 200;
+      label.appendChild(input);
+      wrap.appendChild(label);
+
+      var errBox = document.createElement('p');
+      errBox.className = 'alert error';
+      errBox.hidden = true;
+      wrap.appendChild(errBox);
+
+      var footer = document.createElement('div');
+      footer.style.display = 'flex';
+      footer.style.gap = '0.5rem';
+      var cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.textContent = sbT('js.action.cancel');
+      cancel.addEventListener('click', closeModal);
+      var ok = document.createElement('button');
+      ok.type = 'button';
+      ok.className = 'primary';
+      ok.textContent = sbT('js.action.save');
+
+      function submit() {
+        var v = input.value.trim();
+        if (!v) { input.focus(); return; }
+        if (v === currentName) { closeModal(); return; }
+        ok.disabled = true;
+        cancel.disabled = true;
+        errBox.hidden = true;
+        var token = readCSRFToken();
+        var body = new URLSearchParams({ name: v, csrf_token: token });
+        var url = (window.__sbRoot || '') + '/admin/templates/' + tplID + '/rename';
+        fetch(url, {
+          method: 'POST',
+          headers: { 'X-CSRF-Token': token, 'Accept': 'application/json' },
+          body: body,
+          credentials: 'same-origin'
+        })
+          .then(function (res) {
+            return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+          })
+          .then(function (r) {
+            if (!r.ok || !r.data || !r.data.ok) {
+              errBox.textContent = (r.data && r.data.error) ? r.data.error : sbT('js.modal.rename.failed');
+              errBox.hidden = false;
+              ok.disabled = false;
+              cancel.disabled = false;
+              return;
+            }
+            var newName = r.data.name;
+            currentName = newName;
+            renameBtn.setAttribute('data-current-name', newName);
+            var span = document.querySelector('[data-template-name]');
+            if (span) span.textContent = newName;
+            // Page <title> is "<prefix>: <name>" — replace just the trailing name.
+            var sep = ': ';
+            var idx = document.title.lastIndexOf(sep);
+            if (idx >= 0) document.title = document.title.slice(0, idx + sep.length) + newName;
+            // Keep the save-as / export buttons' pre-fill in sync.
+            var saveAsBtn = document.querySelector('[data-template-save-as]');
+            if (saveAsBtn) saveAsBtn.setAttribute('data-current-name', newName);
+            var exportBtn = document.querySelector('[data-template-export]');
+            if (exportBtn) exportBtn.setAttribute('data-current-name', newName);
+            closeModal();
+          })
+          .catch(function () {
+            errBox.textContent = sbT('js.modal.rename.failed');
+            errBox.hidden = false;
+            ok.disabled = false;
+            cancel.disabled = false;
+          });
+      }
+
+      ok.addEventListener('click', submit);
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); submit(); }
+      });
+      footer.appendChild(cancel);
+      footer.appendChild(ok);
+
+      openModal({ title: sbT('js.modal.rename.title'), bodyNode: wrap, footerNode: footer });
+      setTimeout(function () { input.focus(); input.select(); }, 0);
+    });
+  }
+
   // Export: prompt for optional name / memo overrides, then nav to the
   // GET export endpoint with those values on the query string.
   var exportBtn = document.querySelector('[data-template-export]');

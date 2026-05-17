@@ -548,6 +548,15 @@ table.listing td.actions { white-space: nowrap; }
 .btn-icon.danger { color: var(--danger); }
 .btn-icon.danger:hover { background: var(--danger-soft); border-color: var(--danger); }
 
+/* Template edit screen: keep the rename pencil aligned with the heading
+   text instead of breaking onto its own line. */
+.template-edit-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 /* Column-width helpers — list tables all share these so the same
    narrow metadata (ID / dates / actions) stays a predictable width and
    the wide columns (title / body) get whatever's left. */
