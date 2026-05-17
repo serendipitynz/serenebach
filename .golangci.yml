@@ -96,12 +96,6 @@ linters:
         linters:
           - errcheck
           - gocognit
-          # gocyclo is also relaxed in tests: integration tests stack
-          # sequential setup + assertions that legitimately exceed 15
-          # branches. goreportcard still counts these toward its score,
-          # but the CI guard treats production code as the load-bearing
-          # surface.
-          - gocyclo
           # `unparam` is relaxed for test helpers: a fixture builder
           # whose `entryID` parameter currently always receives 1 is
           # signalling future flexibility, not dead code. The few real

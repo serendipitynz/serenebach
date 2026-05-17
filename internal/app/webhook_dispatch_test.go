@@ -23,20 +23,8 @@ func TestFlatPayloadFormatDispatch(t *testing.T) {
 	a := newTestApp(t)
 	a.Webhooks.AllowLoopback = true
 
-	var (
-		mu       sync.Mutex
-		received []map[string]any
-	)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		var payload map[string]any
-		if err := json.Unmarshal(body, &payload); err == nil {
-			mu.Lock()
-			received = append(received, payload)
-			mu.Unlock()
-		}
-		w.WriteHeader(http.StatusOK)
-	}))
+	collector := newWebhookPayloadCollector()
+	srv := httptest.NewServer(http.HandlerFunc(collector.handle))
 	defer srv.Close()
 
 	if _, err := a.DB.Exec(`INSERT INTO webhooks (wid, url, events, active, payload_format, created_at, updated_at)
@@ -55,40 +43,76 @@ func TestFlatPayloadFormatDispatch(t *testing.T) {
 		t.Fatalf("create entry status = %d; body:\n%s", w.Code, w.Body.String())
 	}
 
-	// Async dispatch — poll briefly for the delivery to land.
-	deadline := time.Now().Add(2 * time.Second)
+	received := collector.waitFor(1, 2*time.Second)
+	if len(received) == 0 {
+		t.Fatalf("no webhook payload received")
+	}
+	assertFlatEntryPayload(t, received[0])
+}
+
+// webhookPayloadCollector is a tiny sink for httptest webhook servers:
+// it decodes every JSON body as map[string]any and keeps the list
+// behind a mutex so tests can poll for deliveries.
+type webhookPayloadCollector struct {
+	mu       sync.Mutex
+	received []map[string]any
+}
+
+func newWebhookPayloadCollector() *webhookPayloadCollector {
+	return &webhookPayloadCollector{}
+}
+
+func (c *webhookPayloadCollector) handle(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err == nil {
+		c.mu.Lock()
+		c.received = append(c.received, payload)
+		c.mu.Unlock()
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// waitFor blocks until at least n payloads have been received or the
+// timeout fires, then returns a snapshot of the slice.
+func (c *webhookPayloadCollector) waitFor(n int, timeout time.Duration) []map[string]any {
+	deadline := time.Now().Add(timeout)
 	for {
-		mu.Lock()
-		n := len(received)
-		mu.Unlock()
-		if n > 0 || time.Now().After(deadline) {
+		c.mu.Lock()
+		got := len(c.received)
+		c.mu.Unlock()
+		if got >= n || time.Now().After(deadline) {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	snapshot := make([]map[string]any, len(c.received))
+	copy(snapshot, c.received)
+	return snapshot
+}
 
-	mu.Lock()
-	defer mu.Unlock()
-	if len(received) == 0 {
-		t.Fatalf("no webhook payload received")
-	}
-	p := received[0]
+// assertFlatEntryPayload checks the shape promises of payload_format=flat
+// against a single entry.published delivery captured during the test.
+func assertFlatEntryPayload(t *testing.T, p map[string]any) {
+	t.Helper()
 	// Flat shape: nested keys land on top level joined with "_".
-	if got := p["event"]; got != "entry.published" {
-		t.Errorf("event = %v, want entry.published", got)
+	wantKV := map[string]any{
+		"event":      "entry.published",
+		"data_title": "Hello, World!",
+		"weblog_id":  float64(1),
 	}
-	if got := p["data_title"]; got != "Hello, World!" {
-		t.Errorf("data_title = %v, want \"Hello, World!\"", got)
-	}
-	if got := p["weblog_id"]; got != float64(1) {
-		t.Errorf("weblog_id = %v (%T), want 1", got, got)
+	for k, want := range wantKV {
+		if p[k] != want {
+			t.Errorf("%s = %v (%T), want %v", k, p[k], p[k], want)
+		}
 	}
 	// Envelope-only keys should NOT appear as nested objects.
-	if _, hasData := p["data"].(map[string]any); hasData {
-		t.Errorf("flat payload should not contain nested \"data\" object: %v", p["data"])
-	}
-	if _, hasWeblog := p["weblog"].(map[string]any); hasWeblog {
-		t.Errorf("flat payload should not contain nested \"weblog\" object: %v", p["weblog"])
+	for _, key := range []string{"data", "weblog"} {
+		if _, nested := p[key].(map[string]any); nested {
+			t.Errorf("flat payload should not contain nested %q object: %v", key, p[key])
+		}
 	}
 	// text / content carry the one-line summary so a direct Slack /
 	// Discord Incoming Webhook subscription can pick it up.
