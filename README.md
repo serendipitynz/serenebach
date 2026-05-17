@@ -40,6 +40,8 @@ A `.env` template ships at `.env.example`. Copy it to `.env` and fill in `SB_AI_
 
 Server-mode HTTP timeouts and graceful shutdown have sensible defaults out of the box and can be tuned via `SB_READ_HEADER_TIMEOUT`, `SB_WRITE_TIMEOUT`, `SB_IDLE_TIMEOUT`, `SB_MAX_HEADER_BYTES`, and `SB_SHUTDOWN_TIMEOUT`. Set `SB_TZ` (e.g. `Asia/Tokyo`) to pin the timezone used for archive month/year boundaries and rendered entry dates so the same binary produces identical output regardless of the host clock. See [docs/configuration.md](docs/configuration.md) for the full list.
 
+Run `serenebach --version` to print the version of the binary you have on disk and exit. The flag works even when the database or environment configuration is missing or broken, so it is safe to use for identifying a freshly unpacked build.
+
 ## Docker
 
 ```bash
