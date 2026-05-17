@@ -1,10 +1,13 @@
 package app_test
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/serendipitynz/serenebach/internal/app"
 )
 
 // TestDateFormatSettingsRoundtripAndApply saves a custom entry-date
@@ -14,18 +17,48 @@ func TestDateFormatSettingsRoundtripAndApply(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
-	csrfCookie, token := fetchCSRF(t, a.Handler())
 
+	const pattern = "%Year%年%MonNum%月%DayShort%日(%Week%)"
 	form := url.Values{
-		"csrf_token":          {token},
+		"csrf_token":          {""},
 		"archive_template_id": {"0"},
 		"profile_template_id": {"0"},
-		"date_format_entry":   {"%Year%年%MonNum%月%DayShort%日(%Week%)"},
+		"date_format_entry":   {pattern},
 		"time_format_entry":   {"%Hour%:%Min%"},
 		"date_format_comment": {""},
 		"date_format_list":    {""},
 		"date_format_archive": {""},
 	}
+	saveDateFormatSettings(t, a, cookies, form)
+
+	// Persisted column value matches the submitted string verbatim.
+	var stored string
+	if err := a.DB.QueryRow(`SELECT date_format_entry FROM weblogs WHERE id = 1`).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored != pattern {
+		t.Errorf("stored pattern = %q", stored)
+	}
+
+	// Public entry page must now render the entry date with the new
+	// pattern. The seed weblog ships lang="ja" so %Week% picks the
+	// Japanese short form (日/月/...). The list pages cover SB3 parity
+	// regression: {entry_date} must use DateFormatEntry on home /
+	// category views too — see fix(content): use DateFormatEntry for
+	// {entry_date} on lists.
+	for _, path := range []string{"/entry/1/", "/", "/category/news"} {
+		assertJapaneseEntryDateRendered(t, a, path)
+	}
+}
+
+// saveDateFormatSettings POSTs the design-settings form with a fresh
+// CSRF token. The caller fills in the field values; this helper takes
+// care of the CSRF cookie/token wiring and asserts the 302 redirect.
+func saveDateFormatSettings(t *testing.T, a *app.App, cookies []*http.Cookie, form url.Values) {
+	t.Helper()
+	csrfCookie, token := fetchCSRF(t, a.Handler())
+	form.Set("csrf_token", token)
+
 	req := httptest.NewRequest("POST", "/admin/templates/settings", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(csrfCookie)
@@ -37,57 +70,26 @@ func TestDateFormatSettingsRoundtripAndApply(t *testing.T) {
 	if w.Code != 302 {
 		t.Fatalf("save status = %d, want 302", w.Code)
 	}
+}
 
-	// Persisted column value matches the submitted string verbatim.
-	var stored string
-	if err := a.DB.QueryRow(`SELECT date_format_entry FROM weblogs WHERE id = 1`).Scan(&stored); err != nil {
-		t.Fatal(err)
-	}
-	if stored != "%Year%年%MonNum%月%DayShort%日(%Week%)" {
-		t.Errorf("stored pattern = %q", stored)
-	}
-
-	// Public entry page must now render the entry date with the new
-	// pattern. The seed weblog ships lang="ja" so %Week% picks the
-	// Japanese short form (日/月/...).
-	req = httptest.NewRequest("GET", "/entry/1/", nil)
-	w = httptest.NewRecorder()
+// assertJapaneseEntryDateRendered GETs path and confirms the page
+// expanded the Japanese %Year%/%MonNum%/%DayShort%/%Week% pattern —
+// pattern tokens must not leak verbatim, and 年/月/日 must appear in
+// the body.
+func assertJapaneseEntryDateRendered(t *testing.T, a *app.App, path string) {
+	t.Helper()
+	req := httptest.NewRequest("GET", path, nil)
+	w := httptest.NewRecorder()
 	a.Handler().ServeHTTP(w, req)
 	if w.Code != 200 {
-		t.Fatalf("entry status = %d", w.Code)
+		t.Fatalf("GET %s status = %d", path, w.Code)
 	}
 	body := w.Body.String()
-	// The entry's seed posted_at is a known date; rather than hard-code
-	// the result, just prove the template tokens expanded (no raw
-	// "%Year%" / literal pattern slipped through) and the output
-	// contains Japanese era markers introduced by the custom pattern.
 	if strings.Contains(body, "%Year%") || strings.Contains(body, "%MonNum%") {
-		t.Errorf("pattern tokens leaked unexpanded into the page")
+		t.Errorf("GET %s: pattern tokens leaked unexpanded", path)
 	}
 	if !strings.Contains(body, "年") || !strings.Contains(body, "月") || !strings.Contains(body, "日") {
-		t.Errorf("Japanese era markers missing from rendered entry date\nbody snippet: %s", body[:min(len(body), 400)])
-	}
-
-	// SB3 parity regression guard: {entry_date} must render via the
-	// same DateFormatEntry pattern on list pages (home / category /
-	// archive). Previously list views used FormatListDate, so the
-	// admin's "記事日付" setting silently dropped on every page except
-	// the permalink — see fix(content): use DateFormatEntry for
-	// {entry_date} on lists.
-	for _, path := range []string{"/", "/category/news"} {
-		req = httptest.NewRequest("GET", path, nil)
-		w = httptest.NewRecorder()
-		a.Handler().ServeHTTP(w, req)
-		if w.Code != 200 {
-			t.Fatalf("GET %s status = %d", path, w.Code)
-		}
-		body := w.Body.String()
-		if strings.Contains(body, "%Year%") || strings.Contains(body, "%MonNum%") {
-			t.Errorf("GET %s: pattern tokens leaked unexpanded", path)
-		}
-		if !strings.Contains(body, "年") || !strings.Contains(body, "月") || !strings.Contains(body, "日") {
-			t.Errorf("GET %s: DateFormatEntry not applied to {entry_date}\nbody snippet: %s", path, body[:min(len(body), 400)])
-		}
+		t.Errorf("GET %s: DateFormatEntry not applied to {entry_date}\nbody snippet: %s", path, body[:min(len(body), 400)])
 	}
 }
 
