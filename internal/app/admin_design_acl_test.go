@@ -10,7 +10,7 @@ import (
 )
 
 // TestAdminTemplatesDesignBlocksRegularUser walks the public surface of
-// the "デザイン設定" group (URL: /admin/templates/*) and confirms the
+// the "デザイン" group (URL: /admin/templates/*) and confirms the
 // requireDesign middleware rejects role=3 (regular) sessions. Each
 // entry point is a separate subtest so a regression on a single
 // route is easy to localise.
@@ -61,7 +61,7 @@ func TestAdminTemplatesDesignBlocksRegularUser(t *testing.T) {
 
 // TestAdminTemplatesDesignAllowsAdmin sanity-checks the same routes
 // open up for an admin session. Asserting the index page returns 200
-// and labels the URL as "デザイン設定" pins the surprising-but-
+// and labels the URL as "デザイン" pins the surprising-but-
 // intentional URL/label mismatch the project documents.
 func TestAdminTemplatesDesignAllowsAdmin(t *testing.T) {
 	t.Parallel()
@@ -73,10 +73,10 @@ func TestAdminTemplatesDesignAllowsAdmin(t *testing.T) {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}
 	body := w.Body.String()
-	// "デザイン設定" is the user-facing label even though the URL
+	// "デザイン" is the user-facing label even though the URL
 	// keeps the historical /templates path. Catching a rename here
 	// alerts us to update CLAUDE.md / docs together.
-	if !strings.Contains(body, "デザイン設定") {
-		t.Errorf("expected デザイン設定 label on /admin/templates; body did not contain it")
+	if !strings.Contains(body, "デザイン") {
+		t.Errorf("expected デザイン label on /admin/templates; body did not contain it")
 	}
 }

@@ -18,7 +18,7 @@ A template set consists of:
 
 The individual-entry HTML template is optional; when absent, the base HTML template is used for single-entry pages too.
 
-You can save multiple template sets and switch between them in **Design Settings**. Archive / category listings and profile pages can each use a different template. Per-category templates are also supported.
+You can save multiple template sets and switch between them in **Design**. Archive / category listings and profile pages can each use a different template. Per-category templates are also supported.
 
 Template assets such as images can be uploaded and referenced with `{site_parts}`:
 
@@ -373,7 +373,7 @@ The CSS template can also use tags:
 
 ## Custom tags
 
-The **Custom Tags** tab in Design Settings lets you register your own `{custom_xxx}` placeholders for use in templates. Values are inserted as raw HTML / text — they are **not escaped** when rendered.
+The **Custom Tags** tab in Design lets you register your own `{custom_xxx}` placeholders for use in templates. Values are inserted as raw HTML / text — they are **not escaped** when rendered.
 
 ```html
 <!-- In a template -->
@@ -394,7 +394,7 @@ Registered tags are injected automatically on **every page type** — entry list
 
 ## Design settings
 
-The **Design Settings** screen covers site-wide rendering knobs:
+The **Design** screen covers site-wide rendering knobs:
 
 - Switching the active template
 - Templates used for archive / category listings

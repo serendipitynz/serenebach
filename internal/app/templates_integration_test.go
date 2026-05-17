@@ -21,7 +21,7 @@ func TestAdminTemplatesListRenders(t *testing.T) {
 	}
 	body := w.Body.String()
 	for _, want := range []string{
-		"デザイン設定",
+		"デザイン",
 		"テンプレート",
 		"利用中",
 	} {

@@ -917,6 +917,51 @@
     }
   });
 
+  // ---- drop-to-input (populate a file input without AJAX) -------------
+  // Used by forms that still POST normally (e.g. template import) but
+  // want a drop target on top of the bare <input type="file">.
+  document.querySelectorAll('[data-drop-to-input]').forEach(function (zone) {
+    var input = zone.querySelector('[data-drop-input]');
+    if (!input) return;
+    var placeholder = zone.querySelector('[data-drop-placeholder]');
+    var defaultText = placeholder ? placeholder.textContent : '';
+
+    ['dragenter', 'dragover'].forEach(function (evt) {
+      zone.addEventListener(evt, function (e) {
+        e.preventDefault(); e.stopPropagation();
+        zone.classList.add('drag-over');
+      });
+    });
+    ['dragleave', 'drop'].forEach(function (evt) {
+      zone.addEventListener(evt, function (e) {
+        e.preventDefault(); e.stopPropagation();
+        zone.classList.remove('drag-over');
+      });
+    });
+    zone.addEventListener('drop', function (e) {
+      var files = e.dataTransfer && e.dataTransfer.files;
+      if (!files || !files.length) return;
+      try {
+        var dt = new DataTransfer();
+        dt.items.add(files[0]);
+        input.files = dt.files;
+      } catch (_) {
+        // DataTransfer constructor missing (very old browsers) — leave
+        // the input untouched so the click-to-pick fallback still works.
+        return;
+      }
+      updateLabel();
+    });
+    input.addEventListener('change', updateLabel);
+
+    function updateLabel() {
+      if (!placeholder) return;
+      placeholder.textContent = (input.files && input.files.length)
+        ? input.files[0].name
+        : defaultText;
+    }
+  });
+
   // ---- copy-URL buttons (gallery) --------------------------------------
   // On success: flash a checkmark inside icon-style buttons (or swap
   // the text on link-style buttons) AND raise a small toast so the

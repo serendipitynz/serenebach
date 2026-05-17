@@ -23,7 +23,7 @@ const defaultEntryListSize = 10
 // maps, render ListView" tail used by home/category/archive handlers. The
 // caller supplies the already-filtered entry slice and an optional PageTitle.
 // `useArchiveTemplate` routes category + archive pages through the pinned
-// archive template (when configured via デザイン設定 > 設定); home pages
+// archive template (when configured via デザイン > 設定); home pages
 // leave it false and always use the active template.
 func (h *Handler) renderList(w http.ResponseWriter, r *http.Request, entries []domain.Entry, pageTitle, logTag string, useArchiveTemplate bool, cat *domain.Category, mode, modeCtx string, pg content.Pagination) {
 	ctx := r.Context()
