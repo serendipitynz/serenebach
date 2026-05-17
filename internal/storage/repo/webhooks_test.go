@@ -26,6 +26,14 @@ func TestWebhookCRUD(t *testing.T) {
 		t.Fatalf("CreateWebhook id = %d", id)
 	}
 
+	verifyWebhookCRUDInitialRead(t, ctx, s, id)
+	verifyWebhookCRUDUpdate(t, ctx, s, id)
+	verifyWebhookCRUDSetActive(t, ctx, s, id)
+	verifyWebhookCRUDDelete(t, ctx, s, id)
+}
+
+func verifyWebhookCRUDInitialRead(t *testing.T, ctx context.Context, s *Store, id int64) {
+	t.Helper()
 	hw, err := s.WebhookByID(ctx, 1, id)
 	if err != nil {
 		t.Fatalf("WebhookByID: %v", err)
@@ -39,7 +47,10 @@ func TestWebhookCRUD(t *testing.T) {
 	if len(hw.Events) != 2 || hw.Events[0] != "entry.published" {
 		t.Errorf("Events = %v", hw.Events)
 	}
+}
 
+func verifyWebhookCRUDUpdate(t *testing.T, ctx context.Context, s *Store, id int64) {
+	t.Helper()
 	if err := s.UpdateWebhook(ctx, domain.Webhook{
 		ID:     id,
 		WID:    1,
@@ -50,22 +61,28 @@ func TestWebhookCRUD(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("UpdateWebhook: %v", err)
 	}
-	hw, _ = s.WebhookByID(ctx, 1, id)
+	hw, _ := s.WebhookByID(ctx, 1, id)
 	if hw.URL != "https://hooks.example.com/v2" || hw.Active {
 		t.Errorf("update did not apply: %+v", hw)
 	}
 	if len(hw.Events) != 1 || hw.Events[0] != "entry.published" {
 		t.Errorf("Events after update = %v", hw.Events)
 	}
+}
 
+func verifyWebhookCRUDSetActive(t *testing.T, ctx context.Context, s *Store, id int64) {
+	t.Helper()
 	if err := s.SetWebhookActive(ctx, 1, id, true); err != nil {
 		t.Fatalf("SetWebhookActive: %v", err)
 	}
-	hw, _ = s.WebhookByID(ctx, 1, id)
+	hw, _ := s.WebhookByID(ctx, 1, id)
 	if !hw.Active {
 		t.Errorf("Active flag did not flip back")
 	}
+}
 
+func verifyWebhookCRUDDelete(t *testing.T, ctx context.Context, s *Store, id int64) {
+	t.Helper()
 	if err := s.DeleteWebhook(ctx, 1, id); err != nil {
 		t.Fatalf("DeleteWebhook: %v", err)
 	}
