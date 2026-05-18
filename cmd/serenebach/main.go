@@ -388,10 +388,12 @@ func runMCPServe(a *app.App) {
 func runImport(a *app.App, args []string) {
 	fs := flag.NewFlagSet("import", flag.ExitOnError)
 	sbVersion := fs.Int("sb-version", 3, "source format: 2 (SB2 flat-file dir) or 3 (SB3 SQLite database)")
+	source := fs.String("source", "", `override the legacy SB version dispatch: "md" reads a directory of markdown files`)
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: serenebach import [--sb-version 2|3] <path>")
-		fmt.Fprintln(os.Stderr, "  SB3 (default): <path> is the data.db SQLite file")
-		fmt.Fprintln(os.Stderr, "  SB2:           <path> is the data directory holding configure.cgi etc.")
+		fmt.Fprintln(os.Stderr, "usage: serenebach import [--source=md | --sb-version=2|3] <path>")
+		fmt.Fprintln(os.Stderr, "  SB3 (default):   <path> is the data.db SQLite file")
+		fmt.Fprintln(os.Stderr, "  SB2:             <path> is the data directory holding configure.cgi etc.")
+		fmt.Fprintln(os.Stderr, "  markdown (md):   <path> is a directory of *.md files (non-recursive)")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -407,12 +409,19 @@ func runImport(a *app.App, args []string) {
 		AuthorID:      1,
 		OnlyPublished: true,
 		SBVersion:     *sbVersion,
+		Source:        *source,
+		ImageDir:      a.Config.ImageDir,
 	})
 	if err != nil {
 		log.Fatalf("import: %v", err)
 	}
-	fmt.Fprintf(os.Stderr, "import: weblog updated=%t, templates=%d, categories=%d, entries=%d, skipped=%d\n",
-		report.WeblogUpdated, report.Templates, report.Categories, report.Entries, report.SkippedEntries)
+	if *source == "md" {
+		fmt.Fprintf(os.Stderr, "import (md): inserted=%d, updated=%d\n",
+			report.EntriesInserted, report.EntriesUpdated)
+	} else {
+		fmt.Fprintf(os.Stderr, "import: weblog updated=%t, templates=%d, categories=%d, entries=%d, skipped=%d\n",
+			report.WeblogUpdated, report.Templates, report.Categories, report.Entries, report.SkippedEntries)
+	}
 	for _, warn := range report.Warnings {
 		fmt.Fprintf(os.Stderr, "import: warning: %s\n", warn)
 	}

@@ -19,7 +19,7 @@
 - 常駐 HTTP サーバ・もしくは従来型レンタルサーバの CGI として動作
 - 管理画面 UI / MCP サーバ / 管理画面ヘルプ もすべてバイナリに同梱
 - ハイブリッド配信向けの静的サイト生成 (CDN 前段 + 動的管理画面)
-- 旧 Serene Bach v2 (テキストファイル) / v3 (SQLite) (Perl 版) からのインポートに対応
+- 旧 Serene Bach v2 (テキストファイル) / v3 (SQLite) (Perl 版) からのインポートに対応。YAML front-matter 付き markdown ファイル群からの取り込みもサポート
 - Outbound Webhooks: 記事公開 / コメント受信 / 画像アップロード で Slack / Discord / Zapier / n8n に通知
 
 ## クイックスタート
@@ -102,6 +102,7 @@ CI でも push / PR ごとに同じコマンドが走ります:
 | 環境変数 / フラグ / `task` ショートカット | [docs/configuration.md](docs/configuration.md) |
 | 動作モード (HTTP サーバ / CGI / 静的生成 / Docker) | [docs/deployment.md](docs/deployment.md) |
 | Serene Bach v2 / v3 (Perl 版) からの移行 | [docs/importing-sb3.md](docs/importing-sb3.md) |
+| Markdown ファイル群からの取り込み | [docs/importing-markdown.md](docs/importing-markdown.md) |
 | アーキテクチャ + 設計ノート (CSRF, anti-spam, OG カード, アクセス解析 …) | [docs/architecture.md](docs/architecture.md) |
 | エンドユーザー向けヘルプ (管理画面 `/admin/help` で閲覧可) | [docs/help/ja/](docs/help/ja/) |
 

@@ -31,7 +31,12 @@ type Report struct {
 	Categories     int
 	Entries        int
 	SkippedEntries int // closed / draft rows the caller asked us to skip
-	Warnings       []string
+	// Markdown-source counters. Kept separate from Entries so callers
+	// can tell at a glance whether a re-run produced new rows or just
+	// refreshed existing ones.
+	EntriesInserted int
+	EntriesUpdated  int
+	Warnings        []string
 }
 
 // Options controls import behaviour. Defaults are fine for the common
@@ -60,6 +65,14 @@ type Options struct {
 	// data directory (sourcePath = the data dir itself; DataDir is
 	// ignored in that mode). Other values return an error.
 	SBVersion int
+	// Source overrides the legacy SBVersion-based dispatch. Empty
+	// falls back to SBVersion. "md" reads a directory of markdown
+	// files (sourcePath = the directory itself, non-recursive).
+	Source string
+	// ImageDir is the destination ImageDir used by markdown imports
+	// for OG card generation. Empty disables OG generation entirely
+	// (handy for tests). Other source modes ignore this field.
+	ImageDir string
 }
 
 // SB3 config.pl defaults used when sb_config has no override row. Real
@@ -98,10 +111,12 @@ func defaultLegacyURLConfig() legacyURLConfig {
 	}
 }
 
-// Import opens the source described by opts.SBVersion at sourcePath
-// (read-only) and copies data into dest. The entire operation runs in
-// a single destination transaction: any error rolls back everything.
+// Import opens the source described by opts (Source first, then
+// SBVersion) at sourcePath (read-only for SB sources, read-only-ish
+// for markdown) and copies data into dest. The entire operation runs
+// in a single destination transaction: any error rolls back everything.
 //
+// Source "md":      sourcePath is a directory of *.md files (non-recursive).
 // SBVersion 0 / 3: sourcePath is a SB3 data.db (SQLite).
 // SBVersion 2:     sourcePath is the SB2 data directory (flat files).
 func Import(ctx context.Context, dest *sql.DB, sourcePath string, opts Options) (*Report, error) {
@@ -110,6 +125,15 @@ func Import(ctx context.Context, dest *sql.DB, sourcePath string, opts Options) 
 	}
 	if opts.AuthorID == 0 {
 		opts.AuthorID = 1
+	}
+
+	if opts.Source != "" {
+		switch opts.Source {
+		case "md":
+			return importMarkdown(ctx, dest, sourcePath, opts)
+		default:
+			return nil, fmt.Errorf("importer: unsupported source %q (expected \"md\")", opts.Source)
+		}
 	}
 
 	switch opts.SBVersion {
