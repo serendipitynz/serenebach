@@ -273,45 +273,6 @@ func composeKeywordsAction(req composeRequest, lang, format string) (string, str
 	return req.Text, resolveComposePrompt("keywords", lang, format), nil
 }
 
-// composeMaxTokens caps output per action. Title / tag suggestions
-// should be a single line; rewrite / continue / summarise can go
-// longer but stay bounded so a runaway generation doesn't wedge the
-// UI spinner.
-//
-// Headroom note: caps account for reasoning/thinking models (qwen3,
-// llm-jp-thinking, deepseek-r1, gemma thinking variants) that spend
-// most of completion_tokens on hidden chain-of-thought before emitting
-// the answer. Non-thinking models stop on `stop` well before these
-// limits, so widening the ceiling has no cost on them but lets thinking
-// models actually reach the final answer. Title / tags / keywords look
-// like they only need a few tokens of final output, but the reasoning
-// budget they consume on the way there is comparable to longer tasks —
-// keep the cap generous on purpose.
-func composeMaxTokens(action string) int {
-	switch action {
-	case "title", "tags", "keywords", "summarise", "summarize":
-		return 2048
-	case "continue":
-		return 2048
-	case "rewrite":
-		return 4096
-	}
-	return 2048
-}
-
-// composeTemperature trades off determinism. Titles / tags benefit
-// from a bit of variety; rewrite favours faithful reproduction so
-// 0.2 keeps hallucinations rare.
-func composeTemperature(action string) float64 {
-	switch action {
-	case "title", "tags", "keywords":
-		return 0.7
-	case "summarise", "summarize":
-		return 0.3
-	}
-	return 0.2
-}
-
 func langName(lang string) string {
 	switch lang {
 	case "en":
