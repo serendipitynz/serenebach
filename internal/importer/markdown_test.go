@@ -231,7 +231,7 @@ Second body.
 	}
 
 	var (
-		newPosted, newID int64
+		newPosted, newID  int64
 		newTitle, newBody string
 	)
 	if err := a.DB.QueryRow(`SELECT id, posted_at, title, body FROM entries WHERE slug = ?`, "same-slug").Scan(&newID, &newPosted, &newTitle, &newBody); err != nil {
