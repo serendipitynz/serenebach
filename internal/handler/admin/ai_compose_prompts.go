@@ -111,45 +111,17 @@ func stripJSONCComments(in []byte) []byte {
 	i, n := 0, len(in)
 	for i < n {
 		c := in[i]
-		// Preserve string literals verbatim, including any
-		// embedded `/`. JSON strings cannot span lines without
-		// escaping, so a stray `"` inside `\"…\"` will not
-		// confuse the state machine as long as we honour `\`.
 		if c == '"' {
-			out = append(out, c)
-			i++
-			for i < n {
-				ch := in[i]
-				out = append(out, ch)
-				i++
-				if ch == '\\' && i < n {
-					out = append(out, in[i])
-					i++
-					continue
-				}
-				if ch == '"' {
-					break
-				}
-			}
+			i, out = copyJSONCString(in, i, n, out)
 			continue
 		}
 		if c == '/' && i+1 < n {
-			switch in[i+1] {
-			case '/':
-				for i < n && in[i] != '\n' {
-					i++
-				}
+			if in[i+1] == '/' {
+				i = skipJSONCLineComment(in, i, n)
 				continue
-			case '*':
-				i += 2
-				for i+1 < n && !(in[i] == '*' && in[i+1] == '/') {
-					i++
-				}
-				if i+1 < n {
-					i += 2
-				} else {
-					i = n
-				}
+			}
+			if in[i+1] == '*' {
+				i = skipJSONCBlockComment(in, i+2, n)
 				continue
 			}
 		}
@@ -157,4 +129,52 @@ func stripJSONCComments(in []byte) []byte {
 		i++
 	}
 	return out
+}
+
+// copyJSONCString copies a JSON string literal verbatim, including
+// any comment-like bytes inside it. Escape sequences (`\"`, `\\`,
+// etc.) are forwarded as-is so the embedded `"` does not prematurely
+// close the literal.
+func copyJSONCString(in []byte, i, n int, out []byte) (int, []byte) {
+	out = append(out, in[i])
+	i++
+	for i < n {
+		ch := in[i]
+		out = append(out, ch)
+		i++
+		if ch == '\\' && i < n {
+			out = append(out, in[i])
+			i++
+			continue
+		}
+		if ch == '"' {
+			return i, out
+		}
+	}
+	return i, out
+}
+
+// skipJSONCLineComment advances past `//` to the next newline (the
+// newline itself is preserved so line numbers in JSON parse errors
+// still line up with the source file).
+func skipJSONCLineComment(in []byte, i, n int) int {
+	for i < n && in[i] != '\n' {
+		i++
+	}
+	return i
+}
+
+// skipJSONCBlockComment advances past the opening `/*` (caller has
+// already moved i past it) to just after the closing `*/`. An
+// unterminated block comment consumes the rest of the input rather
+// than panicking; the JSON unmarshal step will surface the resulting
+// truncation as a parse error.
+func skipJSONCBlockComment(in []byte, i, n int) int {
+	for i+1 < n && (in[i] != '*' || in[i+1] != '/') {
+		i++
+	}
+	if i+1 < n {
+		return i + 2
+	}
+	return n
 }
