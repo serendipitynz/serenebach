@@ -218,11 +218,32 @@ func resolveComposeLocale(r *http.Request) string {
 	return locale
 }
 
+// resolveComposePrompt looks up the system prompt for action and
+// substitutes the per-request {format} / {lang} placeholders. Keeps
+// every per-action handler down to "validate input → return prompt"
+// so the prompt wording itself lives in ai_compose_prompts.jsonc.
+//
+// Returns an "unknown_action" error when the catalogue has no entry
+// for action. Startup validation makes this unreachable for the
+// wired-in verbs, but propagating the error here guarantees an
+// empty system prompt can never silently reach the provider if the
+// invariant ever drifts at runtime.
+func resolveComposePrompt(action, lang, format string) (string, error) {
+	system, ok := composePromptSystem(action, format, langName(lang))
+	if !ok {
+		return "", fmt.Errorf("unknown_action")
+	}
+	return system, nil
+}
+
 func composeRewriteAction(req composeRequest, lang, format string) (string, string, error) {
 	if strings.TrimSpace(req.Text) == "" {
 		return "", "", fmt.Errorf("selection_required")
 	}
-	system := "You are a concise writing assistant. Rewrite the passage the user sends so it reads more naturally while preserving meaning, tone, and any " + format + " markup. Return only the rewritten passage — no preamble, no commentary, no quotation marks. Reply in " + langName(lang) + "."
+	system, err := resolveComposePrompt("rewrite", lang, format)
+	if err != nil {
+		return "", "", err
+	}
 	return req.Text, system, nil
 }
 
@@ -234,80 +255,55 @@ func composeContinueAction(req composeRequest, lang, format string) (string, str
 	if ctxText == "" {
 		return "", "", fmt.Errorf("context_required")
 	}
-	system := "You are a concise writing assistant. Continue the passage the user sends with one or two additional paragraphs that match the existing voice and " + format + " markup. Return only the new text — do not repeat what was already written. Reply in " + langName(lang) + "."
+	system, err := resolveComposePrompt("continue", lang, format)
+	if err != nil {
+		return "", "", err
+	}
 	return ctxText, system, nil
 }
 
-func composeSummariseAction(req composeRequest, lang, _ string) (string, string, error) {
+func composeSummariseAction(req composeRequest, lang, format string) (string, string, error) {
 	if strings.TrimSpace(req.Text) == "" {
 		return "", "", fmt.Errorf("text_required")
 	}
-	system := "Summarise the passage in one short paragraph (under 120 words) in " + langName(lang) + ". No preamble."
+	system, err := resolveComposePrompt("summarise", lang, format)
+	if err != nil {
+		return "", "", err
+	}
 	return req.Text, system, nil
 }
 
-func composeTitleAction(req composeRequest, lang, _ string) (string, string, error) {
+func composeTitleAction(req composeRequest, lang, format string) (string, string, error) {
 	if strings.TrimSpace(req.Text) == "" {
 		return "", "", fmt.Errorf("text_required")
 	}
-	system := "Suggest a short, engaging title for the entry below. Reply with exactly one title, no quotation marks, no preamble, under 40 characters. Reply in " + langName(lang) + "."
+	system, err := resolveComposePrompt("title", lang, format)
+	if err != nil {
+		return "", "", err
+	}
 	return req.Text, system, nil
 }
 
-func composeTagsAction(req composeRequest, lang, _ string) (string, string, error) {
+func composeTagsAction(req composeRequest, lang, format string) (string, string, error) {
 	if strings.TrimSpace(req.Text) == "" {
 		return "", "", fmt.Errorf("text_required")
 	}
-	system := "Suggest 3-6 short tags (1-3 words each) for the entry below. Reply with a single line of comma-separated tags. No preamble, no numbering, no quotation marks. Tags should be in " + langName(lang) + "."
+	system, err := resolveComposePrompt("tags", lang, format)
+	if err != nil {
+		return "", "", err
+	}
 	return req.Text, system, nil
 }
 
-func composeKeywordsAction(req composeRequest, lang, _ string) (string, string, error) {
+func composeKeywordsAction(req composeRequest, lang, format string) (string, string, error) {
 	if strings.TrimSpace(req.Text) == "" {
 		return "", "", fmt.Errorf("text_required")
 	}
-	system := "Suggest SEO keywords for the entry below. Reply with a single line of comma-separated keywords (5-10 total). No preamble. Keywords should be in " + langName(lang) + "."
+	system, err := resolveComposePrompt("keywords", lang, format)
+	if err != nil {
+		return "", "", err
+	}
 	return req.Text, system, nil
-}
-
-// composeMaxTokens caps output per action. Title / tag suggestions
-// should be a single line; rewrite / continue / summarise can go
-// longer but stay bounded so a runaway generation doesn't wedge the
-// UI spinner.
-//
-// Headroom note: caps account for reasoning/thinking models (qwen3,
-// llm-jp-thinking, deepseek-r1) that spend most of completion_tokens
-// on hidden chain-of-thought before emitting the answer. Non-thinking
-// models stop on `stop` well before these limits, so widening the
-// ceiling has no cost on them but lets thinking models actually reach
-// the final answer.
-func composeMaxTokens(action string) int {
-	switch action {
-	case "title":
-		return 200
-	case "tags", "keywords":
-		return 200
-	case "summarise", "summarize":
-		return 800
-	case "rewrite":
-		return 4096
-	case "continue":
-		return 2048
-	}
-	return 1024
-}
-
-// composeTemperature trades off determinism. Titles / tags benefit
-// from a bit of variety; rewrite favours faithful reproduction so
-// 0.2 keeps hallucinations rare.
-func composeTemperature(action string) float64 {
-	switch action {
-	case "title", "tags", "keywords":
-		return 0.7
-	case "summarise", "summarize":
-		return 0.3
-	}
-	return 0.2
 }
 
 func langName(lang string) string {
