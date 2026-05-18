@@ -218,12 +218,20 @@ func resolveComposeLocale(r *http.Request) string {
 	return locale
 }
 
+// resolveComposePrompt looks up the system prompt for action and
+// substitutes the per-request {format} / {lang} placeholders. Keeps
+// every per-action handler down to "validate input → return prompt"
+// so the prompt wording itself lives in ai_compose_prompts.json.
+func resolveComposePrompt(action, lang, format string) string {
+	system, _ := composePromptSystem(action, format, langName(lang))
+	return system
+}
+
 func composeRewriteAction(req composeRequest, lang, format string) (string, string, error) {
 	if strings.TrimSpace(req.Text) == "" {
 		return "", "", fmt.Errorf("selection_required")
 	}
-	system := "You are a concise writing assistant. Rewrite the passage the user sends so it reads more naturally while preserving meaning, tone, and any " + format + " markup. Return only the rewritten passage — no preamble, no commentary, no quotation marks. Reply in " + langName(lang) + "."
-	return req.Text, system, nil
+	return req.Text, resolveComposePrompt("rewrite", lang, format), nil
 }
 
 func composeContinueAction(req composeRequest, lang, format string) (string, string, error) {
@@ -234,40 +242,35 @@ func composeContinueAction(req composeRequest, lang, format string) (string, str
 	if ctxText == "" {
 		return "", "", fmt.Errorf("context_required")
 	}
-	system := "You are a concise writing assistant. Continue the passage the user sends with one or two additional paragraphs that match the existing voice and " + format + " markup. Return only the new text — do not repeat what was already written. Reply in " + langName(lang) + "."
-	return ctxText, system, nil
+	return ctxText, resolveComposePrompt("continue", lang, format), nil
 }
 
-func composeSummariseAction(req composeRequest, lang, _ string) (string, string, error) {
+func composeSummariseAction(req composeRequest, lang, format string) (string, string, error) {
 	if strings.TrimSpace(req.Text) == "" {
 		return "", "", fmt.Errorf("text_required")
 	}
-	system := "Summarise the passage in one short paragraph (under 120 words) in " + langName(lang) + ". No preamble."
-	return req.Text, system, nil
+	return req.Text, resolveComposePrompt("summarise", lang, format), nil
 }
 
-func composeTitleAction(req composeRequest, lang, _ string) (string, string, error) {
+func composeTitleAction(req composeRequest, lang, format string) (string, string, error) {
 	if strings.TrimSpace(req.Text) == "" {
 		return "", "", fmt.Errorf("text_required")
 	}
-	system := "Suggest a short, engaging title for the entry below. Reply with exactly one title, no quotation marks, no preamble, under 40 characters. Reply in " + langName(lang) + "."
-	return req.Text, system, nil
+	return req.Text, resolveComposePrompt("title", lang, format), nil
 }
 
-func composeTagsAction(req composeRequest, lang, _ string) (string, string, error) {
+func composeTagsAction(req composeRequest, lang, format string) (string, string, error) {
 	if strings.TrimSpace(req.Text) == "" {
 		return "", "", fmt.Errorf("text_required")
 	}
-	system := "Suggest 3-6 short tags (1-3 words each) for the entry below. Reply with a single line of comma-separated tags. No preamble, no numbering, no quotation marks. Tags should be in " + langName(lang) + "."
-	return req.Text, system, nil
+	return req.Text, resolveComposePrompt("tags", lang, format), nil
 }
 
-func composeKeywordsAction(req composeRequest, lang, _ string) (string, string, error) {
+func composeKeywordsAction(req composeRequest, lang, format string) (string, string, error) {
 	if strings.TrimSpace(req.Text) == "" {
 		return "", "", fmt.Errorf("text_required")
 	}
-	system := "Suggest SEO keywords for the entry below. Reply with a single line of comma-separated keywords (5-10 total). No preamble. Keywords should be in " + langName(lang) + "."
-	return req.Text, system, nil
+	return req.Text, resolveComposePrompt("keywords", lang, format), nil
 }
 
 // composeMaxTokens caps output per action. Title / tag suggestions
