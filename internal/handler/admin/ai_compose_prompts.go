@@ -31,7 +31,12 @@ type composePromptTemplate struct {
 
 // composePrompts is decoded once at package init from the JSONC
 // catalogue. A malformed file is treated as a build bug and panics
-// so the regression is caught loudly in tests.
+// so the regression is caught loudly in tests. Drift between
+// composeActions and the catalogue is caught by the test
+// TestComposeActionsHaveCatalogueEntries — we cannot validate it
+// at package init time without creating an initialization cycle
+// (composeActions' values transitively reference composePrompts
+// via resolveComposePrompt), and the project policy bans init().
 var composePrompts = mustLoadComposePrompts()
 
 func mustLoadComposePrompts() map[string]composePromptTemplate {

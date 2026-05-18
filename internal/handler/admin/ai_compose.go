@@ -221,17 +221,30 @@ func resolveComposeLocale(r *http.Request) string {
 // resolveComposePrompt looks up the system prompt for action and
 // substitutes the per-request {format} / {lang} placeholders. Keeps
 // every per-action handler down to "validate input → return prompt"
-// so the prompt wording itself lives in ai_compose_prompts.json.
-func resolveComposePrompt(action, lang, format string) string {
-	system, _ := composePromptSystem(action, format, langName(lang))
-	return system
+// so the prompt wording itself lives in ai_compose_prompts.jsonc.
+//
+// Returns an "unknown_action" error when the catalogue has no entry
+// for action. Startup validation makes this unreachable for the
+// wired-in verbs, but propagating the error here guarantees an
+// empty system prompt can never silently reach the provider if the
+// invariant ever drifts at runtime.
+func resolveComposePrompt(action, lang, format string) (string, error) {
+	system, ok := composePromptSystem(action, format, langName(lang))
+	if !ok {
+		return "", fmt.Errorf("unknown_action")
+	}
+	return system, nil
 }
 
 func composeRewriteAction(req composeRequest, lang, format string) (string, string, error) {
 	if strings.TrimSpace(req.Text) == "" {
 		return "", "", fmt.Errorf("selection_required")
 	}
-	return req.Text, resolveComposePrompt("rewrite", lang, format), nil
+	system, err := resolveComposePrompt("rewrite", lang, format)
+	if err != nil {
+		return "", "", err
+	}
+	return req.Text, system, nil
 }
 
 func composeContinueAction(req composeRequest, lang, format string) (string, string, error) {
@@ -242,35 +255,55 @@ func composeContinueAction(req composeRequest, lang, format string) (string, str
 	if ctxText == "" {
 		return "", "", fmt.Errorf("context_required")
 	}
-	return ctxText, resolveComposePrompt("continue", lang, format), nil
+	system, err := resolveComposePrompt("continue", lang, format)
+	if err != nil {
+		return "", "", err
+	}
+	return ctxText, system, nil
 }
 
 func composeSummariseAction(req composeRequest, lang, format string) (string, string, error) {
 	if strings.TrimSpace(req.Text) == "" {
 		return "", "", fmt.Errorf("text_required")
 	}
-	return req.Text, resolveComposePrompt("summarise", lang, format), nil
+	system, err := resolveComposePrompt("summarise", lang, format)
+	if err != nil {
+		return "", "", err
+	}
+	return req.Text, system, nil
 }
 
 func composeTitleAction(req composeRequest, lang, format string) (string, string, error) {
 	if strings.TrimSpace(req.Text) == "" {
 		return "", "", fmt.Errorf("text_required")
 	}
-	return req.Text, resolveComposePrompt("title", lang, format), nil
+	system, err := resolveComposePrompt("title", lang, format)
+	if err != nil {
+		return "", "", err
+	}
+	return req.Text, system, nil
 }
 
 func composeTagsAction(req composeRequest, lang, format string) (string, string, error) {
 	if strings.TrimSpace(req.Text) == "" {
 		return "", "", fmt.Errorf("text_required")
 	}
-	return req.Text, resolveComposePrompt("tags", lang, format), nil
+	system, err := resolveComposePrompt("tags", lang, format)
+	if err != nil {
+		return "", "", err
+	}
+	return req.Text, system, nil
 }
 
 func composeKeywordsAction(req composeRequest, lang, format string) (string, string, error) {
 	if strings.TrimSpace(req.Text) == "" {
 		return "", "", fmt.Errorf("text_required")
 	}
-	return req.Text, resolveComposePrompt("keywords", lang, format), nil
+	system, err := resolveComposePrompt("keywords", lang, format)
+	if err != nil {
+		return "", "", err
+	}
+	return req.Text, system, nil
 }
 
 func langName(lang string) string {
