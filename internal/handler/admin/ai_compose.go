@@ -276,25 +276,24 @@ func composeKeywordsAction(req composeRequest, lang, _ string) (string, string, 
 // UI spinner.
 //
 // Headroom note: caps account for reasoning/thinking models (qwen3,
-// llm-jp-thinking, deepseek-r1) that spend most of completion_tokens
-// on hidden chain-of-thought before emitting the answer. Non-thinking
-// models stop on `stop` well before these limits, so widening the
-// ceiling has no cost on them but lets thinking models actually reach
-// the final answer.
+// llm-jp-thinking, deepseek-r1, gemma thinking variants) that spend
+// most of completion_tokens on hidden chain-of-thought before emitting
+// the answer. Non-thinking models stop on `stop` well before these
+// limits, so widening the ceiling has no cost on them but lets thinking
+// models actually reach the final answer. Title / tags / keywords look
+// like they only need a few tokens of final output, but the reasoning
+// budget they consume on the way there is comparable to longer tasks —
+// keep the cap generous on purpose.
 func composeMaxTokens(action string) int {
 	switch action {
-	case "title":
-		return 200
-	case "tags", "keywords":
-		return 200
-	case "summarise", "summarize":
-		return 800
-	case "rewrite":
-		return 4096
+	case "title", "tags", "keywords", "summarise", "summarize":
+		return 2048
 	case "continue":
 		return 2048
+	case "rewrite":
+		return 4096
 	}
-	return 1024
+	return 2048
 }
 
 // composeTemperature trades off determinism. Titles / tags benefit
