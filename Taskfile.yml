@@ -122,6 +122,11 @@ tasks:
     cmds:
       - go run {{.PKG}} --db=./data/dev.db import {{.CLI_ARGS}}
 
+  import-md:
+    desc: "Import entries from a directory of markdown files. Usage: task import-md -- /path/to/content"
+    cmds:
+      - go run {{.PKG}} --db=./data/dev.db import --source=md {{.CLI_ARGS}}
+
   build-site:
     desc: Render the public site as static HTML under ./data/public
     cmds:
