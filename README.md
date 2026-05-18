@@ -19,7 +19,7 @@ A self-hostable Go weblog engine — a lighter path between WordPress and Hugo. 
 - Runs as a long-lived HTTP server, **or** as a CGI program on traditional shared hosting
 - Embedded admin UI, MCP server, and end-user help — nothing extra to deploy
 - Static rebuild for hybrid hosting (CDN / static front, dynamic admin behind)
-- Imports content from legacy Serene Bach v2 (flat-file) and v3 (SQLite) installations
+- Imports content from legacy Serene Bach v2 (flat-file) and v3 (SQLite) installations, and from a directory of markdown files with YAML front-matter
 - Outbound webhooks (entry / comment / image events) for Slack / Discord / Zapier / n8n
 
 ## Quick start
@@ -100,6 +100,7 @@ CI runs the same checks on every push and pull request:
 | Environment variables, flags, `task` shortcuts | [docs/configuration.md](docs/configuration.md) |
 | Deployment modes (HTTP server / CGI / static rebuild) | [docs/deployment.md](docs/deployment.md) |
 | Migrating from Serene Bach v2 / v3 | [docs/importing-sb3.md](docs/importing-sb3.md) |
+| Importing from a directory of markdown files | [docs/importing-markdown.md](docs/importing-markdown.md) |
 | Stack overview + design notes (CSRF, anti-spam, OG cards, analytics, …) | [docs/architecture.md](docs/architecture.md) |
 | End-user help (also served at `/admin/help` from the running binary) | [docs/help/](docs/help/) |
 

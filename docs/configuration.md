@@ -79,6 +79,7 @@ Everything below is a `go run` or `go build` under the hood, so the Taskfile is 
 | `task build-site` | Render the whole site to static HTML under `./data/public` |
 | `task extract-assets` | Write embedded admin assets to `./admin-static` for Apache direct serving in CGI mode |
 | `task import -- <path>` | Import from a legacy SereneBach v3 SQLite database |
+| `task import-md -- <dir>` | Import entries from a directory of markdown files with YAML front-matter. See [docs/importing-markdown.md](importing-markdown.md) |
 | `task build-proxy` | Build the MCP OAuth proxy at `./bin/mcp-oauth-proxy`. Bridges ChatGPT's OAuth-only MCP client to Serene Bach's Bearer-token `/mcp` endpoint. See `cmd/mcp-oauth-proxy/README.md` for env vars and ChatGPT configuration. |
 | `./bin/serenebach mcp serve` | Start the MCP server over stdio — exposes the read tools to Claude Code / Cursor / Zed |
 | `./bin/serenebach extract-assets` | Write embedded admin assets (`admin.css`, `admin.js`, logos, favicon) to disk so Apache can serve them directly in CGI mode. See [docs/deployment.md](docs/deployment.md) |
