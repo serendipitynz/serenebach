@@ -143,7 +143,7 @@ Read [docs/architecture.md](docs/architecture.md) before starting any new phase 
 | Public + admin URL reference                           | [docs/url-map.md](docs/url-map.md)               |
 | Environment variables, flags, `task` commands          | [docs/configuration.md](docs/configuration.md)   |
 | Deploy modes (HTTP / CGI / static rebuild)             | [docs/deployment.md](docs/deployment.md)         |
-| SB3 migration                                          | [docs/importing-sb3.md](docs/importing-sb3.md)   |
+| SB2 / SB3 migration                                    | [docs/importing-legacy-sb.md](docs/importing-legacy-sb.md) |
 | End-user help (also served at `/admin/help`)           | [docs/help/](docs/help/)                         |
 
 ## Project status

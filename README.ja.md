@@ -101,7 +101,7 @@ CI でも push / PR ごとに同じコマンドが走ります:
 | 公開・管理画面の URL リファレンス | [docs/url-map.md](docs/url-map.md) |
 | 環境変数 / フラグ / `task` ショートカット | [docs/configuration.md](docs/configuration.md) |
 | 動作モード (HTTP サーバ / CGI / 静的生成 / Docker) | [docs/deployment.md](docs/deployment.md) |
-| Serene Bach v2 / v3 (Perl 版) からの移行 | [docs/importing-sb3.md](docs/importing-sb3.md) |
+| Serene Bach v2 / v3 (Perl 版) からの移行 | [docs/importing-legacy-sb.md](docs/importing-legacy-sb.md) |
 | Markdown ファイル群からの取り込み | [docs/importing-markdown.md](docs/importing-markdown.md) |
 | アーキテクチャ + 設計ノート (CSRF, anti-spam, OG カード, アクセス解析 …) | [docs/architecture.md](docs/architecture.md) |
 | エンドユーザー向けヘルプ (管理画面 `/admin/help` で閲覧可) | [docs/help/ja/](docs/help/ja/) |

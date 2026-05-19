@@ -99,7 +99,7 @@ CI runs the same checks on every push and pull request:
 | Public + admin URL reference | [docs/url-map.md](docs/url-map.md) |
 | Environment variables, flags, `task` shortcuts | [docs/configuration.md](docs/configuration.md) |
 | Deployment modes (HTTP server / CGI / static rebuild) | [docs/deployment.md](docs/deployment.md) |
-| Migrating from Serene Bach v2 / v3 | [docs/importing-sb3.md](docs/importing-sb3.md) |
+| Migrating from Serene Bach v2 / v3 | [docs/importing-legacy-sb.md](docs/importing-legacy-sb.md) |
 | Importing from a directory of markdown files | [docs/importing-markdown.md](docs/importing-markdown.md) |
 | Stack overview + design notes (CSRF, anti-spam, OG cards, analytics, …) | [docs/architecture.md](docs/architecture.md) |
 | End-user help (also served at `/admin/help` from the running binary) | [docs/help/](docs/help/) |
