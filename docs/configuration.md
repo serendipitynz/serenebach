@@ -34,6 +34,7 @@ Every knob the running binary respects, plus the `task` shortcuts the dev workfl
 | `SB_SHUTDOWN_TIMEOUT` | `time.ParseDuration` value bounding how long graceful shutdown waits for in-flight requests after `SIGINT`/`SIGTERM` before exiting (default `15s`, server mode only) |
 | `SB_TZ` | IANA timezone name (e.g. `Asia/Tokyo`, `UTC`) used for archive year/month boundaries, the admin `posted_at` form input, and rendered entry/list/archive dates. Default is the host clock (`time.Local`). Set this when the binary moves between hosts whose local clocks differ (Docker UTC vs Sakura JST) so the static rebuild and the dynamic site agree on which entries fall in which month |
 | `SB_WEBHOOKS_DISABLED` | Set to `1` to cut every outbound-webhook dispatch to a no-op. Operators reach for this when a misbehaving subscriber needs to be silenced faster than the admin UI's per-row toggle can be visited. Per-row enable/disable lives on `/admin/settings/webhooks` |
+| `SB_CSRF_MULTIPART_MAX_BYTES` | Raw byte cap on how much of a multipart body the CSRF middleware is willing to read pre-authentication while looking for the form-encoded `csrf_token`. Default `1048576` (1 MiB). The JS upload paths in `web/templates/admin/admin.js` send the token via the `X-CSRF-Token` header instead, so the middleware never touches the body and this cap doesn't apply to them. Raise it only when a `<noscript>` fallback genuinely needs to submit larger multipart forms; the canonical large-upload path is the JS one |
 
 ### MCP OAuth proxy env vars
 

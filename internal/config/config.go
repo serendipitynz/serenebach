@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/serendipitynz/serenebach/internal/clientip"
+	"github.com/serendipitynz/serenebach/internal/csrf"
 )
 
 type Mode string
@@ -63,6 +64,13 @@ type Config struct {
 	// UploadMaxBytes caps a single image upload (Content-Length + body
 	// read). Configured via SB_UPLOAD_MAX_MB (default 10 MB).
 	UploadMaxBytes int64
+	// CSRFMultipartMaxBytes caps how much of a multipart body the CSRF
+	// middleware will read pre-authentication while extracting the
+	// form-encoded token. Defaults to 1 MiB. Override via
+	// SB_CSRF_MULTIPART_MAX_BYTES (raw bytes). Real upload flows send
+	// the token in the X-CSRF-Token header so the middleware never
+	// touches the body and the cap does not apply.
+	CSRFMultipartMaxBytes int64
 	// TrustedProxies decides which peers are allowed to set the
 	// X-Forwarded-For / X-Real-IP headers the IP blacklist, login
 	// rate-limiter, and like/stamp fingerprint consult. Empty (the
@@ -172,6 +180,7 @@ func Load(args []string) (*Config, string, []string, error) {
 		ImageDir:               envOr("SB_IMAGE_DIR", "./data/img"),
 		TemplateDir:            envOr("SB_TEMPLATE_DIR", "./data/templates"),
 		UploadMaxBytes:         parseUploadMaxBytes(os.Getenv("SB_UPLOAD_MAX_MB")),
+		CSRFMultipartMaxBytes:  parseCSRFMultipartMaxBytes(os.Getenv("SB_CSRF_MULTIPART_MAX_BYTES")),
 		DevMode:                os.Getenv("SB_DEV") == "1",
 		ReadHeaderTimeout:      parseDurationEnv(os.Getenv("SB_READ_HEADER_TIMEOUT"), DefaultReadHeaderTimeout),
 		ReadTimeout:            parseDurationEnv(os.Getenv("SB_READ_TIMEOUT"), DefaultReadTimeout),
@@ -307,6 +316,21 @@ func parseUploadMaxBytes(raw string) int64 {
 		return int64(DefaultUploadMaxMB) << 20
 	}
 	return int64(n) << 20
+}
+
+// parseCSRFMultipartMaxBytes resolves SB_CSRF_MULTIPART_MAX_BYTES into
+// the byte cap the CSRF middleware uses for no-JS multipart bodies.
+// Empty / unparseable / non-positive falls back to
+// csrf.DefaultMultipartMaxBytes (1 MiB).
+func parseCSRFMultipartMaxBytes(raw string) int64 {
+	if raw == "" {
+		return csrf.DefaultMultipartMaxBytes
+	}
+	n, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || n <= 0 {
+		return csrf.DefaultMultipartMaxBytes
+	}
+	return n
 }
 
 func parseAnalyticsRetention(raw string) int {
