@@ -38,7 +38,7 @@ Prefer the CLI? `task seed` still works — it creates the dev DB and seeds an a
 
 A `.env` template ships at `.env.example`. Copy it to `.env` and fill in `SB_AI_SECRET` if you plan to enable the AI writing assists.
 
-Server-mode HTTP timeouts and graceful shutdown have sensible defaults out of the box and can be tuned via `SB_READ_HEADER_TIMEOUT`, `SB_WRITE_TIMEOUT`, `SB_IDLE_TIMEOUT`, `SB_MAX_HEADER_BYTES`, and `SB_SHUTDOWN_TIMEOUT`. Set `SB_TZ` (e.g. `Asia/Tokyo`) to pin the timezone used for archive month/year boundaries and rendered entry dates so the same binary produces identical output regardless of the host clock. See [docs/configuration.md](docs/configuration.md) for the full list.
+Server-mode HTTP timeouts and graceful shutdown have sensible defaults out of the box and can be tuned via `SB_READ_HEADER_TIMEOUT`, `SB_WRITE_TIMEOUT`, `SB_IDLE_TIMEOUT`, `SB_MAX_HEADER_BYTES`, and `SB_SHUTDOWN_TIMEOUT`. Set `SB_TZ` (e.g. `Asia/Tokyo`) to pin the timezone used for archive month/year boundaries and rendered entry dates so the same binary produces identical output regardless of the host clock. `SB_CSRF_MULTIPART_MAX_BYTES` (raw bytes, default `1048576`) caps how much of a multipart body the CSRF middleware will parse pre-authentication for no-JS fallback forms; JS upload paths send the token via the `X-CSRF-Token` header and bypass the cap entirely. See [docs/configuration.md](docs/configuration.md) for the full list.
 
 Run `serenebach --version` to print the version of the binary you have on disk and exit. The flag works even when the database or environment configuration is missing or broken, so it is safe to use for identifying a freshly unpacked build.
 
