@@ -24,35 +24,65 @@ func (h *Handler) mountTags(r chi.Router) {
 	r.Post("/tags/{id}/delete", h.tagDelete)
 }
 
-// tagRow decorates domain.Tag with the entry count that drives the list
-// table's 記事数 column.
-type tagRow struct {
-	domain.Tag
-	EntryCount int64
+// tagSortColumns lists the sortable columns of the admin tag list
+// with the direction used on first click. The default landing order
+// (name ASC) is the zero value of TagSortKey and not in this list —
+// users restore it by visiting /admin/tags without query params.
+var tagSortColumns = []struct {
+	Key        string
+	DefaultDir string
+}{
+	{"id", "desc"},
+	{"name", "asc"},
+	{"slug", "asc"},
+	{"count", "desc"},
 }
 
 type tagsListPageData struct {
 	pageBase
-	Tags  []tagRow
-	Flash string
+	Tags      []repo.TagWithCount
+	Flash     string
+	SortLinks map[string]sortLink
 }
 
 func (h *Handler) tagList(w http.ResponseWriter, r *http.Request) {
-	tags, err := h.Store.AllTags(r.Context(), h.wid())
+	q := r.URL.Query()
+	sortRaw := q.Get("sort")
+	dirRaw := q.Get("dir")
+	sortKey := repo.ParseTagSortKey(sortRaw)
+	sortDir := repo.ParseSortDir(dirRaw)
+
+	tags, err := h.Store.ListTagsForAdmin(r.Context(), h.wid(), repo.ListTagsQuery{
+		SortBy:  sortKey,
+		SortDir: sortDir,
+	})
 	if err != nil {
 		log.Printf("admin.tagList: %v", err)
 		http.Error(w, "failed to list tags", http.StatusInternalServerError)
 		return
 	}
-	rows := make([]tagRow, 0, len(tags))
-	for _, t := range tags {
-		// Small N expected in practice; once the tag list gets large,
-		// swap this for a single GROUP BY query.
-		count, err := h.Store.TagEntryCount(r.Context(), t.ID)
-		if err != nil {
-			log.Printf("admin.tagList: count: %v", err)
+
+	// Don't echo the synthetic default-name sort back into URLs — the
+	// canonical landing page has no ?sort= at all.
+	echoSortKey := ""
+	if sortRaw != "" {
+		echoSortKey = sortKey.String()
+	}
+	echoSortDir := ""
+	if dirRaw != "" {
+		echoSortDir = sortDirString(sortDir)
+	}
+	state := listURLState{
+		BasePath: root(r) + "/admin/tags",
+		SortKey:  echoSortKey,
+		SortDir:  echoSortDir,
+	}
+	sortLinks := make(map[string]sortLink, len(tagSortColumns))
+	for _, col := range tagSortColumns {
+		sortLinks[col.Key] = sortLink{
+			Href:  state.hrefSort(col.Key, col.DefaultDir),
+			Class: state.classFor(col.Key),
 		}
-		rows = append(rows, tagRow{Tag: t, EntryCount: count})
 	}
 
 	renderMain(w, r, pageTagsList, tagsListPageData{
@@ -62,8 +92,9 @@ func (h *Handler) tagList(w http.ResponseWriter, r *http.Request) {
 			CSRFToken:  csrf.Token(r.Context()),
 			User:       session.UserFrom(r.Context()),
 		},
-		Tags:  rows,
-		Flash: r.URL.Query().Get("ok"),
+		Tags:      tags,
+		Flash:     r.URL.Query().Get("ok"),
+		SortLinks: sortLinks,
 	})
 }
 

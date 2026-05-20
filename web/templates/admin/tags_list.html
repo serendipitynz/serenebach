@@ -11,12 +11,12 @@
   </div>
   <div class="panel-body">
     {{if .Tags}}
-    <table class="listing">
+    <table class="listing listing-sortable">
       <thead><tr>
-        <th class="col-id col-hide-mobile">{{T "common.col.id"}}</th>
-        <th class="col-flex-wide">{{T "tags.col.name"}}</th>
-        <th class="col-flex">{{T "tags.col.slug"}}</th>
-        <th class="col-count">{{T "tags.col.count"}}</th>
+        <th class="col-id col-hide-mobile"><a href="{{(index .SortLinks `id`).Href}}" class="sort-link {{(index .SortLinks `id`).Class}}">{{T "common.col.id"}}</a></th>
+        <th class="col-flex-wide"><a href="{{(index .SortLinks `name`).Href}}" class="sort-link {{(index .SortLinks `name`).Class}}">{{T "tags.col.name"}}</a></th>
+        <th class="col-flex"><a href="{{(index .SortLinks `slug`).Href}}" class="sort-link {{(index .SortLinks `slug`).Class}}">{{T "tags.col.slug"}}</a></th>
+        <th class="col-count"><a href="{{(index .SortLinks `count`).Href}}" class="sort-link {{(index .SortLinks `count`).Class}}">{{T "tags.col.count"}}</a></th>
         <th class="col-actions">{{T "common.col.action"}}</th>
       </tr></thead>
       <tbody>
