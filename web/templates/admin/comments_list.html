@@ -15,7 +15,7 @@
              aria-label="{{T `comments.search.label`}}">
       {{if .StatusRaw}}<input type="hidden" name="status" value="{{.StatusRaw}}">{{end}}
       <button type="submit">{{T "common.search"}}</button>
-      {{if .Search}}<a href="{{index .FilterLinks .StatusRaw}}" class="list-search-clear">{{T "common.search.clear"}}</a>{{end}}
+      {{if .Search}}<a href="{{.ClearSearchHref}}" class="list-search-clear">{{T "common.search.clear"}}</a>{{end}}
     </form>
   </div>
   <nav class="filter-tabs" style="display:flex;gap:0.5rem;padding:0.5rem 0.875rem;flex-wrap:wrap">

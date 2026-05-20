@@ -124,8 +124,14 @@ type commentsListPageData struct {
 	StatusRaw   string // "" | "waiting" | "approved" | "hidden" — for filter-tab active state
 	SortLinks   map[string]sortLink
 	FilterLinks map[string]string // "all"/"waiting"/... -> href preserving q/sort/dir
-	Pager       pagerView
-	TotalCount  int64
+	// ClearSearchHref drops q= while keeping the active status filter
+	// and sort. Computed in the handler because the template can't
+	// derive it from FilterLinks (FilterLinks keys are the four named
+	// statuses, but StatusRaw can be "" — indexing FilterLinks[""]
+	// would return the empty string and break the clear link).
+	ClearSearchHref string
+	Pager           pagerView
+	TotalCount      int64
 }
 
 func (h *Handler) commentList(w http.ResponseWriter, r *http.Request) {
@@ -133,8 +139,22 @@ func (h *Handler) commentList(w http.ResponseWriter, r *http.Request) {
 	statusRaw := q.Get("status")
 
 	search := repo.NormalizeSearch(q.Get("q"))
-	sortKey := repo.ParseMessageSortKey(q.Get("sort"))
-	sortDir := repo.ParseSortDir(q.Get("dir"))
+	sortRaw := q.Get("sort")
+	dirRaw := q.Get("dir")
+	sortKey := repo.ParseMessageSortKey(sortRaw)
+	sortDir := repo.ParseSortDir(dirRaw)
+	// echoSortKey / echoSortDir are what gets re-embedded in generated
+	// URLs. Empty when the user didn't pass ?sort= / ?dir= explicitly,
+	// so the default-sort landing URLs stay clean instead of carrying
+	// a redundant ?sort=posted&dir=desc that the user never picked.
+	echoSortKey := ""
+	if sortRaw != "" {
+		echoSortKey = sortKey.String()
+	}
+	echoSortDir := ""
+	if dirRaw != "" {
+		echoSortDir = sortDirString(sortDir)
+	}
 
 	listQ := repo.ListMessagesQuery{
 		Filter:  parseMessageStatusFilter(statusRaw),
@@ -164,8 +184,8 @@ func (h *Handler) commentList(w http.ResponseWriter, r *http.Request) {
 	state := listURLState{
 		BasePath: root(r) + "/admin/comments",
 		Search:   search,
-		SortKey:  sortKey.String(),
-		SortDir:  sortDirString(sortDir),
+		SortKey:  echoSortKey,
+		SortDir:  echoSortDir,
 		Page:     page,
 		Extras:   extras,
 	}
@@ -179,11 +199,15 @@ func (h *Handler) commentList(w http.ResponseWriter, r *http.Request) {
 	// Filter tabs preserve q / sort / dir but flip ?status= (and reset
 	// to page 1 since switching tabs invalidates the previous index).
 	filterLinks := map[string]string{
-		"all":      commentFilterHref(root(r), search, sortKey.String(), sortDirString(sortDir), ""),
-		"waiting":  commentFilterHref(root(r), search, sortKey.String(), sortDirString(sortDir), "waiting"),
-		"approved": commentFilterHref(root(r), search, sortKey.String(), sortDirString(sortDir), "approved"),
-		"hidden":   commentFilterHref(root(r), search, sortKey.String(), sortDirString(sortDir), "hidden"),
+		"all":      commentFilterHref(root(r), search, echoSortKey, echoSortDir, ""),
+		"waiting":  commentFilterHref(root(r), search, echoSortKey, echoSortDir, "waiting"),
+		"approved": commentFilterHref(root(r), search, echoSortKey, echoSortDir, "approved"),
+		"hidden":   commentFilterHref(root(r), search, echoSortKey, echoSortDir, "hidden"),
 	}
+	// Clear-search href: keep the active status + sort, drop q. Built
+	// here (not in FilterLinks) so it works for the empty-status
+	// "all comments" landing too.
+	clearSearchHref := commentFilterHref(root(r), "", echoSortKey, echoSortDir, statusRaw)
 	prev, next := pagerNeighbours(page, totalPages)
 
 	renderMain(w, r, pageCommentsList, commentsListPageData{
@@ -193,11 +217,12 @@ func (h *Handler) commentList(w http.ResponseWriter, r *http.Request) {
 			CSRFToken:  csrf.Token(r.Context()),
 			User:       session.UserFrom(r.Context()),
 		},
-		Messages:    messages,
-		Search:      search,
-		StatusRaw:   statusRaw,
-		SortLinks:   sortLinks,
-		FilterLinks: filterLinks,
+		Messages:        messages,
+		Search:          search,
+		StatusRaw:       statusRaw,
+		SortLinks:       sortLinks,
+		FilterLinks:     filterLinks,
+		ClearSearchHref: clearSearchHref,
 		Pager: pagerView{
 			Page:       page,
 			TotalPages: totalPages,

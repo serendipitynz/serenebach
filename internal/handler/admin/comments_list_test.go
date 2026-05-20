@@ -150,6 +150,40 @@ func TestCommentList_PaginatesOver50Comments(t *testing.T) {
 	}
 }
 
+func TestCommentList_ClearSearchHref_NoStatus(t *testing.T) {
+	h, _ := newAdminTestHandler(t)
+	seedListMessage(t, h, "alpha", "a", domain.MessageApproved, 10)
+
+	req := withAdmin(httptest.NewRequest(http.MethodGet, "/admin/comments?q=needle", nil))
+	rec := httptest.NewRecorder()
+	h.commentList(rec, req)
+
+	body := rec.Body.String()
+	// The clear-search anchor must have a non-empty href even when no
+	// ?status= is active (regression: a template lookup keyed on the
+	// empty status returned "" and made the link inert).
+	if !strings.Contains(body, `href="/admin/comments" class="list-search-clear"`) {
+		t.Errorf("clear-search href should drop q and land on /admin/comments; got: %s", body[:min(800, len(body))])
+	}
+}
+
+func TestCommentList_ClearSearchHref_KeepsStatusAndSort(t *testing.T) {
+	h, _ := newAdminTestHandler(t)
+	seedListMessage(t, h, "alpha", "a", domain.MessageWaiting, 10)
+
+	req := withAdmin(httptest.NewRequest(http.MethodGet, "/admin/comments?status=waiting&q=needle&sort=author&dir=asc", nil))
+	rec := httptest.NewRecorder()
+	h.commentList(rec, req)
+
+	body := rec.Body.String()
+	// Clear should drop q but keep sort + dir + status — the user
+	// explicitly chose those, only the search needle is ephemeral.
+	if !strings.Contains(body, `href="/admin/comments?sort=author&amp;dir=asc&amp;status=waiting" class="list-search-clear"`) &&
+		!strings.Contains(body, `href="/admin/comments?sort=author&dir=asc&status=waiting" class="list-search-clear"`) {
+		t.Errorf("clear-search href should preserve sort/dir/status; got: %s", body[:min(800, len(body))])
+	}
+}
+
 func TestCommentList_FilterTabLinksPreserveSearchAndSort(t *testing.T) {
 	h, _ := newAdminTestHandler(t)
 	seedListMessage(t, h, "alpha", "a", domain.MessageApproved, 10)
