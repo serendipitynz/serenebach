@@ -84,6 +84,12 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	applyDevMode(cfg.DevMode)
+	// Publish the configured CSRF multipart cap before any router uses
+	// the middleware. Defaults to 1 MiB; raise it only when the no-JS
+	// fallback genuinely needs larger bodies.
+	if cfg.CSRFMultipartMaxBytes > 0 {
+		csrf.MultipartMaxBytes = cfg.CSRFMultipartMaxBytes
+	}
 	webhookSvc := webhook.New(store, cfg.Mode == config.ModeCGI, cfg.WebhooksDisabled)
 	adminH := buildAdminHandler(cfg, store, sessions, analyticsStore, auditStore)
 	adminH.Webhooks = webhookSvc
