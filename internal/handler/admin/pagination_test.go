@@ -81,6 +81,34 @@ func TestListURLState_HrefPage_EncodesSearch(t *testing.T) {
 	}
 }
 
+func TestListURLState_ExtrasPreservedAcrossLinks(t *testing.T) {
+	base := listURLState{
+		BasePath: "/admin/comments",
+		Search:   "foo",
+		SortKey:  "posted",
+		SortDir:  "desc",
+		Page:     2,
+		Extras:   map[string]string{"status": "waiting"},
+	}
+	// Pager and sort links must keep status= attached.
+	if got := base.hrefPage(3); got != "/admin/comments?q=foo&sort=posted&dir=desc&page=3&status=waiting" {
+		t.Errorf("hrefPage extras: got %q", got)
+	}
+	if got := base.hrefSort("author", "asc"); got != "/admin/comments?q=foo&sort=author&dir=asc&status=waiting" {
+		t.Errorf("hrefSort extras: got %q", got)
+	}
+}
+
+func TestListURLState_ExtrasEmptyValueOmitted(t *testing.T) {
+	base := listURLState{
+		BasePath: "/admin/comments",
+		Extras:   map[string]string{"status": ""},
+	}
+	if got := base.hrefPage(2); got != "/admin/comments?page=2" {
+		t.Errorf("empty extras value should be omitted: got %q", got)
+	}
+}
+
 func TestListURLState_ClassFor(t *testing.T) {
 	state := listURLState{SortKey: "title", SortDir: "asc"}
 	if got := state.classFor("title"); got != "active asc" {

@@ -2,6 +2,7 @@ package admin
 
 import (
 	"net/url"
+	"sort"
 	"strconv"
 )
 
@@ -68,13 +69,17 @@ type sortLink struct {
 // admin list page's links: the search needle, the active sort column,
 // the sort direction, and the page number. Methods on this type
 // generate the URL strings the template consumes — handlers don't
-// touch query strings directly.
+// touch query strings directly. Extras carry list-specific params
+// (e.g. ?status= on the comments list) so they ride along with every
+// sort / pager / clear-search link without each handler hand-
+// encoding them.
 type listURLState struct {
 	BasePath string // e.g. "/admin/entries"
 	Search   string // ?q= value (un-escaped)
 	SortKey  string // ?sort= value
 	SortDir  string // ?dir= value ("asc" / "desc")
 	Page     int    // ?page= value (1 = omit)
+	Extras   map[string]string
 }
 
 // hrefSort returns the URL to navigate to when the user clicks the
@@ -97,6 +102,7 @@ func (s listURLState) hrefSort(key, defaultDir string) string {
 		SortKey:  key,
 		SortDir:  dir,
 		Page:     1,
+		Extras:   s.Extras,
 	})
 }
 
@@ -113,6 +119,7 @@ func (s listURLState) hrefPage(page int) string {
 		SortKey:  s.SortKey,
 		SortDir:  s.SortDir,
 		Page:     page,
+		Extras:   s.Extras,
 	})
 }
 
@@ -132,8 +139,8 @@ func (s listURLState) classFor(key string) string {
 
 // encode renders a listURLState as a relative URL. Empty fields are
 // omitted; page=1 is omitted so the canonical landing URL stays
-// clean. Order is stable (q, sort, dir, page) so equivalent states
-// produce identical URLs — easier to spot in browser history.
+// clean. Order is stable (q, sort, dir, page, then Extras keys in
+// alphabetical order) so equivalent states produce identical URLs.
 func (listURLState) encode(s listURLState) string {
 	v := url.Values{}
 	if s.Search != "" {
@@ -148,21 +155,41 @@ func (listURLState) encode(s listURLState) string {
 	if s.Page > 1 {
 		v.Set("page", strconv.Itoa(s.Page))
 	}
+	extraKeys := make([]string, 0, len(s.Extras))
+	for k, val := range s.Extras {
+		if val == "" {
+			continue
+		}
+		v.Set(k, val)
+		extraKeys = append(extraKeys, k)
+	}
+	sort.Strings(extraKeys)
 	if len(v) == 0 {
 		return s.BasePath
 	}
-	return s.BasePath + "?" + encodeStable(v)
+	return s.BasePath + "?" + encodeStable(v, extraKeys)
 }
 
 // encodeStable is url.Values.Encode with a fixed key order so the
 // output is reproducible across runs. url.Values.Encode itself sorts
 // keys alphabetically, which is good for determinism but produces
 // "?dir=…&page=…&q=…&sort=…" — readable enough, but we want q first
-// because it's the most user-visible part of the URL.
-func encodeStable(v url.Values) string {
+// because it's the most user-visible part of the URL. List-specific
+// extras come after the canonical four, in alphabetical order.
+func encodeStable(v url.Values, extraKeys []string) string {
 	order := []string{"q", "sort", "dir", "page"}
 	out := ""
 	for _, k := range order {
+		val := v.Get(k)
+		if val == "" {
+			continue
+		}
+		if out != "" {
+			out += "&"
+		}
+		out += k + "=" + url.QueryEscape(val)
+	}
+	for _, k := range extraKeys {
 		val := v.Get(k)
 		if val == "" {
 			continue

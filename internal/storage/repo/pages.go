@@ -41,7 +41,7 @@ func (s *Store) PageByID(ctx context.Context, wid, id int64) (*domain.Page, erro
 type PageSortKey int
 
 const (
-	PageSortDefault  PageSortKey = iota // sort_order ASC, id ASC
+	PageSortDefault PageSortKey = iota // sort_order ASC, id ASC
 	PageSortTitle
 	PageSortSlug
 	PageSortTemplate
