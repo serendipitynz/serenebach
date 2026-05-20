@@ -234,8 +234,11 @@
   "common.col.updated": "Updated",
   "common.col.delete": "Delete",
   "common.col.action": "View",
+  "common.col.slug": "Slug",
   "common.noTitle": "(no title)",
   "common.dragToReorder": "Drag to reorder",
+  "pager.prev": "← Previous",
+  "pager.next": "Next →",
 
   "entries.title": "Entries",
   "entries.heading": "Entries (%d)",
@@ -533,8 +536,6 @@
   "images.col.size": "Size",
   "images.col.url": "URL",
   "images.copyUrl": "Copy URL",
-  "images.pager.prev": "← Previous",
-  "images.pager.next": "Next →",
 
   "templates.title": "Design",
   "templates.tab.list": "Templates",

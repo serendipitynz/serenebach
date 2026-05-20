@@ -234,8 +234,11 @@
   "common.col.updated": "更新日時",
   "common.col.delete": "削除",
   "common.col.action": "確認",
+  "common.col.slug": "Slug",
   "common.noTitle": "(no title)",
   "common.dragToReorder": "ドラッグして並び替えできます",
+  "pager.prev": "← 前のページ",
+  "pager.next": "次のページ →",
 
   "entries.title": "記事リスト",
   "entries.heading": "記事 (%d)",
@@ -533,8 +536,6 @@
   "images.col.size": "サイズ",
   "images.col.url": "URL",
   "images.copyUrl": "URLをコピー",
-  "images.pager.prev": "← 前のページ",
-  "images.pager.next": "次のページ →",
 
   "templates.title": "デザイン",
   "templates.tab.list": "テンプレート",
