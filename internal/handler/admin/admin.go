@@ -355,7 +355,7 @@ func (h *Handler) home(w http.ResponseWriter, r *http.Request) {
 		Stats:       h.collectDashboardStats(r.Context()),
 	}
 
-	entries, err := h.Store.ListEntriesForAdmin(r.Context(), h.wid(), 5)
+	entries, err := h.Store.ListEntriesForAdmin(r.Context(), h.wid(), repo.ListEntriesQuery{Limit: 5})
 	if err != nil {
 		log.Printf("admin.home: recent entries: %v", err)
 	}

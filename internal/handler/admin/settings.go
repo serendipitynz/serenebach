@@ -14,6 +14,7 @@ import (
 	"github.com/serendipitynz/serenebach/internal/domain"
 	"github.com/serendipitynz/serenebach/internal/i18n"
 	"github.com/serendipitynz/serenebach/internal/session"
+	"github.com/serendipitynz/serenebach/internal/storage/repo"
 )
 
 // mountSettings registers the /admin/settings/* routes. Called from
@@ -235,7 +236,7 @@ func (h *Handler) regenerateAllOGCards(ctx context.Context) {
 	// Pass a big limit — ListEntriesForAdmin uses it as LIMIT in SQL;
 	// typical blogs sit well under 10k entries. Missing a few tail
 	// cards is acceptable given the goroutine is best-effort anyway.
-	entries, err := h.Store.ListEntriesForAdmin(ctx, h.wid(), 10000)
+	entries, err := h.Store.ListEntriesForAdmin(ctx, h.wid(), repo.ListEntriesQuery{Limit: 10000})
 	if err != nil {
 		log.Printf("admin.regenerateAllOGCards: list: %v", err)
 		return

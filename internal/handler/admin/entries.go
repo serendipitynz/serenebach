@@ -104,7 +104,7 @@ type entriesListPageData struct {
 }
 
 func (h *Handler) entryList(w http.ResponseWriter, r *http.Request) {
-	entries, err := h.Store.ListEntriesForAdmin(r.Context(), h.wid(), adminEntryListLimit)
+	entries, err := h.Store.ListEntriesForAdmin(r.Context(), h.wid(), repo.ListEntriesQuery{Limit: adminEntryListLimit})
 	if err != nil {
 		log.Printf("admin.entryList: %v", err)
 		http.Error(w, "failed to list entries", http.StatusInternalServerError)
