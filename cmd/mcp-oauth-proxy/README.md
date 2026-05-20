@@ -67,9 +67,12 @@ export UPSTREAM_URL=https://blog.example.com
 export MCP_BEARER_TOKEN=sb_tok_xxxxxxxxxxxxxxxx
 export OAUTH_CLIENT_ID=chatgpt_mcp
 export BASE_URL=http://localhost:8080
+export PROXY_LISTEN_ADDR=127.0.0.1:8080  # bind to loopback only, no PIN required
 
 ./bin/mcp-oauth-proxy
 ```
+
+`PROXY_LISTEN_ADDR=127.0.0.1:8080` keeps the proxy reachable only from your own machine, which is the configuration the production-mode guard treats as safe without a PIN or redirect allowlist. If you drop that line, the default `:8080` binds every interface and the guard demands `AUTH_PIN` + `OAUTH_REDIRECT_URIS` (or `PROXY_ALLOW_INSECURE_DEV=1`).
 
 ### Production (PIN + redirect URI allowlist)
 
