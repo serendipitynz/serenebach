@@ -196,4 +196,3 @@ func TestEntryList_PageParamClampsToValidRange(t *testing.T) {
 		t.Error("clamp should still render the only available entry")
 	}
 }
-
