@@ -44,11 +44,12 @@ These are read by `cmd/mcp-oauth-proxy`, not the main binary. Set them when runn
 | `UPSTREAM_URL` | Base URL of the Serene Bach instance the proxy forwards to (e.g. `https://blog.example.com`) |
 | `MCP_BEARER_TOKEN` | Static Bearer token minted in `/admin/settings/ai` → **MCPトークン管理** |
 | `OAUTH_CLIENT_ID` | Client ID registered in ChatGPT's MCP settings (e.g. `chatgpt_mcp`) |
-| `OAUTH_REDIRECT_URIS` | **Recommended for public deployments.** Comma-separated allowlist of `redirect_uri` values. When empty, any URI is accepted (development only). |
-| `AUTH_PIN` | **Recommended for public deployments.** If set, the `/authorize` page requires this PIN before issuing a code |
-| `BASE_URL` | Public URL of the proxy itself, used in OAuth metadata (default `http://localhost:8080`) |
+| `OAUTH_REDIRECT_URIS` | **Required when `BASE_URL` is non-loopback.** Comma-separated allowlist of `redirect_uri` values. When empty, any URI is accepted (loopback / development only). |
+| `AUTH_PIN` | **Required when `BASE_URL` is non-loopback.** If set, the `/authorize` page requires this PIN before issuing a code |
+| `BASE_URL` | Public URL of the proxy itself, used in OAuth metadata (default `http://localhost:8080`). When the host is not `localhost` / `127.0.0.1` / `::1`, the proxy refuses to start unless both `AUTH_PIN` and `OAUTH_REDIRECT_URIS` are set (or `PROXY_ALLOW_INSECURE_DEV=1` is given as an explicit override). |
 | `PROXY_LISTEN_ADDR` | Listen address for the proxy (default `:8080`) |
 | `TOKEN_TTL` | Access-token lifetime (default `24h`) |
+| `PROXY_ALLOW_INSECURE_DEV` | Set to `1` to skip the non-loopback `BASE_URL` safety check that otherwise demands `AUTH_PIN` and `OAUTH_REDIRECT_URIS`. Development / closed networks only |
 
 ## Top-level flags
 
