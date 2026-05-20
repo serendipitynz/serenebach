@@ -19,7 +19,7 @@
 //	AUTH_PIN                 If set, the /authorize page asks for this PIN before issuing a code
 //	OAUTH_REDIRECT_URIS      Comma-separated allowlist of redirect_uris. When empty, any uri is accepted (dev only).
 //	TOKEN_TTL                Access-token lifetime (default "24h")
-//	PROXY_ALLOW_INSECURE_DEV Set to "1" to skip the production-mode guards (AUTH_PIN + OAUTH_REDIRECT_URIS required when BASE_URL is non-loopback). Development only.
+//	PROXY_ALLOW_INSECURE_DEV Set to "1" to skip the production-mode guards (AUTH_PIN + OAUTH_REDIRECT_URIS required when BASE_URL or PROXY_LISTEN_ADDR is non-loopback). Development only.
 //
 // Usage:
 //
@@ -36,6 +36,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -82,7 +83,11 @@ func main() {
 	if baseURL == "" {
 		baseURL = "http://localhost:8080"
 	}
-	if productionGuardsRequired(baseURL, os.Getenv("PROXY_ALLOW_INSECURE_DEV")) {
+	addr := os.Getenv("PROXY_LISTEN_ADDR")
+	if addr == "" {
+		addr = ":8080"
+	}
+	if productionGuardsRequired(baseURL, addr, os.Getenv("PROXY_ALLOW_INSECURE_DEV")) {
 		if err := validateProductionConfig(authPIN, allowedRedirectURIs); err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(1)
@@ -102,11 +107,6 @@ func main() {
 	mux.HandleFunc("/authorize", handleAuthorize)
 	mux.HandleFunc("/token", handleToken)
 	mux.HandleFunc("/mcp", handleMCPProxy)
-
-	addr := os.Getenv("PROXY_LISTEN_ADDR")
-	if addr == "" {
-		addr = ":8080"
-	}
 	log.Printf("mcp-oauth-proxy listening on %s", addr)
 	log.Printf("upstream: %s  client_id: %s  pin_required: %v  redirect_uris: %d",
 		upstreamURL, oauthClientID, authPIN != "", len(allowedRedirectURIs))
@@ -562,15 +562,16 @@ func sliceContains(haystack []string, needle string) bool {
 	return false
 }
 
-// productionGuardsRequired reports whether the configured BASE_URL points at
-// a non-loopback host and the operator has not explicitly opted into the
-// insecure-dev escape hatch. The proxy then must run with both AUTH_PIN
-// and OAUTH_REDIRECT_URIS set.
-func productionGuardsRequired(baseURL, allowInsecureDev string) bool {
+// productionGuardsRequired reports whether the proxy must be started
+// with both AUTH_PIN and OAUTH_REDIRECT_URIS in place. The check fires
+// when either the advertised BASE_URL or the actual listen address can
+// be reached from a non-loopback origin, unless the operator opts out
+// via the insecure-dev escape hatch.
+func productionGuardsRequired(baseURL, listenAddr, allowInsecureDev string) bool {
 	if allowInsecureDev == "1" {
 		return false
 	}
-	return !isLoopbackBaseURL(baseURL)
+	return !isLoopbackBaseURL(baseURL) || !isLoopbackListenAddr(listenAddr)
 }
 
 // isLoopbackBaseURL returns true when the URL host resolves to a loopback
@@ -581,7 +582,30 @@ func isLoopbackBaseURL(raw string) bool {
 	if err != nil || u.Host == "" {
 		return false
 	}
-	switch strings.ToLower(u.Hostname()) {
+	return isLoopbackHostLiteral(u.Hostname())
+}
+
+// isLoopbackListenAddr reports whether the given net.Listen-style address
+// only accepts connections from the local machine. Empty host (":8080"),
+// the IPv4 wildcard "0.0.0.0", and the IPv6 wildcard "::" all bind to
+// every interface and are treated as public. Hostnames that are not
+// literal loopback are also treated as public so we fail safe.
+func isLoopbackListenAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		// Can't parse — treat as public-bound to err on the safer side.
+		return false
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		return false
+	}
+	return isLoopbackHostLiteral(host)
+}
+
+// isLoopbackHostLiteral reports whether the given host string is one of
+// the recognized loopback literals. Case-insensitive on the name form.
+func isLoopbackHostLiteral(host string) bool {
+	switch strings.ToLower(host) {
 	case "localhost", "127.0.0.1", "::1":
 		return true
 	}
@@ -594,10 +618,10 @@ func isLoopbackBaseURL(raw string) bool {
 func validateProductionConfig(authPIN string, allowedRedirectURIs []string) error {
 	const hint = " (set PROXY_ALLOW_INSECURE_DEV=1 to override for development only)"
 	if authPIN == "" {
-		return fmt.Errorf("AUTH_PIN must be set when BASE_URL is not a loopback address%s", hint)
+		return fmt.Errorf("AUTH_PIN must be set when BASE_URL or PROXY_LISTEN_ADDR is non-loopback%s", hint)
 	}
 	if len(allowedRedirectURIs) == 0 {
-		return fmt.Errorf("OAUTH_REDIRECT_URIS must be set when BASE_URL is not a loopback address%s", hint)
+		return fmt.Errorf("OAUTH_REDIRECT_URIS must be set when BASE_URL or PROXY_LISTEN_ADDR is non-loopback%s", hint)
 	}
 	return nil
 }

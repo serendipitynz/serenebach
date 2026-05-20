@@ -9,26 +9,68 @@ import (
 )
 
 func TestProductionGuardsRequired(t *testing.T) {
+	const loopbackBase = "http://localhost:8080"
+	const loopbackAddr = "127.0.0.1:8080"
 	cases := []struct {
 		name             string
 		baseURL          string
+		listenAddr       string
 		allowInsecureDev string
 		want             bool
 	}{
-		{"localhost-default", "http://localhost:8080", "", false},
-		{"127-0-0-1", "http://127.0.0.1:8080", "", false},
-		{"ipv6-loopback", "http://[::1]:8080", "", false},
-		{"public-without-override", "https://mcp.example.com", "", true},
-		{"public-with-override", "https://mcp.example.com", "1", false},
-		{"empty-baseurl-fails-safe", "", "", true},
-		{"unparseable-baseurl-fails-safe", "::not a url::", "", true},
-		{"localhost-uppercase", "http://LOCALHOST:8080", "", false},
+		// Pure BASE_URL axis (listen addr held loopback)
+		{"loopback-everywhere", loopbackBase, loopbackAddr, "", false},
+		{"baseurl-127-0-0-1", "http://127.0.0.1:8080", loopbackAddr, "", false},
+		{"baseurl-ipv6-loopback", "http://[::1]:8080", loopbackAddr, "", false},
+		{"baseurl-public-without-override", "https://mcp.example.com", loopbackAddr, "", true},
+		{"baseurl-public-with-override", "https://mcp.example.com", loopbackAddr, "1", false},
+		{"baseurl-empty-fails-safe", "", loopbackAddr, "", true},
+		{"baseurl-unparseable-fails-safe", "::not a url::", loopbackAddr, "", true},
+		{"baseurl-localhost-uppercase", "http://LOCALHOST:8080", loopbackAddr, "", false},
+		// Pure listen-addr axis (BASE_URL held loopback) — covers the
+		// "BASE_URL omitted but :8080 binds every interface" case the
+		// reviewer surfaced on PR #97.
+		{"addr-wildcard-empty-host", loopbackBase, ":8080", "", true},
+		{"addr-0-0-0-0", loopbackBase, "0.0.0.0:8080", "", true},
+		{"addr-ipv6-wildcard", loopbackBase, "[::]:8080", "", true},
+		{"addr-localhost", loopbackBase, "localhost:8080", "", false},
+		{"addr-ipv6-loopback", loopbackBase, "[::1]:8080", "", false},
+		{"addr-public-ip", loopbackBase, "203.0.113.5:8080", "", true},
+		{"addr-unparseable-fails-safe", loopbackBase, "garbage", "", true},
+		// Override applies regardless of axis.
+		{"addr-public-with-override", loopbackBase, ":8080", "1", false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := productionGuardsRequired(c.baseURL, c.allowInsecureDev); got != c.want {
-				t.Errorf("productionGuardsRequired(%q, %q) = %v, want %v",
-					c.baseURL, c.allowInsecureDev, got, c.want)
+			if got := productionGuardsRequired(c.baseURL, c.listenAddr, c.allowInsecureDev); got != c.want {
+				t.Errorf("productionGuardsRequired(%q, %q, %q) = %v, want %v",
+					c.baseURL, c.listenAddr, c.allowInsecureDev, got, c.want)
+			}
+		})
+	}
+}
+
+func TestIsLoopbackListenAddr(t *testing.T) {
+	cases := []struct {
+		addr string
+		want bool
+	}{
+		{"127.0.0.1:8080", true},
+		{"localhost:8080", true},
+		{"LOCALHOST:8080", true},
+		{"[::1]:8080", true},
+		{":8080", false},
+		{"0.0.0.0:8080", false},
+		{"[::]:8080", false},
+		{"203.0.113.5:8080", false},
+		{"example.com:8080", false},
+		{"", false},
+		{"no-port", false},
+	}
+	for _, c := range cases {
+		t.Run(c.addr, func(t *testing.T) {
+			if got := isLoopbackListenAddr(c.addr); got != c.want {
+				t.Errorf("isLoopbackListenAddr(%q) = %v, want %v", c.addr, got, c.want)
 			}
 		})
 	}
