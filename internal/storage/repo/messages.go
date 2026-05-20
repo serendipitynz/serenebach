@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/serendipitynz/serenebach/internal/domain"
@@ -13,6 +14,11 @@ import (
 // messageColumns is the canonical column list for the messages table.
 // Order must match the Scan argument order in scanMessages.
 const messageColumns = `id, wid, entry_id, status, posted_at, author_name, author_email, author_url, body, ip_address, user_agent`
+
+// messageColumnsM is messageColumns qualified with the `m.` alias for
+// the admin list query (used so additional WHERE clauses can reference
+// the alias unambiguously).
+const messageColumnsM = `m.id, m.wid, m.entry_id, m.status, m.posted_at, m.author_name, m.author_email, m.author_url, m.body, m.ip_address, m.user_agent`
 
 // CountMessagesByStatus returns how many comments the weblog has at the
 // given status. Used to surface the moderation queue size on the dashboard.
@@ -78,34 +84,162 @@ func (s *Store) ApprovedMessagesByEntry(ctx context.Context, wid, entryID int64)
 	return scanMessages(rows)
 }
 
-// ListMessagesForAdmin returns every comment (optionally filtered by status)
-// newest first. Pass -99 or any non-valid MessageStatus for "no filter".
-func (s *Store) ListMessagesForAdmin(ctx context.Context, wid int64, filter domain.MessageStatus, limit int) ([]domain.Message, error) {
-	var (
-		rows *sql.Rows
-		err  error
-	)
-	switch filter {
-	case domain.MessageWaiting, domain.MessageApproved, domain.MessageHidden:
-		rows, err = s.db.QueryContext(ctx, `
-			SELECT `+messageColumns+`
-			FROM messages
-			WHERE wid = ? AND status = ?
-			ORDER BY posted_at DESC
-			LIMIT ?`, wid, filter, limit)
+// MessageSortKey is a typed enum of the columns the admin comment list
+// can sort by. Default is posted_at DESC — the moderation queue's
+// natural order.
+type MessageSortKey int
+
+const (
+	MessageSortPostedAt MessageSortKey = iota // default
+	MessageSortID
+	MessageSortAuthor
+	MessageSortStatus
+	MessageSortEntry
+	MessageSortBody
+)
+
+func (k MessageSortKey) orderClause() string {
+	switch k {
+	case MessageSortID:
+		return "m.id"
+	case MessageSortAuthor:
+		return "m.author_name"
+	case MessageSortStatus:
+		return "m.status"
+	case MessageSortEntry:
+		return "m.entry_id"
+	case MessageSortBody:
+		return "m.body"
 	default:
-		rows, err = s.db.QueryContext(ctx, `
-			SELECT `+messageColumns+`
-			FROM messages
-			WHERE wid = ?
-			ORDER BY posted_at DESC
-			LIMIT ?`, wid, limit)
+		return "m.posted_at"
 	}
+}
+
+func (k MessageSortKey) String() string {
+	switch k {
+	case MessageSortID:
+		return "id"
+	case MessageSortAuthor:
+		return "author"
+	case MessageSortStatus:
+		return "status"
+	case MessageSortEntry:
+		return "entry"
+	case MessageSortBody:
+		return "body"
+	default:
+		return "posted"
+	}
+}
+
+// ParseMessageSortKey maps a ?sort= query value to the enum.
+func ParseMessageSortKey(s string) MessageSortKey {
+	switch s {
+	case "id":
+		return MessageSortID
+	case "author":
+		return MessageSortAuthor
+	case "status":
+		return MessageSortStatus
+	case "entry":
+		return MessageSortEntry
+	case "body":
+		return MessageSortBody
+	default:
+		return MessageSortPostedAt
+	}
+}
+
+// ListMessagesQuery bundles the admin comment list's filter / search /
+// sort / paging parameters. Filter is a pointer so the zero-value
+// query (every field zero) means "no filter" — needed because
+// MessageWaiting's underlying int is 0, which would otherwise collide
+// with the natural "unset" default.
+type ListMessagesQuery struct {
+	// Filter, when non-nil, restricts to one MessageStatus (waiting /
+	// approved / hidden). nil = no status filter (all rows).
+	Filter  *domain.MessageStatus
+	Search  string // matches author_name, body, author_email, ip_address
+	SortBy  MessageSortKey
+	SortDir SortDir
+	Limit   int
+	Offset  int
+}
+
+// ListMessagesForAdmin returns comments matching q. The Filter field
+// is interpreted with the same sentinel rules as the previous
+// signature (anything outside waiting/approved/hidden = no filter).
+func (s *Store) ListMessagesForAdmin(ctx context.Context, wid int64, q ListMessagesQuery) ([]domain.Message, error) {
+	sqlText, args := buildMessagesListSQL(wid, q)
+	rows, err := s.db.QueryContext(ctx, sqlText, args...)
 	if err != nil {
 		return nil, fmt.Errorf("repo: ListMessagesForAdmin: %w", err)
 	}
 	defer rows.Close()
 	return scanMessages(rows)
+}
+
+// CountMessagesForAdmin returns how many rows ListMessagesForAdmin
+// would produce ignoring Limit / Offset.
+func (s *Store) CountMessagesForAdmin(ctx context.Context, wid int64, q ListMessagesQuery) (int64, error) {
+	sqlText, args := buildMessagesCountSQL(wid, q)
+	var n int64
+	if err := s.db.QueryRowContext(ctx, sqlText, args...).Scan(&n); err != nil {
+		return 0, fmt.Errorf("repo: CountMessagesForAdmin: %w", err)
+	}
+	return n, nil
+}
+
+func buildMessagesListSQL(wid int64, q ListMessagesQuery) (string, []any) {
+	var b strings.Builder
+	b.WriteString(`SELECT ` + messageColumnsM + `
+		FROM messages m
+		WHERE m.wid = ?`)
+	args := []any{wid}
+	appendMessagesFilters(&b, &args, q)
+	b.WriteString(` ORDER BY `)
+	b.WriteString(q.SortBy.orderClause())
+	b.WriteByte(' ')
+	b.WriteString(q.SortDir.String())
+	b.WriteString(`, m.id DESC`)
+	if q.Limit > 0 {
+		b.WriteString(` LIMIT ?`)
+		args = append(args, q.Limit)
+		if q.Offset > 0 {
+			b.WriteString(` OFFSET ?`)
+			args = append(args, q.Offset)
+		}
+	}
+	return b.String(), args
+}
+
+func buildMessagesCountSQL(wid int64, q ListMessagesQuery) (string, []any) {
+	var b strings.Builder
+	b.WriteString(`SELECT COUNT(*) FROM messages m WHERE m.wid = ?`)
+	args := []any{wid}
+	appendMessagesFilters(&b, &args, q)
+	return b.String(), args
+}
+
+func appendMessagesFilters(b *strings.Builder, args *[]any, q ListMessagesQuery) {
+	if q.Filter != nil {
+		switch *q.Filter {
+		case domain.MessageWaiting, domain.MessageApproved, domain.MessageHidden:
+			b.WriteString(` AND m.status = ?`)
+			*args = append(*args, *q.Filter)
+		}
+	}
+	if q.Search != "" {
+		needle := "%" + escapeLike(q.Search) + "%"
+		// Search hits author_name + body (the spec's mandatory pair)
+		// plus author_email + ip_address (the §12-2 add — useful for
+		// moderation; not exposed to readers).
+		b.WriteString(` AND (m.author_name LIKE ? ESCAPE '\'
+			OR m.body LIKE ? ESCAPE '\'
+			OR m.author_email LIKE ? ESCAPE '\'
+			OR m.ip_address LIKE ? ESCAPE '\')`)
+		*args = append(*args, needle, needle, needle, needle)
+	}
 }
 
 // UpdateMessageStatus flips a comment between waiting / approved / hidden.

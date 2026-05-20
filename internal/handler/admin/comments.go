@@ -15,7 +15,24 @@ import (
 	"github.com/serendipitynz/serenebach/internal/storage/repo"
 )
 
-const adminCommentListLimit = 200
+// adminCommentPageSize is the per-page row count for the admin
+// comment list. Aligned with the entry list pager so the two
+// moderation surfaces feel consistent.
+const adminCommentPageSize = 50
+
+// commentSortColumns lists the sortable columns of the admin comment
+// list with the direction used on first click.
+var commentSortColumns = []struct {
+	Key        string
+	DefaultDir string
+}{
+	{"id", "desc"},
+	{"author", "asc"},
+	{"status", "asc"},
+	{"posted", "desc"},
+	{"entry", "desc"},
+	{"body", "asc"},
+}
 
 func (h *Handler) mountComments(r chi.Router) {
 	r.Get("/comments", h.commentList)
@@ -102,17 +119,97 @@ func (h *Handler) renderCommentSettingsWith(w http.ResponseWriter, r *http.Reque
 
 type commentsListPageData struct {
 	pageBase
-	Messages []domain.Message
+	Messages    []domain.Message
+	Search      string
+	StatusRaw   string // "" | "waiting" | "approved" | "hidden" — for filter-tab active state
+	SortLinks   map[string]sortLink
+	FilterLinks map[string]string // "all"/"waiting"/... -> href preserving q/sort/dir
+	// ClearSearchHref drops q= while keeping the active status filter
+	// and sort. Computed in the handler because the template can't
+	// derive it from FilterLinks (FilterLinks keys are the four named
+	// statuses, but StatusRaw can be "" — indexing FilterLinks[""]
+	// would return the empty string and break the clear link).
+	ClearSearchHref string
+	Pager           pagerView
+	TotalCount      int64
 }
 
 func (h *Handler) commentList(w http.ResponseWriter, r *http.Request) {
-	filter := parseMessageStatusFilter(r.URL.Query().Get("status"))
-	messages, err := h.Store.ListMessagesForAdmin(r.Context(), h.wid(), filter, adminCommentListLimit)
+	q := r.URL.Query()
+	statusRaw := q.Get("status")
+
+	search := repo.NormalizeSearch(q.Get("q"))
+	sortRaw := q.Get("sort")
+	dirRaw := q.Get("dir")
+	sortKey := repo.ParseMessageSortKey(sortRaw)
+	sortDir := repo.ParseSortDir(dirRaw)
+	// echoSortKey / echoSortDir are what gets re-embedded in generated
+	// URLs. Empty when the user didn't pass ?sort= / ?dir= explicitly,
+	// so the default-sort landing URLs stay clean instead of carrying
+	// a redundant ?sort=posted&dir=desc that the user never picked.
+	echoSortKey := ""
+	if sortRaw != "" {
+		echoSortKey = sortKey.String()
+	}
+	echoSortDir := ""
+	if dirRaw != "" {
+		echoSortDir = sortDirString(sortDir)
+	}
+
+	listQ := repo.ListMessagesQuery{
+		Filter:  parseMessageStatusFilter(statusRaw),
+		Search:  search,
+		SortBy:  sortKey,
+		SortDir: sortDir,
+		Limit:   adminCommentPageSize,
+	}
+
+	total, err := h.Store.CountMessagesForAdmin(r.Context(), h.wid(), listQ)
+	if err != nil {
+		log.Printf("admin.commentList: count: %v", err)
+		http.Error(w, "failed to list comments", http.StatusInternalServerError)
+		return
+	}
+	page, totalPages, offset := listPagination(q.Get("page"), total, adminCommentPageSize)
+	listQ.Offset = offset
+
+	messages, err := h.Store.ListMessagesForAdmin(r.Context(), h.wid(), listQ)
 	if err != nil {
 		log.Printf("admin.commentList: %v", err)
 		http.Error(w, "failed to list comments", http.StatusInternalServerError)
 		return
 	}
+
+	extras := map[string]string{"status": statusRaw}
+	state := listURLState{
+		BasePath: root(r) + "/admin/comments",
+		Search:   search,
+		SortKey:  echoSortKey,
+		SortDir:  echoSortDir,
+		Page:     page,
+		Extras:   extras,
+	}
+	sortLinks := make(map[string]sortLink, len(commentSortColumns))
+	for _, col := range commentSortColumns {
+		sortLinks[col.Key] = sortLink{
+			Href:  state.hrefSort(col.Key, col.DefaultDir),
+			Class: state.classFor(col.Key),
+		}
+	}
+	// Filter tabs preserve q / sort / dir but flip ?status= (and reset
+	// to page 1 since switching tabs invalidates the previous index).
+	filterLinks := map[string]string{
+		"all":      commentFilterHref(root(r), search, echoSortKey, echoSortDir, ""),
+		"waiting":  commentFilterHref(root(r), search, echoSortKey, echoSortDir, "waiting"),
+		"approved": commentFilterHref(root(r), search, echoSortKey, echoSortDir, "approved"),
+		"hidden":   commentFilterHref(root(r), search, echoSortKey, echoSortDir, "hidden"),
+	}
+	// Clear-search href: keep the active status + sort, drop q. Built
+	// here (not in FilterLinks) so it works for the empty-status
+	// "all comments" landing too.
+	clearSearchHref := commentFilterHref(root(r), "", echoSortKey, echoSortDir, statusRaw)
+	prev, next := pagerNeighbours(page, totalPages)
+
 	renderMain(w, r, pageCommentsList, commentsListPageData{
 		pageBase: pageBase{
 			Title:      tr(r, "comments.title"),
@@ -120,22 +217,53 @@ func (h *Handler) commentList(w http.ResponseWriter, r *http.Request) {
 			CSRFToken:  csrf.Token(r.Context()),
 			User:       session.UserFrom(r.Context()),
 		},
-		Messages: messages,
+		Messages:        messages,
+		Search:          search,
+		StatusRaw:       statusRaw,
+		SortLinks:       sortLinks,
+		FilterLinks:     filterLinks,
+		ClearSearchHref: clearSearchHref,
+		Pager: pagerView{
+			Page:       page,
+			TotalPages: totalPages,
+			PrevHref:   state.hrefPage(prev),
+			NextHref:   state.hrefPage(next),
+		},
+		TotalCount: total,
 	})
 }
 
-// parseMessageStatusFilter maps the ?status= query value to a MessageStatus
-// for the repo layer, or returns a sentinel value that disables the filter.
-func parseMessageStatusFilter(raw string) domain.MessageStatus {
+// commentFilterHref builds the URL for a filter tab. The tabs sit
+// outside the listURLState mechanism because they themselves change
+// the Extras value; reusing listURLState would force a redundant
+// per-tab listURLState construction.
+func commentFilterHref(basePath, search, sortKey, sortDir, status string) string {
+	state := listURLState{
+		BasePath: basePath + "/admin/comments",
+		Search:   search,
+		SortKey:  sortKey,
+		SortDir:  sortDir,
+		Extras:   map[string]string{"status": status},
+	}
+	return state.encode(state)
+}
+
+// parseMessageStatusFilter maps the ?status= query value to a pointer
+// for ListMessagesQuery.Filter. Empty / unknown values return nil so
+// the repo layer renders "no status filter".
+func parseMessageStatusFilter(raw string) *domain.MessageStatus {
+	var s domain.MessageStatus
 	switch raw {
 	case "waiting":
-		return domain.MessageWaiting
+		s = domain.MessageWaiting
 	case "approved":
-		return domain.MessageApproved
+		s = domain.MessageApproved
 	case "hidden":
-		return domain.MessageHidden
+		s = domain.MessageHidden
+	default:
+		return nil
 	}
-	return domain.MessageStatus(-99)
+	return &s
 }
 
 func (h *Handler) commentApprove(w http.ResponseWriter, r *http.Request) {

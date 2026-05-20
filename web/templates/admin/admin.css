@@ -966,6 +966,11 @@ table.listing td.cell-clamp-host {
 .list-search button:hover { background: var(--accent-soft); color: var(--accent-hover); }
 .list-search-clear { color: var(--text-muted); font-size: 0.8rem; }
 
+/* Filter tabs on the comments list — flat inline links, the active
+   one bolded + accented so the moderator can tell at a glance which
+   status they're filtered to. */
+.filter-tabs a.active { color: var(--accent); font-weight: 600; }
+
 /* Sortable column headers — only the active column shows an arrow;
    inactive columns underline on hover to hint they're clickable.
    The arrow is drawn via ::after so the click target is the whole
