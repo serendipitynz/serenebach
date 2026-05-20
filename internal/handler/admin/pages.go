@@ -41,26 +41,69 @@ type pageRow struct {
 
 type pagesListPageData struct {
 	pageBase
-	Pages []pageRow
-	Flash string
+	Pages      []pageRow
+	Flash      string
+	Search     string
+	SortLinks  map[string]sortLink
+	TotalCount int64
+}
+
+// pageSortColumns lists the sortable columns of the admin page list
+// with the direction used on first click. The historical default
+// (sort_order) is not in this list because it has no header to click;
+// users restore it by clearing query params (e.g. clicking the
+// sidebar "固定ページ" link).
+var pageSortColumns = []struct {
+	Key        string
+	DefaultDir string
+}{
+	{"title", "asc"},
+	{"slug", "asc"},
+	{"template", "asc"},
+	{"status", "asc"},
+	{"updated", "desc"},
 }
 
 func (h *Handler) pageList(w http.ResponseWriter, r *http.Request) {
-	pages, err := h.Store.ListPagesForAdmin(r.Context(), h.wid())
+	q := r.URL.Query()
+	u := session.UserFrom(r.Context())
+
+	search := repo.NormalizeSearch(q.Get("q"))
+	sortRaw := q.Get("sort")
+	sortKey := repo.ParsePageSortKey(sortRaw)
+	sortDir := repo.ParseSortDir(q.Get("dir"))
+	// When the user hasn't explicitly picked a sort yet, default to
+	// sort_order ASC so a manually-reordered list renders the way the
+	// admin set it up. ParseSortDir would otherwise give us DESC.
+	if sortRaw == "" {
+		sortDir = repo.SortAsc
+	}
+
+	listQ := repo.ListPagesQuery{
+		Search:  search,
+		SortBy:  sortKey,
+		SortDir: sortDir,
+	}
+	// Regular-tier authors only see their own pages. Pushed into SQL
+	// for consistency with the entries handler; no pagination here
+	// so the practical difference is small, but the SQL path stays
+	// readable when someone copies this pattern elsewhere.
+	if u != nil && u.Role == domain.RoleRegular {
+		ownerID := u.ID
+		listQ.OwnerID = &ownerID
+	}
+
+	total, err := h.Store.CountPagesForAdmin(r.Context(), h.wid(), listQ)
+	if err != nil {
+		log.Printf("admin.pageList: count: %v", err)
+		http.Error(w, "failed to list pages", http.StatusInternalServerError)
+		return
+	}
+	pages, err := h.Store.ListPagesForAdmin(r.Context(), h.wid(), listQ)
 	if err != nil {
 		log.Printf("admin.pageList: %v", err)
 		http.Error(w, "failed to list pages", http.StatusInternalServerError)
 		return
-	}
-	u := session.UserFrom(r.Context())
-	if u != nil {
-		filtered := make([]domain.Page, 0, len(pages))
-		for _, p := range pages {
-			if u.CanEditEntry(p.AuthorID) {
-				filtered = append(filtered, p)
-			}
-		}
-		pages = filtered
 	}
 	templates, err := h.Store.ListTemplatesForAdmin(r.Context(), h.wid())
 	if err != nil {
@@ -78,15 +121,39 @@ func (h *Handler) pageList(w http.ResponseWriter, r *http.Request) {
 		}
 		rows = append(rows, pageRow{Page: p, TemplateName: name})
 	}
+
+	state := listURLState{
+		BasePath: root(r) + "/admin/pages",
+		Search:   search,
+		SortKey:  sortKey.String(),
+		SortDir:  sortDirString(sortDir),
+	}
+	// Don't echo the synthetic "default" sort back into URLs — the
+	// canonical landing page has no ?sort= at all.
+	if sortKey == repo.PageSortDefault {
+		state.SortKey = ""
+		state.SortDir = ""
+	}
+	sortLinks := make(map[string]sortLink, len(pageSortColumns))
+	for _, col := range pageSortColumns {
+		sortLinks[col.Key] = sortLink{
+			Href:  state.hrefSort(col.Key, col.DefaultDir),
+			Class: state.classFor(col.Key),
+		}
+	}
+
 	renderMain(w, r, pagePagesList, pagesListPageData{
 		pageBase: pageBase{
 			Title:      tr(r, "pages.list.title"),
 			ActiveMenu: "pages",
 			CSRFToken:  csrf.Token(r.Context()),
-			User:       session.UserFrom(r.Context()),
+			User:       u,
 		},
-		Pages: rows,
-		Flash: r.URL.Query().Get("ok"),
+		Pages:      rows,
+		Flash:      q.Get("ok"),
+		Search:     search,
+		SortLinks:  sortLinks,
+		TotalCount: total,
 	})
 }
 
@@ -176,7 +243,7 @@ func (h *Handler) renderPageForm(w http.ResponseWriter, r *http.Request, action 
 // any existing page slug, either exactly or as a prefix/child.  The
 // excludeID argument lets updates skip the page being edited.
 func validatePageSlug(ctx context.Context, store *repo.Store, wid int64, slug string, excludeID int64) error {
-	pages, err := store.ListPagesForAdmin(ctx, wid)
+	pages, err := store.ListPagesForAdmin(ctx, wid, repo.ListPagesQuery{})
 	if err != nil {
 		return err
 	}

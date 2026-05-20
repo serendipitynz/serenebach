@@ -5,18 +5,25 @@
 
 <div class="panel">
   <div class="panel-head">
-    <h2>{{Tf "pages.heading" (len .Pages)}}</h2>
+    <h2>{{Tf "pages.heading" .TotalCount}}</h2>
+    <form method="get" action="{{Root}}/admin/pages" class="list-search" role="search">
+      <input type="search" name="q" value="{{.Search}}"
+             placeholder="{{T `pages.search.placeholder`}}"
+             aria-label="{{T `pages.search.label`}}">
+      <button type="submit">{{T "common.search"}}</button>
+      {{if .Search}}<a href="{{Root}}/admin/pages" class="list-search-clear">{{T "common.search.clear"}}</a>{{end}}
+    </form>
     <a href="{{Root}}/admin/pages/new" class="more">{{T "pages.form.newPage"}} →</a>
   </div>
   <div class="panel-body">
     {{if .Pages}}
-    <table class="listing listing-cards">
+    <table class="listing listing-cards listing-sortable">
       <thead><tr>
-        <th class="col-flex-wide">{{T "common.col.title"}}</th>
-        <th class="col-flex">{{T "pages.col.path"}}</th>
-        <th class="col-flex">{{T "pages.col.template"}}</th>
-        <th class="col-status">{{T "common.col.status"}}</th>
-        <th class="col-datetime">{{T "common.col.updated"}}</th>
+        <th class="col-flex-wide"><a href="{{(index .SortLinks `title`).Href}}" class="sort-link {{(index .SortLinks `title`).Class}}">{{T "common.col.title"}}</a></th>
+        <th class="col-flex"><a href="{{(index .SortLinks `slug`).Href}}" class="sort-link {{(index .SortLinks `slug`).Class}}">{{T "pages.col.path"}}</a></th>
+        <th class="col-flex"><a href="{{(index .SortLinks `template`).Href}}" class="sort-link {{(index .SortLinks `template`).Class}}">{{T "pages.col.template"}}</a></th>
+        <th class="col-status"><a href="{{(index .SortLinks `status`).Href}}" class="sort-link {{(index .SortLinks `status`).Class}}">{{T "common.col.status"}}</a></th>
+        <th class="col-datetime"><a href="{{(index .SortLinks `updated`).Href}}" class="sort-link {{(index .SortLinks `updated`).Class}}">{{T "common.col.updated"}}</a></th>
         <th class="col-actions">{{T "common.col.action"}}</th>
       </tr></thead>
       <tbody>
@@ -40,7 +47,7 @@
       </tbody>
     </table>
     {{else}}
-      <p class="hint">{{T "pages.empty"}}</p>
+      <p class="hint">{{if .Search}}{{T "pages.searchEmpty"}}{{else}}{{T "pages.empty"}}{{end}}</p>
     {{end}}
   </div>
 </div>

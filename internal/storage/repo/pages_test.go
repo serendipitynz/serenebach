@@ -78,7 +78,7 @@ func pageCRUDListAdminIncludesDrafts(t *testing.T, ctx context.Context, s *Store
 	}); err != nil {
 		t.Fatalf("CreatePage draft: %v", err)
 	}
-	all, err := s.ListPagesForAdmin(ctx, 1)
+	all, err := s.ListPagesForAdmin(ctx, 1, ListPagesQuery{})
 	if err != nil {
 		t.Fatalf("ListPagesForAdmin: %v", err)
 	}
