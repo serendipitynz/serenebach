@@ -47,12 +47,12 @@ type settingsAIPageData struct {
 
 	// MCP panel (admin-only). Empty slice when the signed-in user
 	// isn't an admin; the template gates rendering on .CanManageUsers.
-	Tokens         []mcpTokenRow
-	Users          []domain.User
-	Audit          []mcpAuditRow
-	NewRawToken    string
-	NewTokenID     int64
-	MCPSortLinks   map[string]sortLink
+	Tokens       []mcpTokenRow
+	Users        []domain.User
+	Audit        []mcpAuditRow
+	NewRawToken  string
+	NewTokenID   int64
+	MCPSortLinks map[string]sortLink
 
 	// Ops reflects the env-var snapshot for the MCP-audit state
 	// chip rendered next to the panel header when the admin cares

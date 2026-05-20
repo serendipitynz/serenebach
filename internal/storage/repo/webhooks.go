@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/serendipitynz/serenebach/internal/domain"
@@ -19,14 +20,114 @@ const webhookColumns = `id, wid, url, secret, events, active, payload_format, cr
 // webhook_deliveries. Same contract as the webhooks list.
 const webhookDeliveryColumns = `id, webhook_id, event, delivery_id, payload, status_code, error, delivered_at, created_at`
 
-// ListWebhooks returns every webhook subscription for the given weblog,
-// newest first.
-func (s *Store) ListWebhooks(ctx context.Context, wid int64) ([]domain.Webhook, error) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT `+webhookColumns+`
-		FROM webhooks
-		WHERE wid = ?
-		ORDER BY id DESC`, wid)
+// WebhookSortKey is a typed enum of the columns the admin webhook
+// list can sort by. Default is created_at DESC — most-recently-
+// registered first, the same shape as the MCP token list.
+type WebhookSortKey int
+
+const (
+	WebhookSortCreatedAt WebhookSortKey = iota // default
+	WebhookSortURL
+	WebhookSortActive
+	WebhookSortFormat
+	WebhookSortLastAt
+	WebhookSortLastStatus
+)
+
+// String returns the URL-form name of the sort key.
+func (k WebhookSortKey) String() string {
+	switch k {
+	case WebhookSortURL:
+		return "url"
+	case WebhookSortActive:
+		return "active"
+	case WebhookSortFormat:
+		return "format"
+	case WebhookSortLastAt:
+		return "lastAt"
+	case WebhookSortLastStatus:
+		return "lastStatus"
+	default:
+		return ""
+	}
+}
+
+// ParseWebhookSortKey maps a ?sort= query value to the enum.
+func ParseWebhookSortKey(s string) WebhookSortKey {
+	switch s {
+	case "url":
+		return WebhookSortURL
+	case "active":
+		return WebhookSortActive
+	case "format":
+		return WebhookSortFormat
+	case "lastAt":
+		return WebhookSortLastAt
+	case "lastStatus":
+		return WebhookSortLastStatus
+	default:
+		return WebhookSortCreatedAt
+	}
+}
+
+// ListWebhooksQuery bundles the admin webhook list's sort parameters.
+// No search / paging — the list is capped at maxWebhooks (50) in the
+// admin form, so paging would be permanently single-page anyway.
+type ListWebhooksQuery struct {
+	SortBy  WebhookSortKey
+	SortDir SortDir
+}
+
+// webhookLatestDeliveredAtExpr / webhookLatestStatusCodeExpr are the
+// correlated subqueries the ORDER BY clauses use for the "last
+// delivery" columns. Inlined because each call site needs the same
+// expression twice (once for the NULL-handling CASE, once for the
+// actual ordering).
+const webhookLatestDeliveredAtExpr = `(SELECT delivered_at FROM webhook_deliveries WHERE webhook_id = webhooks.id ORDER BY id DESC LIMIT 1)`
+const webhookLatestStatusCodeExpr = `(SELECT status_code FROM webhook_deliveries WHERE webhook_id = webhooks.id ORDER BY id DESC LIMIT 1)`
+
+// orderClause writes the ORDER BY fragment for `k` directly to b,
+// including direction and any NULLS-LAST handling. lastAt /
+// lastStatus join through a correlated subquery and need an explicit
+// "NULL sorts last" pass because SQLite would otherwise put never-
+// delivered webhooks on top in ASC order.
+func (k WebhookSortKey) writeOrderBy(b *strings.Builder, d SortDir) {
+	switch k {
+	case WebhookSortURL:
+		b.WriteString(`url `)
+		b.WriteString(d.String())
+	case WebhookSortActive:
+		b.WriteString(`active `)
+		b.WriteString(d.String())
+	case WebhookSortFormat:
+		b.WriteString(`payload_format `)
+		b.WriteString(d.String())
+	case WebhookSortLastAt:
+		fmt.Fprintf(b, `CASE WHEN %s IS NULL THEN 1 ELSE 0 END, %s %s`,
+			webhookLatestDeliveredAtExpr, webhookLatestDeliveredAtExpr, d.String())
+	case WebhookSortLastStatus:
+		fmt.Fprintf(b, `CASE WHEN %s IS NULL THEN 1 ELSE 0 END, %s %s`,
+			webhookLatestStatusCodeExpr, webhookLatestStatusCodeExpr, d.String())
+	default:
+		b.WriteString(`created_at `)
+		b.WriteString(d.String())
+	}
+}
+
+// ListWebhooks returns every webhook subscription for the given weblog
+// ordered by q. Zero-value query reproduces the legacy "ORDER BY id
+// DESC" behaviour via the WebhookSortCreatedAt default + the id
+// tie-breaker (id correlates with created_at for any monotonic-id
+// table).
+func (s *Store) ListWebhooks(ctx context.Context, wid int64, q ListWebhooksQuery) ([]domain.Webhook, error) {
+	var b strings.Builder
+	b.WriteString(`SELECT ` + webhookColumns + ` FROM webhooks WHERE wid = ? ORDER BY `)
+	q.SortBy.writeOrderBy(&b, q.SortDir)
+	// Stable tie-breaker. For the default sort this also degrades the
+	// SQL back into "ORDER BY created_at DESC, id DESC" — i.e. the
+	// pre-refactor order.
+	b.WriteString(`, id DESC`)
+	rows, err := s.db.QueryContext(ctx, b.String(), wid)
 	if err != nil {
 		return nil, fmt.Errorf("repo: ListWebhooks: %w", err)
 	}

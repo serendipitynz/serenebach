@@ -33,7 +33,7 @@ func TestTagList_DefaultSortsByNameAsc(t *testing.T) {
 	apple := strings.Index(body, "apple")
 	banana := strings.Index(body, "banana")
 	cherry := strings.Index(body, "cherry")
-	if !(apple < banana && banana < cherry) {
+	if apple >= banana || banana >= cherry {
 		t.Errorf("name ASC: positions apple=%d banana=%d cherry=%d", apple, banana, cherry)
 	}
 }
@@ -54,4 +54,3 @@ func TestTagList_SortByIDToggles(t *testing.T) {
 		t.Error("active id column should toggle to asc on next click")
 	}
 }
-
