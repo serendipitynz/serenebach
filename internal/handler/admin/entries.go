@@ -22,7 +22,27 @@ import (
 	"github.com/serendipitynz/serenebach/internal/storage/repo"
 )
 
-const adminEntryListLimit = 200
+// adminEntryPageSize is the per-page row count for the admin entry
+// list. Aligned with the comments list pager so the UI feels
+// consistent; images stay at their grid-friendly 48.
+const adminEntryPageSize = 50
+
+// entrySortColumns lists the sortable columns of the admin entry list
+// along with the direction used the first time a user clicks an
+// otherwise-inactive column header (subsequent clicks toggle). Time
+// columns default to descending — newest first — while text columns
+// default to ascending.
+var entrySortColumns = []struct {
+	Key        string
+	DefaultDir string
+}{
+	{"id", "desc"},
+	{"title", "asc"},
+	{"slug", "asc"},
+	{"category", "asc"},
+	{"posted", "desc"},
+	{"status", "asc"},
+}
 
 // mountEntries registers the /admin/entries/* routes. Called from
 // MountProtected so the RequireUser middleware already wraps this group.
@@ -99,27 +119,52 @@ type entryRow struct {
 
 type entriesListPageData struct {
 	pageBase
-	Entries []entryRow
-	Flash   string
+	Entries    []entryRow
+	Flash      string
+	Search     string
+	SortLinks  map[string]sortLink
+	Pager      pagerView
+	TotalCount int64
 }
 
 func (h *Handler) entryList(w http.ResponseWriter, r *http.Request) {
-	entries, err := h.Store.ListEntriesForAdmin(r.Context(), h.wid(), adminEntryListLimit)
+	q := r.URL.Query()
+	u := session.UserFrom(r.Context())
+
+	search := repo.NormalizeSearch(q.Get("q"))
+	sortKey := repo.ParseEntrySortKey(q.Get("sort"))
+	sortDir := repo.ParseSortDir(q.Get("dir"))
+
+	listQ := repo.ListEntriesQuery{
+		Search:  search,
+		SortBy:  sortKey,
+		SortDir: sortDir,
+		Limit:   adminEntryPageSize,
+	}
+	// Regular-tier authors only see their own entries; pushing this
+	// into SQL keeps pagination correct (post-filtering would yield
+	// short pages and a wrong totalCount).
+	if u != nil && u.Role == domain.RoleRegular {
+		ownerID := u.ID
+		listQ.OwnerID = &ownerID
+	}
+
+	total, err := h.Store.CountEntriesForAdmin(r.Context(), h.wid(), listQ)
+	if err != nil {
+		log.Printf("admin.entryList: count: %v", err)
+		http.Error(w, "failed to list entries", http.StatusInternalServerError)
+		return
+	}
+	page, totalPages, offset := listPagination(q.Get("page"), total, adminEntryPageSize)
+	listQ.Offset = offset
+
+	entries, err := h.Store.ListEntriesForAdmin(r.Context(), h.wid(), listQ)
 	if err != nil {
 		log.Printf("admin.entryList: %v", err)
 		http.Error(w, "failed to list entries", http.StatusInternalServerError)
 		return
 	}
-	u := session.UserFrom(r.Context())
-	if u != nil {
-		filtered := make([]domain.Entry, 0, len(entries))
-		for _, e := range entries {
-			if u.CanEditEntry(e.AuthorID) {
-				filtered = append(filtered, e)
-			}
-		}
-		entries = filtered
-	}
+
 	catIDs := make([]int64, 0, len(entries))
 	for _, e := range entries {
 		catIDs = append(catIDs, e.CategoryID)
@@ -137,16 +182,50 @@ func (h *Handler) entryList(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, entryRow{Entry: e, CategoryName: name})
 	}
 
+	state := listURLState{
+		BasePath: root(r) + "/admin/entries",
+		Search:   search,
+		SortKey:  sortKey.String(),
+		SortDir:  sortDirString(sortDir),
+		Page:     page,
+	}
+	sortLinks := make(map[string]sortLink, len(entrySortColumns))
+	for _, col := range entrySortColumns {
+		sortLinks[col.Key] = sortLink{
+			Href:  state.hrefSort(col.Key, col.DefaultDir),
+			Class: state.classFor(col.Key),
+		}
+	}
+	prev, next := pagerNeighbours(page, totalPages)
+
 	renderMain(w, r, pageEntriesList, entriesListPageData{
 		pageBase: pageBase{
 			Title:      tr(r, "entries.list.title"),
 			ActiveMenu: "entries",
 			CSRFToken:  csrf.Token(r.Context()),
-			User:       session.UserFrom(r.Context()),
+			User:       u,
 		},
-		Entries: rows,
-		Flash:   r.URL.Query().Get("ok"),
+		Entries:   rows,
+		Flash:     q.Get("ok"),
+		Search:    search,
+		SortLinks: sortLinks,
+		Pager: pagerView{
+			Page:       page,
+			TotalPages: totalPages,
+			PrevHref:   state.hrefPage(prev),
+			NextHref:   state.hrefPage(next),
+		},
+		TotalCount: total,
 	})
+}
+
+// sortDirString is the inverse of repo.ParseSortDir — returns the
+// lowercase token used in URL params and CSS class names.
+func sortDirString(d repo.SortDir) string {
+	if d == repo.SortAsc {
+		return "asc"
+	}
+	return "desc"
 }
 
 // ---- new / edit shared form --------------------------------------------

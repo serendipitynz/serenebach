@@ -239,10 +239,15 @@
   "common.dragToReorder": "ドラッグして並び替えできます",
   "pager.prev": "← 前のページ",
   "pager.next": "次のページ →",
+  "common.search": "検索",
+  "common.search.clear": "クリア",
 
   "entries.title": "記事リスト",
   "entries.heading": "記事 (%d)",
   "entries.empty": "まだ記事がありません。",
+  "entries.searchEmpty": "該当する記事はありません。",
+  "entries.search.placeholder": "タイトル・本文・キーワード・slug で検索",
+  "entries.search.label": "記事を検索",
 
   "entries.form.titleLabel": "タイトル",
   "entries.form.titleNew": "新規記事",

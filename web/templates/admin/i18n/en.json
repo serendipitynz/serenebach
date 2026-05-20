@@ -239,10 +239,15 @@
   "common.dragToReorder": "Drag to reorder",
   "pager.prev": "← Previous",
   "pager.next": "Next →",
+  "common.search": "Search",
+  "common.search.clear": "Clear",
 
   "entries.title": "Entries",
   "entries.heading": "Entries (%d)",
   "entries.empty": "No entries yet.",
+  "entries.searchEmpty": "No entries match your search.",
+  "entries.search.placeholder": "Search by title, body, keyword, or slug",
+  "entries.search.label": "Search entries",
 
   "entries.form.titleLabel": "Title",
   "entries.form.titleNew": "New entry",

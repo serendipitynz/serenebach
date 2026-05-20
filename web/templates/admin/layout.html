@@ -188,3 +188,18 @@
 <script src="{{Root}}/admin/static/admin.js" defer></script>
 </body>
 </html>{{end}}
+
+{{/*
+Shared pager partial. Pass a pagerView (see internal/handler/admin/pagination.go).
+PrevHref / NextHref are precomputed in the handler so the template stays
+state-free — the empty string renders the arrow as disabled.
+*/}}
+{{define "pager"}}
+{{if gt .TotalPages 1}}
+<nav class="pager" aria-label="pagination">
+  {{if .PrevHref}}<a href="{{.PrevHref}}" rel="prev">{{T "pager.prev"}}</a>{{else}}<span class="disabled" aria-disabled="true">{{T "pager.prev"}}</span>{{end}}
+  <span class="pager-state">{{.Page}} / {{.TotalPages}}</span>
+  {{if .NextHref}}<a href="{{.NextHref}}" rel="next">{{T "pager.next"}}</a>{{else}}<span class="disabled" aria-disabled="true">{{T "pager.next"}}</span>{{end}}
+</nav>
+{{end}}
+{{end}}

@@ -937,6 +937,56 @@ table.listing td.cell-clamp-host {
 .pager .pager-state { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .pager .disabled { color: var(--text-faint); pointer-events: none; }
 
+/* List search form — sits in the panel head between heading and the
+   "new" link. Stays inline on desktop; wraps under the heading on
+   narrow viewports so the new-link doesn't shrink. */
+.list-search {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 auto 0 1rem;
+  font-size: 0.85rem;
+}
+.list-search input[type="search"] {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  min-width: 14rem;
+}
+.list-search button {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+  color: var(--text);
+  cursor: pointer;
+}
+.list-search button:hover { background: var(--accent-soft); color: var(--accent-hover); }
+.list-search-clear { color: var(--text-muted); font-size: 0.8rem; }
+
+/* Sortable column headers — only the active column shows an arrow;
+   inactive columns underline on hover to hint they're clickable.
+   The arrow is drawn via ::after so the click target is the whole
+   cell text. */
+table.listing-sortable thead .sort-link {
+  color: inherit;
+  text-decoration: none;
+  display: inline-block;
+  width: 100%;
+}
+table.listing-sortable thead .sort-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+table.listing-sortable thead .sort-link.active {
+  color: var(--accent);
+  font-weight: 600;
+}
+table.listing-sortable thead .sort-link.asc::after { content: " ▲"; }
+table.listing-sortable thead .sort-link.desc::after { content: " ▼"; }
+
 .image-gallery {
   list-style: none;
   margin: 0;

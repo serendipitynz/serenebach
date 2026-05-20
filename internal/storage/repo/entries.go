@@ -18,6 +18,11 @@ import (
 // order in scanEntryOrNotFound / scanEntries and the inline Scans.
 const entryColumns = `id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned, accept_comments`
 
+// entryColumnsE is entryColumns qualified with the `e.` alias for
+// queries that join other tables (notably the admin list, which joins
+// categories to allow sort-by-category-name).
+const entryColumnsE = `e.id, e.wid, e.author_id, e.category_id, e.title, e.slug, e.keywords, e.body, e.more, e.format, e.status, e.posted_at, e.updated_at, e.likes_count, e.stamps_count, e.comments_count, e.og_bg_image_path, e.pinned, e.accept_comments`
+
 // EntryByID returns one entry by id and weblog id. ErrNotFound when missing.
 // The caller decides how to treat the entry's status (e.g. 410 vs 200) —
 // this layer returns closed/draft rows exactly as stored.
@@ -109,20 +114,195 @@ func (s *Store) CountEntriesByStatus(ctx context.Context, wid int64, status doma
 	return n, nil
 }
 
-// ListEntriesForAdmin returns every entry regardless of status, newest first,
-// for the admin entries table. Status filtering is handled client-side.
-func (s *Store) ListEntriesForAdmin(ctx context.Context, wid int64, limit int) ([]domain.Entry, error) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT `+entryColumns+`
-		FROM entries
-		WHERE wid = ?
-		ORDER BY posted_at DESC
-		LIMIT ?`, wid, limit)
+// EntrySortKey is a typed enum of the columns the admin entry list can
+// sort by. Handlers map ?sort= strings to one of these via
+// ParseEntrySortKey; the orderClause method emits the qualified SQL
+// fragment so handlers can't smuggle raw SQL into ORDER BY.
+type EntrySortKey int
+
+const (
+	EntrySortPostedAt EntrySortKey = iota // default
+	EntrySortUpdatedAt
+	EntrySortID
+	EntrySortTitle
+	EntrySortSlug
+	EntrySortCategory
+	EntrySortStatus
+)
+
+// orderClause returns the SQL fragment to use after ORDER BY. Always
+// qualified with the entries alias `e` (or `c` for the JOINed
+// categories table); pair only with a SortDir whose String() is also
+// in a closed value space.
+func (k EntrySortKey) orderClause() string {
+	switch k {
+	case EntrySortUpdatedAt:
+		return "e.updated_at"
+	case EntrySortID:
+		return "e.id"
+	case EntrySortTitle:
+		return "e.title"
+	case EntrySortSlug:
+		return "e.slug"
+	case EntrySortCategory:
+		// LEFT JOIN'd in ListEntriesForAdmin so c.name resolves.
+		// NULL category (uncategorised) sorts as empty string.
+		return "COALESCE(c.name, '')"
+	case EntrySortStatus:
+		return "e.status"
+	default:
+		return "e.posted_at"
+	}
+}
+
+// String returns the URL-form name of the sort key, matching the
+// strings ParseEntrySortKey accepts. Kept symmetric so handlers can
+// echo the current sort back into hidden inputs and pager links.
+func (k EntrySortKey) String() string {
+	switch k {
+	case EntrySortUpdatedAt:
+		return "updated"
+	case EntrySortID:
+		return "id"
+	case EntrySortTitle:
+		return "title"
+	case EntrySortSlug:
+		return "slug"
+	case EntrySortCategory:
+		return "category"
+	case EntrySortStatus:
+		return "status"
+	default:
+		return "posted"
+	}
+}
+
+// ParseEntrySortKey maps a ?sort= query value to the corresponding
+// enum. Unknown / empty values fall back to EntrySortPostedAt so a
+// malformed bookmark never 404s.
+func ParseEntrySortKey(s string) EntrySortKey {
+	switch s {
+	case "updated":
+		return EntrySortUpdatedAt
+	case "id":
+		return EntrySortID
+	case "title":
+		return EntrySortTitle
+	case "slug":
+		return EntrySortSlug
+	case "category":
+		return EntrySortCategory
+	case "status":
+		return EntrySortStatus
+	default:
+		return EntrySortPostedAt
+	}
+}
+
+// ListEntriesQuery bundles the admin entry list's filter / sort / page
+// parameters. Zero-value fields mean "no constraint" — the default
+// produces the legacy behaviour (newest first, no filter, no paging).
+type ListEntriesQuery struct {
+	// OwnerID, when non-nil, restricts results to entries authored by
+	// that user. Used to enforce CanEditEntry for the regular tier
+	// at the SQL layer so pagination stays consistent.
+	OwnerID *int64
+	// Search is a normalized LIKE needle matched against title, body,
+	// more, keywords, and slug. Empty means no search filter.
+	Search  string
+	SortBy  EntrySortKey
+	SortDir SortDir
+	// Limit <= 0 disables LIMIT (returns every match). Offset is
+	// applied only when Limit > 0.
+	Limit  int
+	Offset int
+}
+
+// ListEntriesForAdmin returns every entry matching q. Designed for the
+// admin entries table — supports server-side search, sort, and
+// pagination so the page can render any slice of a large weblog
+// without loading every row. Status filtering is intentionally
+// unhandled; callers that need it can build on top.
+func (s *Store) ListEntriesForAdmin(ctx context.Context, wid int64, q ListEntriesQuery) ([]domain.Entry, error) {
+	sqlText, args := buildEntriesListSQL(wid, q)
+	rows, err := s.db.QueryContext(ctx, sqlText, args...)
 	if err != nil {
 		return nil, fmt.Errorf("repo: ListEntriesForAdmin: %w", err)
 	}
 	defer rows.Close()
 	return scanEntries(rows)
+}
+
+// CountEntriesForAdmin returns how many rows ListEntriesForAdmin would
+// produce ignoring Limit / Offset. Lets pagers compute totalPages
+// without scanning the whole result set.
+func (s *Store) CountEntriesForAdmin(ctx context.Context, wid int64, q ListEntriesQuery) (int64, error) {
+	sqlText, args := buildEntriesCountSQL(wid, q)
+	var n int64
+	if err := s.db.QueryRowContext(ctx, sqlText, args...).Scan(&n); err != nil {
+		return 0, fmt.Errorf("repo: CountEntriesForAdmin: %w", err)
+	}
+	return n, nil
+}
+
+// buildEntriesListSQL composes the parameterised SELECT for the admin
+// entry list. ORDER BY values are pulled from typed enums
+// (EntrySortKey / SortDir) so this is the only place that string-
+// concatenates SQL — and it does so only from a closed value space.
+func buildEntriesListSQL(wid int64, q ListEntriesQuery) (string, []any) {
+	var b strings.Builder
+	b.WriteString(`SELECT ` + entryColumnsE + `
+		FROM entries e
+		LEFT JOIN categories c ON c.id = e.category_id
+		WHERE e.wid = ?`)
+	args := []any{wid}
+	appendEntriesFilters(&b, &args, q)
+	b.WriteString(` ORDER BY `)
+	b.WriteString(q.SortBy.orderClause())
+	b.WriteByte(' ')
+	b.WriteString(q.SortDir.String())
+	// Stable tie-breaker so paging is deterministic when many rows
+	// share a sort value (e.g. all drafts in a status sort).
+	b.WriteString(`, e.id DESC`)
+	if q.Limit > 0 {
+		b.WriteString(` LIMIT ?`)
+		args = append(args, q.Limit)
+		if q.Offset > 0 {
+			b.WriteString(` OFFSET ?`)
+			args = append(args, q.Offset)
+		}
+	}
+	return b.String(), args
+}
+
+// buildEntriesCountSQL is buildEntriesListSQL minus ORDER / LIMIT /
+// OFFSET / JOIN — the JOIN is only needed when sort-by-category is
+// active, and counting never sorts.
+func buildEntriesCountSQL(wid int64, q ListEntriesQuery) (string, []any) {
+	var b strings.Builder
+	b.WriteString(`SELECT COUNT(*) FROM entries e WHERE e.wid = ?`)
+	args := []any{wid}
+	appendEntriesFilters(&b, &args, q)
+	return b.String(), args
+}
+
+// appendEntriesFilters writes the WHERE-clause fragments shared between
+// list and count: owner restriction, search needle. The opening
+// `WHERE e.wid = ?` is the caller's responsibility.
+func appendEntriesFilters(b *strings.Builder, args *[]any, q ListEntriesQuery) {
+	if q.OwnerID != nil {
+		b.WriteString(` AND e.author_id = ?`)
+		*args = append(*args, *q.OwnerID)
+	}
+	if q.Search != "" {
+		needle := "%" + escapeLike(q.Search) + "%"
+		b.WriteString(` AND (e.title LIKE ? ESCAPE '\'
+			OR e.body LIKE ? ESCAPE '\'
+			OR e.more LIKE ? ESCAPE '\'
+			OR e.keywords LIKE ? ESCAPE '\'
+			OR e.slug LIKE ? ESCAPE '\')`)
+		*args = append(*args, needle, needle, needle, needle, needle)
+	}
 }
 
 // CreateEntry inserts a new entry and returns its id. Timestamps created_at
