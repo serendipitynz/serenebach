@@ -35,7 +35,7 @@ func mcpTokenCRUDCreate(t *testing.T, ctx context.Context, s *Store, rawToken st
 
 func mcpTokenCRUDList(t *testing.T, ctx context.Context, s *Store) {
 	t.Helper()
-	tokens, err := s.ListMCPTokens(ctx, 1)
+	tokens, err := s.ListMCPTokens(ctx, 1, ListMCPTokensQuery{})
 	if err != nil {
 		t.Fatalf("ListMCPTokens: %v", err)
 	}
@@ -81,7 +81,7 @@ func mcpTokenCRUDTouch(t *testing.T, ctx context.Context, s *Store, id int64) {
 	if err := s.TouchMCPToken(ctx, id); err != nil {
 		t.Fatalf("TouchMCPToken: %v", err)
 	}
-	tokens, _ := s.ListMCPTokens(ctx, 1)
+	tokens, _ := s.ListMCPTokens(ctx, 1, ListMCPTokensQuery{})
 	if tokens[0].LastUsedAt == 0 {
 		t.Error("expected LastUsedAt > 0 after TouchMCPToken")
 	}
@@ -92,7 +92,7 @@ func mcpTokenCRUDRevoke(t *testing.T, ctx context.Context, s *Store, rawToken st
 	if err := s.RevokeMCPToken(ctx, 1, id); err != nil {
 		t.Fatalf("RevokeMCPToken: %v", err)
 	}
-	tokens, _ := s.ListMCPTokens(ctx, 1)
+	tokens, _ := s.ListMCPTokens(ctx, 1, ListMCPTokensQuery{})
 	if tokens[0].Active() {
 		t.Error("expected token to be inactive after revoke")
 	}
@@ -163,11 +163,11 @@ func TestMCPTokenWIDScoping(t *testing.T) {
 	}
 
 	// ListMCPTokens should be scoped
-	tokens1, _ := s.ListMCPTokens(ctx, 1)
+	tokens1, _ := s.ListMCPTokens(ctx, 1, ListMCPTokensQuery{})
 	if len(tokens1) != 1 || tokens1[0].Name != "W1 Token" {
 		t.Errorf("ListMCPTokens wid=1 invalid")
 	}
-	tokens2, _ := s.ListMCPTokens(ctx, 2)
+	tokens2, _ := s.ListMCPTokens(ctx, 2, ListMCPTokensQuery{})
 	if len(tokens2) != 1 || tokens2[0].Name != "W2 Token" {
 		t.Errorf("ListMCPTokens wid=2 invalid")
 	}
@@ -239,7 +239,7 @@ func TestMCPTokenPrefix(t *testing.T) {
 		t.Fatalf("CreateMCPToken: %v", err)
 	}
 
-	tokens, _ := s.ListMCPTokens(ctx, 1)
+	tokens, _ := s.ListMCPTokens(ctx, 1, ListMCPTokensQuery{})
 	if tokens[0].Prefix != "abcdefghijkl" {
 		t.Errorf("prefix = %q, want abcdefghijkl (first 12 chars)", tokens[0].Prefix)
 	}
@@ -259,7 +259,7 @@ func TestMCPTokenListOrdering(t *testing.T) {
 		ids[i] = id
 	}
 
-	tokens, err := s.ListMCPTokens(ctx, 1)
+	tokens, err := s.ListMCPTokens(ctx, 1, ListMCPTokensQuery{})
 	if err != nil {
 		t.Fatalf("ListMCPTokens: %v", err)
 	}
@@ -290,7 +290,7 @@ func TestMCPTokenScopeReadList(t *testing.T) {
 		t.Fatalf("CreateMCPToken write: %v", err)
 	}
 
-	tokens, _ := s.ListMCPTokens(ctx, 1)
+	tokens, _ := s.ListMCPTokens(ctx, 1, ListMCPTokensQuery{})
 	if len(tokens) != 2 {
 		t.Fatalf("len = %d, want 2", len(tokens))
 	}
@@ -321,7 +321,7 @@ func TestMCPTokenRevokedListStillShowsIt(t *testing.T) {
 	s.RevokeMCPToken(ctx, 1, id)
 
 	// Revoked tokens still appear in ListMCPTokens so admin can audit
-	tokens, _ := s.ListMCPTokens(ctx, 1)
+	tokens, _ := s.ListMCPTokens(ctx, 1, ListMCPTokensQuery{})
 	if len(tokens) != 1 {
 		t.Fatalf("expected 1 token in list even after revoke, got %d", len(tokens))
 	}

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/serendipitynz/serenebach/internal/domain"
@@ -59,14 +60,109 @@ func (s *Store) CreateMCPToken(ctx context.Context, wid int64, name, rawToken st
 	return id, nil
 }
 
-// ListMCPTokens returns every token (active + revoked) for the weblog,
-// newest-first. The admin UI shows both so an operator can confirm
-// that a previously-revoked token is actually dead.
-func (s *Store) ListMCPTokens(ctx context.Context, wid int64) ([]domain.MCPToken, error) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT `+mcpTokenColumns+`
-		FROM mcp_tokens WHERE wid = ?
-		ORDER BY created_at DESC, id DESC`, wid)
+// MCPTokenSortKey is a typed enum of the columns the admin token list
+// can sort by. Default is created_at DESC so an operator landing on
+// the page sees the most-recently-issued tokens first.
+type MCPTokenSortKey int
+
+const (
+	MCPTokenSortCreatedAt MCPTokenSortKey = iota // default
+	MCPTokenSortName
+	MCPTokenSortScope
+	MCPTokenSortAuthor
+	MCPTokenSortLastUsed
+	MCPTokenSortRevoked
+)
+
+func (k MCPTokenSortKey) col() string {
+	switch k {
+	case MCPTokenSortName:
+		return "name"
+	case MCPTokenSortScope:
+		return "scope"
+	case MCPTokenSortAuthor:
+		return "author_id"
+	case MCPTokenSortLastUsed:
+		return "last_used_at"
+	case MCPTokenSortRevoked:
+		return "revoked_at"
+	default:
+		return "created_at"
+	}
+}
+
+// String returns the URL-form name of the sort key.
+func (k MCPTokenSortKey) String() string {
+	switch k {
+	case MCPTokenSortName:
+		return "name"
+	case MCPTokenSortScope:
+		return "scope"
+	case MCPTokenSortAuthor:
+		return "author"
+	case MCPTokenSortLastUsed:
+		return "lastUsed"
+	case MCPTokenSortRevoked:
+		return "revoked"
+	default:
+		return ""
+	}
+}
+
+// ParseMCPTokenSortKey maps a ?sort= query value to the enum.
+func ParseMCPTokenSortKey(s string) MCPTokenSortKey {
+	switch s {
+	case "name":
+		return MCPTokenSortName
+	case "scope":
+		return MCPTokenSortScope
+	case "author":
+		return MCPTokenSortAuthor
+	case "lastUsed":
+		return MCPTokenSortLastUsed
+	case "revoked":
+		return MCPTokenSortRevoked
+	default:
+		return MCPTokenSortCreatedAt
+	}
+}
+
+// zeroLast reports whether this column stores 0 as "never used /
+// never revoked" — those rows should always sort to the bottom
+// regardless of direction. last_used_at and revoked_at do; the rest
+// are real values everywhere.
+func (k MCPTokenSortKey) zeroLast() bool {
+	return k == MCPTokenSortLastUsed || k == MCPTokenSortRevoked
+}
+
+// ListMCPTokensQuery bundles the admin token list's sort parameters.
+// No search / paging — the list is small (admin-issued tokens).
+type ListMCPTokensQuery struct {
+	SortBy  MCPTokenSortKey
+	SortDir SortDir
+}
+
+// ListMCPTokens returns every token (active + revoked) for the weblog
+// in the order requested by q. The admin UI shows both active and
+// revoked rows so an operator can confirm that a previously-revoked
+// token is actually dead.
+func (s *Store) ListMCPTokens(ctx context.Context, wid int64, q ListMCPTokensQuery) ([]domain.MCPToken, error) {
+	var b strings.Builder
+	b.WriteString(`SELECT ` + mcpTokenColumns + ` FROM mcp_tokens WHERE wid = ? ORDER BY `)
+	col := q.SortBy.col()
+	if q.SortBy.zeroLast() {
+		// Rows where the column is 0 ("never used" / "never revoked")
+		// sort to the bottom both ways — those tokens have no
+		// timestamp to compare against the rest meaningfully.
+		fmt.Fprintf(&b, `CASE WHEN %s = 0 THEN 1 ELSE 0 END, %s %s`, col, col, q.SortDir.String())
+	} else {
+		b.WriteString(col)
+		b.WriteByte(' ')
+		b.WriteString(q.SortDir.String())
+	}
+	// Stable tie-breaker.
+	b.WriteString(`, id DESC`)
+	rows, err := s.db.QueryContext(ctx, b.String(), wid)
 	if err != nil {
 		return nil, fmt.Errorf("repo: ListMCPTokens: %w", err)
 	}

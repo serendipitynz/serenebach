@@ -164,15 +164,15 @@
 
     {{if .Tokens}}
     <h3 class="panel-subhead">{{Tf "settings.ops.mcp.issuedHeading" (len .Tokens)}}</h3>
-    <table class="listing mcp-token-list listing-cards">
+    <table class="listing mcp-token-list listing-cards listing-sortable">
       <thead><tr>
         <th class="col-id col-hide-mobile">{{T "settings.ops.mcp.col.id"}}</th>
-        <th>{{T "settings.ops.mcp.col.name"}}</th>
-        <th>{{T "settings.ops.mcp.col.scope"}}</th>
-        <th>{{T "settings.ops.mcp.col.author"}}</th>
+        <th><a href="{{(index $.MCPSortLinks `name`).Href}}" class="sort-link {{(index $.MCPSortLinks `name`).Class}}">{{T "settings.ops.mcp.col.name"}}</a></th>
+        <th><a href="{{(index $.MCPSortLinks `scope`).Href}}" class="sort-link {{(index $.MCPSortLinks `scope`).Class}}">{{T "settings.ops.mcp.col.scope"}}</a></th>
+        <th><a href="{{(index $.MCPSortLinks `author`).Href}}" class="sort-link {{(index $.MCPSortLinks `author`).Class}}">{{T "settings.ops.mcp.col.author"}}</a></th>
         <th class="col-role col-hide-mobile">{{T "settings.ops.mcp.col.prefix"}}</th>
-        <th class="col-date col-hide-mobile">{{T "settings.ops.mcp.col.createdAt"}}</th>
-        <th class="col-date col-hide-mobile">{{T "settings.ops.mcp.col.lastUsed"}}</th>
+        <th class="col-date col-hide-mobile"><a href="{{(index $.MCPSortLinks `created`).Href}}" class="sort-link {{(index $.MCPSortLinks `created`).Class}}">{{T "settings.ops.mcp.col.createdAt"}}</a></th>
+        <th class="col-date col-hide-mobile"><a href="{{(index $.MCPSortLinks `lastUsed`).Href}}" class="sort-link {{(index $.MCPSortLinks `lastUsed`).Class}}">{{T "settings.ops.mcp.col.lastUsed"}}</a></th>
         <th class="col-status">{{T "settings.ops.mcp.col.status"}}</th>
         <th class="col-actions col-id">{{T "settings.ops.mcp.col.delete"}}</th>
       </tr></thead>
