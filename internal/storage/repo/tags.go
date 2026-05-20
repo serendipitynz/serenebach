@@ -100,11 +100,13 @@ func (k TagSortKey) String() string {
 	case TagSortCount:
 		return "count"
 	default:
-		return ""
+		return "name"
 	}
 }
 
-// ParseTagSortKey maps a ?sort= query value to the enum.
+// ParseTagSortKey maps a ?sort= query value to the enum. Both "" and
+// "name" land on TagSortName so the default-landing URL and an
+// explicit ?sort=name produce the same SortBy value.
 func ParseTagSortKey(s string) TagSortKey {
 	switch s {
 	case "id":
@@ -147,17 +149,13 @@ func (s *Store) ListTagsForAdmin(ctx context.Context, wid int64, q ListTagsQuery
 		) c ON c.tag_id = t.id
 		WHERE t.wid = ?
 		ORDER BY `)
-	if q.SortBy == TagSortName {
-		// Default landing order has a special two-column tie-break so
-		// equal-name (impossible by schema but defensive) rows stay
-		// stable across pages.
-		b.WriteString(`t.name ASC, t.id ASC`)
-	} else {
-		b.WriteString(q.SortBy.orderClause())
-		b.WriteByte(' ')
-		b.WriteString(q.SortDir.String())
-		b.WriteString(`, t.id DESC`)
-	}
+	b.WriteString(q.SortBy.orderClause())
+	b.WriteByte(' ')
+	b.WriteString(q.SortDir.String())
+	// Stable tie-breaker. (wid+name is UNIQUE in schema, so collisions
+	// on the name sort are theoretical — but the tie-breaker is cheap
+	// and keeps every sort key deterministic.)
+	b.WriteString(`, t.id DESC`)
 	rows, err := s.db.QueryContext(ctx, b.String(), wid)
 	if err != nil {
 		return nil, fmt.Errorf("repo: ListTagsForAdmin: %w", err)

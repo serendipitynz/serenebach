@@ -51,6 +51,14 @@ func (h *Handler) tagList(w http.ResponseWriter, r *http.Request) {
 	dirRaw := q.Get("dir")
 	sortKey := repo.ParseTagSortKey(sortRaw)
 	sortDir := repo.ParseSortDir(dirRaw)
+	// Tags ship with an alphabetical default (name ASC); ParseSortDir
+	// otherwise gives DESC for empty input. Only override when neither
+	// sort nor dir was specified — once a user picks a column they
+	// expect the explicit direction (or its default-dir for that
+	// column) to win.
+	if sortRaw == "" && dirRaw == "" {
+		sortDir = repo.SortAsc
+	}
 
 	tags, err := h.Store.ListTagsForAdmin(r.Context(), h.wid(), repo.ListTagsQuery{
 		SortBy:  sortKey,

@@ -34,19 +34,41 @@ func seedTagWithEntries(t *testing.T, s *Store, name string, entryCount int) int
 	return id
 }
 
-func TestListTagsForAdmin_DefaultsToNameAsc(t *testing.T) {
+func TestListTagsForAdmin_NameAsc(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
 	cherry := seedTagWithEntries(t, s, "cherry", 0)
 	apple := seedTagWithEntries(t, s, "apple", 0)
 	banana := seedTagWithEntries(t, s, "banana", 0)
 
-	got, err := s.ListTagsForAdmin(ctx, 1, ListTagsQuery{})
+	// The handler forces SortAsc for the alphabetical default landing;
+	// the repo treats SortDir literally. Pass SortAsc explicitly so
+	// this test exercises the alphabetical "glossary" ordering.
+	got, err := s.ListTagsForAdmin(ctx, 1, ListTagsQuery{SortBy: TagSortName, SortDir: SortAsc})
 	if err != nil {
 		t.Fatalf("ListTagsForAdmin: %v", err)
 	}
 	if len(got) != 3 || got[0].ID != apple || got[1].ID != banana || got[2].ID != cherry {
-		t.Errorf("name ASC default: got %v", []int64{got[0].ID, got[1].ID, got[2].ID})
+		t.Errorf("name ASC: got %v", []int64{got[0].ID, got[1].ID, got[2].ID})
+	}
+}
+
+func TestListTagsForAdmin_NameDescRespected(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	apple := seedTagWithEntries(t, s, "apple", 0)
+	cherry := seedTagWithEntries(t, s, "cherry", 0)
+	banana := seedTagWithEntries(t, s, "banana", 0)
+
+	// Regression for the previous behaviour where ListTagsForAdmin
+	// silently forced name ASC regardless of SortDir: now DESC must
+	// actually flip the order.
+	got, err := s.ListTagsForAdmin(ctx, 1, ListTagsQuery{SortBy: TagSortName, SortDir: SortDesc})
+	if err != nil {
+		t.Fatalf("ListTagsForAdmin: %v", err)
+	}
+	if got[0].ID != cherry || got[1].ID != banana || got[2].ID != apple {
+		t.Errorf("name DESC: got %v", []int64{got[0].ID, got[1].ID, got[2].ID})
 	}
 }
 

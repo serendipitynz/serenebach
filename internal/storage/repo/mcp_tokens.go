@@ -105,11 +105,13 @@ func (k MCPTokenSortKey) String() string {
 	case MCPTokenSortRevoked:
 		return "revoked"
 	default:
-		return ""
+		return "created"
 	}
 }
 
-// ParseMCPTokenSortKey maps a ?sort= query value to the enum.
+// ParseMCPTokenSortKey maps a ?sort= query value to the enum. Both
+// "" and "created" land on MCPTokenSortCreatedAt so the default-
+// landing URL and an explicit ?sort=created produce the same value.
 func ParseMCPTokenSortKey(s string) MCPTokenSortKey {
 	switch s {
 	case "name":

@@ -38,6 +38,36 @@ func TestTagList_DefaultSortsByNameAsc(t *testing.T) {
 	}
 }
 
+func TestTagList_SortByNameTogglesAndReverses(t *testing.T) {
+	h, _ := newAdminTestHandler(t)
+	seedListTag(t, h, "alpha")
+	seedListTag(t, h, "beta")
+	seedListTag(t, h, "gamma")
+
+	// ?sort=name&dir=desc: active class shows DESC, next click points
+	// to dir=asc, and the body lists gamma → beta → alpha.
+	req := withAdmin(httptest.NewRequest(http.MethodGet, "/admin/tags?sort=name&dir=desc", nil))
+	rec := httptest.NewRecorder()
+	h.tagList(rec, req)
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `sort-link active desc`) {
+		t.Error(`name column should render with "active desc" class`)
+	}
+	if !strings.Contains(body, `sort=name&amp;dir=asc`) && !strings.Contains(body, `sort=name&dir=asc`) {
+		t.Error("active name column should toggle to asc on next click")
+	}
+	// Regression: ListTagsForAdmin used to ignore SortDir for the
+	// default name sort. DESC must actually reverse the order. Tags
+	// are rendered as <input value="..."> so we match on the value=
+	// attribute rather than text-between-tags.
+	alpha := strings.Index(body, `value="alpha"`)
+	gamma := strings.Index(body, `value="gamma"`)
+	if alpha < 0 || gamma < 0 || gamma > alpha {
+		t.Errorf("name DESC: expected gamma before alpha; got positions gamma=%d alpha=%d", gamma, alpha)
+	}
+}
+
 func TestTagList_SortByIDToggles(t *testing.T) {
 	h, _ := newAdminTestHandler(t)
 	seedListTag(t, h, "alpha")

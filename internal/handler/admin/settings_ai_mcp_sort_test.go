@@ -32,6 +32,29 @@ func seedAdminUserAndToken(t *testing.T, h *Handler) int64 {
 	return uid
 }
 
+func TestSettingsAI_MCPCreatedHeaderToggles(t *testing.T) {
+	h, _ := newAdminTestHandler(t)
+	uid := seedAdminUserAndToken(t, h)
+
+	// ?sort=created&dir=desc must render the "created" header in the
+	// active state so a follow-up click can toggle to ASC. Regression
+	// for the previous behaviour where the URL-form name was missing
+	// and the header never picked up the active class.
+	req := httptest.NewRequest(http.MethodGet, "/admin/settings/ai?sort=created&dir=desc", nil)
+	u := &domain.User{ID: uid, Name: "admin-mcp", Role: domain.RoleAdmin}
+	req = req.WithContext(session.WithUser(req.Context(), u))
+	rec := httptest.NewRecorder()
+	h.settingsAIForm(rec, req)
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `sort-link active desc`) {
+		t.Error(`created column should render with "active desc" class`)
+	}
+	if !strings.Contains(body, `sort=created&amp;dir=asc`) && !strings.Contains(body, `sort=created&dir=asc`) {
+		t.Error("active created column should toggle to asc on next click")
+	}
+}
+
 func TestSettingsAI_MCPTokenSortLinkRenders(t *testing.T) {
 	h, _ := newAdminTestHandler(t)
 	uid := seedAdminUserAndToken(t, h)
