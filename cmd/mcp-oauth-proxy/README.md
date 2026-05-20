@@ -42,16 +42,21 @@ The proxy is a single statically-linked Go binary (`CGO_ENABLED=0` is fine).
 |----------|---------|-------------|
 | `PROXY_LISTEN_ADDR` | `:8080` | Address to listen on |
 | `BASE_URL` | `http://localhost:8080` | Public URL of this proxy (used in OAuth metadata) |
-| `AUTH_PIN` | *(empty)* | If set, the `/authorize` page requires this PIN before issuing a code |
-| `OAUTH_REDIRECT_URIS` | *(empty)* | Comma-separated allowlist of `redirect_uri` values. **Required for non-loopback `BASE_URL`.** When empty, any URI is accepted (loopback / development only). |
+| `AUTH_PIN` | *(empty)* | If set, the `/authorize` page requires this PIN before issuing a code. **Required when `BASE_URL` or `PROXY_LISTEN_ADDR` is non-loopback.** |
+| `OAUTH_REDIRECT_URIS` | *(empty)* | Comma-separated allowlist of `redirect_uri` values. **Required when `BASE_URL` or `PROXY_LISTEN_ADDR` is non-loopback.** When empty, any URI is accepted (loopback / development only). |
 | `TOKEN_TTL` | `24h` | Access-token lifetime |
 | `PROXY_ALLOW_INSECURE_DEV` | *(empty)* | Set to `1` to skip the production-mode safety checks. Use only for local development — see "Production-mode guard" below. |
 
 ### Production-mode guard
 
-When `BASE_URL` is **not** a loopback address (`localhost`, `127.0.0.1`, `::1`), the proxy refuses to start unless **both** `AUTH_PIN` and `OAUTH_REDIRECT_URIS` are set. This prevents accidentally exposing a public proxy without authorization controls — anyone who reaches the proxy URL and knows the `client_id` could otherwise complete the flow and obtain an upstream access token.
+The proxy refuses to start unless **both** `AUTH_PIN` and `OAUTH_REDIRECT_URIS` are set when either:
 
-If you really need to run the proxy on a non-loopback host without those controls (e.g. a closed lab network), set `PROXY_ALLOW_INSECURE_DEV=1` to skip the check. Do not use this in production.
+- `BASE_URL` is **not** a loopback address (`localhost`, `127.0.0.1`, `::1`); or
+- `PROXY_LISTEN_ADDR` binds to a non-loopback interface — including the default `:8080`, `0.0.0.0:8080`, `[::]:8080`, or any explicit public IP.
+
+This is on by default because the previous `:8080` default listens on every interface, so `BASE_URL` alone is not enough to tell whether the proxy is reachable from the outside.
+
+If you really need to run the proxy on a non-loopback bind without those controls (e.g. a closed lab network), set `PROXY_ALLOW_INSECURE_DEV=1` to skip the check. Do not use this in production. For a safe local-only setup, prefer `PROXY_LISTEN_ADDR=127.0.0.1:8080` together with the default `BASE_URL`.
 
 ## Run
 
@@ -99,7 +104,7 @@ The first time ChatGPT connects, open the authorization URL in your browser, ent
 ## Security notes
 
 1. **Always run this behind HTTPS** in production.  Bearer tokens and authorization codes must never travel over plain HTTP.
-2. **Set `AUTH_PIN` and `OAUTH_REDIRECT_URIS`** for any public-facing deployment.  The proxy enforces this at startup when `BASE_URL` is non-loopback; see "Production-mode guard" above.  Without a PIN, anyone who discovers the proxy URL can complete the OAuth flow.  Without a redirect URI allowlist, anyone who knows the `client_id` can receive the authorization code on their own endpoint.  The PIN-protected POST also re-checks `redirect_uri` and `code_challenge_method` against these controls so a forged hidden field cannot bypass them.
+2. **Set `AUTH_PIN` and `OAUTH_REDIRECT_URIS`** for any public-facing deployment.  The proxy enforces this at startup when either `BASE_URL` or `PROXY_LISTEN_ADDR` is non-loopback; see "Production-mode guard" above.  Without a PIN, anyone who discovers the proxy URL can complete the OAuth flow.  Without a redirect URI allowlist, anyone who knows the `client_id` can receive the authorization code on their own endpoint.  The PIN-protected POST also re-checks `redirect_uri` and `code_challenge_method` against these controls so a forged hidden field cannot bypass them.
 3. **Token storage is in-memory only**.  Restarting the proxy invalidates all outstanding access tokens.  ChatGPT will simply re-run the OAuth flow.
 4. The proxy strips the upstream `WWW-Authenticate` header so Serene Bach’s internal Bearer realm is never exposed to the client.
 5. Request bodies are capped at **1 MiB** and upstream requests time out after **30 seconds** to prevent resource exhaustion.
