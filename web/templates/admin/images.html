@@ -100,9 +100,9 @@
 
     {{if gt .TotalPages 1}}
     <nav class="pager">
-      {{if .PrevPage}}<a href="?page={{.PrevPage}}&view={{.ViewMode}}">{{T "images.pager.prev"}}</a>{{else}}<span class="disabled">{{T "images.pager.prev"}}</span>{{end}}
+      {{if .PrevPage}}<a href="?page={{.PrevPage}}&view={{.ViewMode}}">{{T "pager.prev"}}</a>{{else}}<span class="disabled">{{T "pager.prev"}}</span>{{end}}
       <span class="pager-state">{{.Page}} / {{.TotalPages}}</span>
-      {{if .NextPage}}<a href="?page={{.NextPage}}&view={{.ViewMode}}">{{T "images.pager.next"}}</a>{{else}}<span class="disabled">{{T "images.pager.next"}}</span>{{end}}
+      {{if .NextPage}}<a href="?page={{.NextPage}}&view={{.ViewMode}}">{{T "pager.next"}}</a>{{else}}<span class="disabled">{{T "pager.next"}}</span>{{end}}
     </nav>
     {{end}}
     {{else}}

@@ -14,6 +14,7 @@
       <thead><tr>
         <th class="col-id col-hide-mobile">{{T "common.col.id"}}</th>
         <th class="col-flex-wide">{{T "common.col.title"}}</th>
+        <th class="col-flex">{{T "common.col.slug"}}</th>
         <th class="col-status">{{T "common.col.status"}}</th>
         <th class="col-datetime">{{T "common.col.posted"}}</th>
         <th class="col-flex">{{T "common.col.category"}}</th>
@@ -24,6 +25,7 @@
         <tr>
           <td class="num col-id col-hide-mobile">{{.ID}}</td>
           <td class="col-flex-wide col-primary"><a href="{{Root}}/admin/entries/{{.ID}}/edit">{{if .Title}}{{.Title}}{{else}}{{T "common.noTitle"}}{{end}}</a></td>
+          <td class="col-flex" data-label="{{T `common.col.slug`}}">{{if .Slug}}{{.Slug}}{{else}}<span class="hint">{{T "common.dash"}}</span>{{end}}</td>
           <td class="col-status" data-label="{{T `common.col.status`}}"><span class="badge {{statusClass .Status}}">{{statusLabel .Status}}</span>{{if and .Pinned (eq .Status 1)}} 📌{{end}}</td>
           <td class="col-datetime" data-label="{{T `common.col.posted`}}">{{fmtDate .PostedAt}}</td>
           <td class="col-flex" data-label="{{T `common.col.category`}}">{{if .CategoryName}}{{.CategoryName}}{{else}}<span class="hint">{{T "common.dash"}}</span>{{end}}</td>
