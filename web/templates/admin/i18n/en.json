@@ -676,6 +676,10 @@
   "templates.import.error.saveFailed": "Could not save the template.",
 
   "comments.title": "Comments",
+  "comments.heading": "Comments (%d)",
+  "comments.searchEmpty": "No comments match your search.",
+  "comments.search.placeholder": "Search by author, body, email, or IP",
+  "comments.search.label": "Search comments",
   "comments.tab.list": "List",
   "comments.tab.settings": "Settings",
   "comments.filter.all": "All",

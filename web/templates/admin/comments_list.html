@@ -6,24 +6,34 @@
   <a href="{{Root}}/admin/comments/settings">{{T "comments.tab.settings"}}</a>
 </nav>
 
-<nav class="filter-tabs" style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap">
-  <a href="{{Root}}/admin/comments?status=waiting">{{T "comments.filter.waiting"}}</a> ·
-  <a href="{{Root}}/admin/comments?status=approved">{{T "comments.filter.approved"}}</a> ·
-  <a href="{{Root}}/admin/comments?status=hidden">{{T "comments.filter.hidden"}}</a> ·
-  <a href="{{Root}}/admin/comments">{{T "comments.filter.all"}}</a>
-</nav>
-
 <div class="panel">
+  <div class="panel-head">
+    <h2>{{Tf "comments.heading" .TotalCount}}</h2>
+    <form method="get" action="{{Root}}/admin/comments" class="list-search" role="search">
+      <input type="search" name="q" value="{{.Search}}"
+             placeholder="{{T `comments.search.placeholder`}}"
+             aria-label="{{T `comments.search.label`}}">
+      {{if .StatusRaw}}<input type="hidden" name="status" value="{{.StatusRaw}}">{{end}}
+      <button type="submit">{{T "common.search"}}</button>
+      {{if .Search}}<a href="{{index .FilterLinks .StatusRaw}}" class="list-search-clear">{{T "common.search.clear"}}</a>{{end}}
+    </form>
+  </div>
+  <nav class="filter-tabs" style="display:flex;gap:0.5rem;padding:0.5rem 0.875rem;flex-wrap:wrap">
+    <a href="{{index .FilterLinks `waiting`}}"{{if eq .StatusRaw `waiting`}} class="active"{{end}}>{{T "comments.filter.waiting"}}</a> ·
+    <a href="{{index .FilterLinks `approved`}}"{{if eq .StatusRaw `approved`}} class="active"{{end}}>{{T "comments.filter.approved"}}</a> ·
+    <a href="{{index .FilterLinks `hidden`}}"{{if eq .StatusRaw `hidden`}} class="active"{{end}}>{{T "comments.filter.hidden"}}</a> ·
+    <a href="{{index .FilterLinks `all`}}"{{if eq .StatusRaw ``}} class="active"{{end}}>{{T "comments.filter.all"}}</a>
+  </nav>
   <div class="panel-body">
     {{if .Messages}}
-    <table class="listing listing-cards">
+    <table class="listing listing-cards listing-sortable">
       <thead><tr>
-        <th class="col-id col-hide-mobile">{{T "common.col.id"}}</th>
-        <th class="col-flex">{{T "comments.col.author"}}</th>
-        <th class="col-status">{{T "common.col.status"}}</th>
-        <th class="col-datetime col-hide-mobile">{{T "comments.col.posted"}}</th>
-        <th class="col-count">{{T "comments.col.entry"}}</th>
-        <th class="col-flex-wide">{{T "comments.col.body"}}</th>
+        <th class="col-id col-hide-mobile"><a href="{{(index .SortLinks `id`).Href}}" class="sort-link {{(index .SortLinks `id`).Class}}">{{T "common.col.id"}}</a></th>
+        <th class="col-flex"><a href="{{(index .SortLinks `author`).Href}}" class="sort-link {{(index .SortLinks `author`).Class}}">{{T "comments.col.author"}}</a></th>
+        <th class="col-status"><a href="{{(index .SortLinks `status`).Href}}" class="sort-link {{(index .SortLinks `status`).Class}}">{{T "common.col.status"}}</a></th>
+        <th class="col-datetime col-hide-mobile"><a href="{{(index .SortLinks `posted`).Href}}" class="sort-link {{(index .SortLinks `posted`).Class}}">{{T "comments.col.posted"}}</a></th>
+        <th class="col-count"><a href="{{(index .SortLinks `entry`).Href}}" class="sort-link {{(index .SortLinks `entry`).Class}}">{{T "comments.col.entry"}}</a></th>
+        <th class="col-flex-wide"><a href="{{(index .SortLinks `body`).Href}}" class="sort-link {{(index .SortLinks `body`).Class}}">{{T "comments.col.body"}}</a></th>
         <th class="col-actions">{{T "common.col.action"}}</th>
       </tr></thead>
       <tbody>
@@ -63,8 +73,9 @@
       {{end}}
       </tbody>
     </table>
+    {{template "pager" .Pager}}
     {{else}}
-      <p class="hint">{{T "comments.list.noneFiltered"}}</p>
+      <p class="hint">{{if .Search}}{{T "comments.searchEmpty"}}{{else}}{{T "comments.list.noneFiltered"}}{{end}}</p>
     {{end}}
   </div>
 </div>
