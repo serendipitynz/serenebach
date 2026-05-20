@@ -14,11 +14,12 @@
 //
 // Optional env vars:
 //
-//	PROXY_LISTEN_ADDR   Listen address (default ":8080")
-//	BASE_URL            Public URL of this proxy, used in metadata (default "http://localhost:8080")
-//	AUTH_PIN            If set, the /authorize page asks for this PIN before issuing a code
-//	OAUTH_REDIRECT_URIS Comma-separated allowlist of redirect_uris. When empty, any uri is accepted (dev only).
-//	TOKEN_TTL           Access-token lifetime (default "24h")
+//	PROXY_LISTEN_ADDR        Listen address (default ":8080")
+//	BASE_URL                 Public URL of this proxy, used in metadata (default "http://localhost:8080")
+//	AUTH_PIN                 If set, the /authorize page asks for this PIN before issuing a code
+//	OAUTH_REDIRECT_URIS      Comma-separated allowlist of redirect_uris. When empty, any uri is accepted (dev only).
+//	TOKEN_TTL                Access-token lifetime (default "24h")
+//	PROXY_ALLOW_INSECURE_DEV Set to "1" to skip the production-mode guards (AUTH_PIN + OAUTH_REDIRECT_URIS required when BASE_URL or PROXY_LISTEN_ADDR is non-loopback). Development only.
 //
 // Usage:
 //
@@ -35,6 +36,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -81,6 +83,16 @@ func main() {
 	if baseURL == "" {
 		baseURL = "http://localhost:8080"
 	}
+	addr := os.Getenv("PROXY_LISTEN_ADDR")
+	if addr == "" {
+		addr = ":8080"
+	}
+	if productionGuardsRequired(baseURL, addr, os.Getenv("PROXY_ALLOW_INSECURE_DEV")) {
+		if err := validateProductionConfig(authPIN, allowedRedirectURIs); err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(1)
+		}
+	}
 	tokenTTL = 24 * time.Hour
 	if d, err := time.ParseDuration(os.Getenv("TOKEN_TTL")); err == nil {
 		tokenTTL = d
@@ -95,11 +107,6 @@ func main() {
 	mux.HandleFunc("/authorize", handleAuthorize)
 	mux.HandleFunc("/token", handleToken)
 	mux.HandleFunc("/mcp", handleMCPProxy)
-
-	addr := os.Getenv("PROXY_LISTEN_ADDR")
-	if addr == "" {
-		addr = ":8080"
-	}
 	log.Printf("mcp-oauth-proxy listening on %s", addr)
 	log.Printf("upstream: %s  client_id: %s  pin_required: %v  redirect_uris: %d",
 		upstreamURL, oauthClientID, authPIN != "", len(allowedRedirectURIs))
@@ -149,83 +156,133 @@ var (
 	codeStore = map[string]*authCode{}
 )
 
+// authorizeParams is the set of OAuth fields the authorize endpoint needs
+// to issue a code. They start out from the initial query and are replaced
+// by the PIN form body when AUTH_PIN is configured.
+type authorizeParams struct {
+	state               string
+	redirectURI         string
+	codeChallenge       string
+	codeChallengeMethod string
+}
+
 func handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	if q.Get("response_type") != "code" {
-		http.Error(w, "unsupported response_type", http.StatusBadRequest)
+	if msg, ok := validateAuthorizeQuery(q); !ok {
+		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}
-	if q.Get("client_id") != oauthClientID {
-		http.Error(w, "invalid client_id", http.StatusBadRequest)
-		return
-	}
-	redirectURI := q.Get("redirect_uri")
-	if redirectURI == "" {
-		http.Error(w, "missing redirect_uri", http.StatusBadRequest)
-		return
-	}
-	// When an allowlist is configured, reject unknown redirect_uris.
-	if len(allowedRedirectURIs) > 0 && !sliceContains(allowedRedirectURIs, redirectURI) {
-		http.Error(w, "invalid redirect_uri", http.StatusBadRequest)
-		return
-	}
-	state := q.Get("state")
-	codeChallenge := q.Get("code_challenge")
-	codeChallengeMethod := q.Get("code_challenge_method")
-	if codeChallenge == "" || codeChallengeMethod != "S256" {
-		http.Error(w, "PKCE S256 required", http.StatusBadRequest)
-		return
+	params := authorizeParams{
+		state:               q.Get("state"),
+		redirectURI:         q.Get("redirect_uri"),
+		codeChallenge:       q.Get("code_challenge"),
+		codeChallengeMethod: q.Get("code_challenge_method"),
 	}
 
-	// If an AUTH_PIN is configured, show a tiny HTML form instead of auto-approving.
+	next, ok := runAuthorizeMethod(w, r, params)
+	if !ok {
+		return
+	}
+	issueAuthCode(w, r, next)
+}
+
+// validateAuthorizeQuery returns ("", true) when the initial GET query
+// satisfies the OAuth + PKCE rules. Otherwise it returns a short error
+// message and false.
+func validateAuthorizeQuery(q url.Values) (string, bool) {
+	if q.Get("response_type") != "code" {
+		return "unsupported response_type", false
+	}
+	if q.Get("client_id") != oauthClientID {
+		return "invalid client_id", false
+	}
+	return validateRedirectAndPKCE(q.Get("redirect_uri"), q.Get("code_challenge"), q.Get("code_challenge_method"))
+}
+
+// validateRedirectAndPKCE checks the redirect allowlist and PKCE method.
+// Used for both the initial GET query and the adopted PIN form body so
+// the latter cannot bypass the former.
+func validateRedirectAndPKCE(redirectURI, codeChallenge, codeChallengeMethod string) (string, bool) {
+	if redirectURI == "" {
+		return "missing redirect_uri", false
+	}
+	if len(allowedRedirectURIs) > 0 && !sliceContains(allowedRedirectURIs, redirectURI) {
+		return "invalid redirect_uri", false
+	}
+	if codeChallenge == "" || codeChallengeMethod != "S256" {
+		return "PKCE S256 required", false
+	}
+	return "", true
+}
+
+// runAuthorizeMethod dispatches the request to the right phase of the
+// PIN flow. It returns the params to issue a code with, or false when
+// the response has already been written (render-form / errors).
+func runAuthorizeMethod(w http.ResponseWriter, r *http.Request, params authorizeParams) (authorizeParams, bool) {
 	if authPIN == "" {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
+			return authorizeParams{}, false
 		}
-		// Fall through to code issuance below.
-	} else {
-		switch r.Method {
-		case http.MethodGet:
-			renderPINForm(w, state, redirectURI, codeChallenge)
-			return
-		case http.MethodPost:
-			if err := r.ParseForm(); err != nil {
-				http.Error(w, "bad form", http.StatusBadRequest)
-				return
-			}
-			if r.FormValue("pin") != authPIN {
-				http.Error(w, "invalid PIN", http.StatusUnauthorized)
-				return
-			}
-			// Adopt form values so the hidden fields carry the original query params through.
-			state = r.FormValue("state")
-			redirectURI = r.FormValue("redirect_uri")
-			codeChallenge = r.FormValue("code_challenge")
-			codeChallengeMethod = r.FormValue("code_challenge_method")
-			// Fall through to code issuance below.
-		default:
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
+		return params, true
 	}
+	switch r.Method {
+	case http.MethodGet:
+		renderPINForm(w, params.state, params.redirectURI, params.codeChallenge)
+		return authorizeParams{}, false
+	case http.MethodPost:
+		return acceptPINPost(w, r)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return authorizeParams{}, false
+	}
+}
 
+// acceptPINPost parses and authenticates a PIN-form submission, then
+// revalidates the adopted redirect_uri and PKCE method against the same
+// rules used for the initial query. Returns the adopted params on
+// success; on failure it has already written an HTTP error.
+func acceptPINPost(w http.ResponseWriter, r *http.Request) (authorizeParams, bool) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return authorizeParams{}, false
+	}
+	if r.FormValue("pin") != authPIN {
+		http.Error(w, "invalid PIN", http.StatusUnauthorized)
+		return authorizeParams{}, false
+	}
+	p := authorizeParams{
+		state:               r.FormValue("state"),
+		redirectURI:         r.FormValue("redirect_uri"),
+		codeChallenge:       r.FormValue("code_challenge"),
+		codeChallengeMethod: r.FormValue("code_challenge_method"),
+	}
+	if msg, ok := validateRedirectAndPKCE(p.redirectURI, p.codeChallenge, p.codeChallengeMethod); !ok {
+		http.Error(w, msg, http.StatusBadRequest)
+		return authorizeParams{}, false
+	}
+	return p, true
+}
+
+// issueAuthCode mints a one-shot authorization code and redirects the
+// user agent to the (already-validated) redirect_uri with ?code=… &state=….
+func issueAuthCode(w http.ResponseWriter, r *http.Request, p authorizeParams) {
 	code := randomString(32)
 	codeMu.Lock()
 	codeStore[code] = &authCode{
-		CodeChallenge:       codeChallenge,
-		CodeChallengeMethod: codeChallengeMethod,
-		RedirectURI:         redirectURI,
+		CodeChallenge:       p.codeChallenge,
+		CodeChallengeMethod: p.codeChallengeMethod,
+		RedirectURI:         p.redirectURI,
 		ClientID:            oauthClientID,
 		ExpiresAt:           time.Now().Add(10 * time.Minute),
 	}
 	codeMu.Unlock()
 
-	u, _ := url.Parse(redirectURI)
+	u, _ := url.Parse(p.redirectURI)
 	qq := u.Query()
 	qq.Set("code", code)
-	if state != "" {
-		qq.Set("state", state)
+	if p.state != "" {
+		qq.Set("state", p.state)
 	}
 	u.RawQuery = qq.Encode()
 	http.Redirect(w, r, u.String(), http.StatusFound)
@@ -503,4 +560,68 @@ func sliceContains(haystack []string, needle string) bool {
 		}
 	}
 	return false
+}
+
+// productionGuardsRequired reports whether the proxy must be started
+// with both AUTH_PIN and OAUTH_REDIRECT_URIS in place. The check fires
+// when either the advertised BASE_URL or the actual listen address can
+// be reached from a non-loopback origin, unless the operator opts out
+// via the insecure-dev escape hatch.
+func productionGuardsRequired(baseURL, listenAddr, allowInsecureDev string) bool {
+	if allowInsecureDev == "1" {
+		return false
+	}
+	return !isLoopbackBaseURL(baseURL) || !isLoopbackListenAddr(listenAddr)
+}
+
+// isLoopbackBaseURL returns true when the URL host resolves to a loopback
+// address by name (localhost) or literal (127.0.0.1, ::1). Unparseable URLs
+// are treated as non-loopback so we fail safe toward enforcement.
+func isLoopbackBaseURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return false
+	}
+	return isLoopbackHostLiteral(u.Hostname())
+}
+
+// isLoopbackListenAddr reports whether the given net.Listen-style address
+// only accepts connections from the local machine. Empty host (":8080"),
+// the IPv4 wildcard "0.0.0.0", and the IPv6 wildcard "::" all bind to
+// every interface and are treated as public. Hostnames that are not
+// literal loopback are also treated as public so we fail safe.
+func isLoopbackListenAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		// Can't parse — treat as public-bound to err on the safer side.
+		return false
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		return false
+	}
+	return isLoopbackHostLiteral(host)
+}
+
+// isLoopbackHostLiteral reports whether the given host string is one of
+// the recognized loopback literals. Case-insensitive on the name form.
+func isLoopbackHostLiteral(host string) bool {
+	switch strings.ToLower(host) {
+	case "localhost", "127.0.0.1", "::1":
+		return true
+	}
+	return false
+}
+
+// validateProductionConfig returns an error when the proxy would start in
+// production mode without the safety controls. The caller decides whether
+// production mode applies.
+func validateProductionConfig(authPIN string, allowedRedirectURIs []string) error {
+	const hint = " (set PROXY_ALLOW_INSECURE_DEV=1 to override for development only)"
+	if authPIN == "" {
+		return fmt.Errorf("AUTH_PIN must be set when BASE_URL or PROXY_LISTEN_ADDR is non-loopback%s", hint)
+	}
+	if len(allowedRedirectURIs) == 0 {
+		return fmt.Errorf("OAUTH_REDIRECT_URIS must be set when BASE_URL or PROXY_LISTEN_ADDR is non-loopback%s", hint)
+	}
+	return nil
 }
