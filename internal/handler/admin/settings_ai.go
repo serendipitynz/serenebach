@@ -14,6 +14,7 @@ import (
 	"github.com/serendipitynz/serenebach/internal/ai"
 	"github.com/serendipitynz/serenebach/internal/domain"
 	"github.com/serendipitynz/serenebach/internal/session"
+	"github.com/serendipitynz/serenebach/internal/storage/repo"
 )
 
 // aiTimeoutMaxSeconds caps the per-user AI request timeout override
@@ -46,11 +47,12 @@ type settingsAIPageData struct {
 
 	// MCP panel (admin-only). Empty slice when the signed-in user
 	// isn't an admin; the template gates rendering on .CanManageUsers.
-	Tokens      []mcpTokenRow
-	Users       []domain.User
-	Audit       []mcpAuditRow
-	NewRawToken string
-	NewTokenID  int64
+	Tokens       []mcpTokenRow
+	Users        []domain.User
+	Audit        []mcpAuditRow
+	NewRawToken  string
+	NewTokenID   int64
+	MCPSortLinks map[string]sortLink
 
 	// Ops reflects the env-var snapshot for the MCP-audit state
 	// chip rendered next to the panel header when the admin cares
@@ -84,6 +86,14 @@ func (h *Handler) renderSettingsAI(w http.ResponseWriter, r *http.Request, newRa
 	q := r.URL.Query()
 	aiFlash, aiError := splitAIFlag(q.Get("ok")), splitAIFlag(q.Get("err"))
 
+	// MCP table sort state. Lives on the AI settings tab URL so all
+	// three list params (sort / dir) travel with the page; the AI
+	// panel itself doesn't read them.
+	mcpSortRaw := q.Get("sort")
+	mcpDirRaw := q.Get("dir")
+	mcpSortKey := repo.ParseMCPTokenSortKey(mcpSortRaw)
+	mcpSortDir := repo.ParseSortDir(mcpDirRaw)
+
 	data := settingsAIPageData{
 		settingsPageBase:   h.newSettingsBase(r, tr(r, "settings.tab.ai"), "ai"),
 		Target:             *fresh,
@@ -97,7 +107,7 @@ func (h *Handler) renderSettingsAI(w http.ResponseWriter, r *http.Request, newRa
 
 	// Admin-only MCP block: fetch tokens, users, and the audit log.
 	if actor.CanManageUsers() {
-		if err := h.fillMCPBlock(r.Context(), &data, newRaw, newID, errMsg); err != nil {
+		if err := h.fillMCPBlock(r, &data, newRaw, newID, errMsg, mcpSortKey, mcpSortDir, mcpSortRaw, mcpDirRaw); err != nil {
 			log.Printf("admin.settingsAI: mcp block: %v", err)
 			http.Error(w, "failed to load MCP block", http.StatusInternalServerError)
 			return
@@ -107,12 +117,34 @@ func (h *Handler) renderSettingsAI(w http.ResponseWriter, r *http.Request, newRa
 	renderMain(w, r, pageSettingsAI, data)
 }
 
+// mcpTokenSortColumns lists the sortable columns of the MCP token
+// table embedded on /admin/settings/ai. Revoked sorting (revoked_at)
+// is supported at the repo layer but not surfaced as a clickable
+// header here because the template renders a status badge rather
+// than a "revoked at" timestamp column.
+var mcpTokenSortColumns = []struct {
+	Key        string
+	DefaultDir string
+}{
+	{"name", "asc"},
+	{"scope", "asc"},
+	{"author", "asc"},
+	{"created", "desc"},
+	{"lastUsed", "desc"},
+}
+
 // fillMCPBlock populates the admin-only MCP panel (tokens / users /
 // audit log) on settingsAIPageData. The caller has already gated on
 // CanManageUsers, so any error from the underlying store calls is a
 // hard failure and is returned for the caller to log + 500.
-func (h *Handler) fillMCPBlock(ctx context.Context, data *settingsAIPageData, newRaw string, newID int64, errMsg string) error {
-	tokens, err := h.Store.ListMCPTokens(ctx, h.wid())
+func (h *Handler) fillMCPBlock(r *http.Request, data *settingsAIPageData, newRaw string, newID int64, errMsg string,
+	sortKey repo.MCPTokenSortKey, sortDir repo.SortDir, sortRaw, dirRaw string,
+) error {
+	ctx := r.Context()
+	tokens, err := h.Store.ListMCPTokens(ctx, h.wid(), repo.ListMCPTokensQuery{
+		SortBy:  sortKey,
+		SortDir: sortDir,
+	})
 	if err != nil {
 		return fmt.Errorf("list tokens: %w", err)
 	}
@@ -144,6 +176,28 @@ func (h *Handler) fillMCPBlock(ctx context.Context, data *settingsAIPageData, ne
 	if errMsg != "" {
 		data.AIError = "mcp:" + errMsg // leave a breadcrumb; template picks up raw errMsg
 	}
+
+	echoSortKey := ""
+	if sortRaw != "" {
+		echoSortKey = sortKey.String()
+	}
+	echoSortDir := ""
+	if dirRaw != "" {
+		echoSortDir = sortDirString(sortDir)
+	}
+	state := listURLState{
+		BasePath: root(r) + "/admin/settings/ai",
+		SortKey:  echoSortKey,
+		SortDir:  echoSortDir,
+	}
+	links := make(map[string]sortLink, len(mcpTokenSortColumns))
+	for _, col := range mcpTokenSortColumns {
+		links[col.Key] = sortLink{
+			Href:  state.hrefSort(col.Key, col.DefaultDir),
+			Class: state.classFor(col.Key),
+		}
+	}
+	data.MCPSortLinks = links
 	return nil
 }
 

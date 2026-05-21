@@ -54,14 +54,39 @@ type webhookRow struct {
 
 type webhookListPageData struct {
 	settingsPageBase
-	Rows  []webhookRow
-	Flash string
-	Error string
+	Rows      []webhookRow
+	Flash     string
+	Error     string
+	SortLinks map[string]sortLink
+}
+
+// webhookSortColumns lists the sortable column headers in the webhook
+// list. Created stays the implicit default (no header click needed)
+// and Format / Events aren't separate columns in the current template,
+// so they're not in this list — the repo still supports the format
+// sort key for future use.
+var webhookSortColumns = []struct {
+	Key        string
+	DefaultDir string
+}{
+	{"url", "asc"},
+	{"active", "desc"},
+	{"lastAt", "desc"},
+	{"lastStatus", "desc"},
 }
 
 func (h *Handler) webhookList(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	hooks, err := h.Store.ListWebhooks(ctx, h.wid())
+	q := r.URL.Query()
+	sortRaw := q.Get("sort")
+	dirRaw := q.Get("dir")
+	sortKey := repo.ParseWebhookSortKey(sortRaw)
+	sortDir := repo.ParseSortDir(dirRaw)
+
+	hooks, err := h.Store.ListWebhooks(ctx, h.wid(), repo.ListWebhooksQuery{
+		SortBy:  sortKey,
+		SortDir: sortDir,
+	})
 	if err != nil {
 		log.Printf("admin.webhookList: %v", err)
 		http.Error(w, "failed to list webhooks", http.StatusInternalServerError)
@@ -89,11 +114,33 @@ func (h *Handler) webhookList(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, row)
 	}
 
+	echoSortKey := ""
+	if sortRaw != "" {
+		echoSortKey = sortKey.String()
+	}
+	echoSortDir := ""
+	if dirRaw != "" {
+		echoSortDir = sortDirString(sortDir)
+	}
+	state := listURLState{
+		BasePath: root(r) + "/admin/settings/webhooks",
+		SortKey:  echoSortKey,
+		SortDir:  echoSortDir,
+	}
+	sortLinks := make(map[string]sortLink, len(webhookSortColumns))
+	for _, col := range webhookSortColumns {
+		sortLinks[col.Key] = sortLink{
+			Href:  state.hrefSort(col.Key, col.DefaultDir),
+			Class: state.classFor(col.Key),
+		}
+	}
+
 	data := webhookListPageData{
 		settingsPageBase: h.newSettingsBase(r, tr(r, "webhooks.title"), "webhooks"),
 		Rows:             rows,
-		Flash:            r.URL.Query().Get("ok"),
-		Error:            r.URL.Query().Get("err"),
+		Flash:            q.Get("ok"),
+		Error:            q.Get("err"),
+		SortLinks:        sortLinks,
 	}
 	renderMain(w, r, pageWebhooksList, data)
 }
@@ -457,7 +504,7 @@ func deliveryWhenLabel(d domain.WebhookDelivery, loc *time.Location) string {
 // "are we over the cap" check. Kept inline because adding a dedicated
 // CountWebhooks repo method would clutter the API for a single caller.
 func countWebhooks(r *http.Request, h *Handler) (int, error) {
-	hooks, err := h.Store.ListWebhooks(r.Context(), h.wid())
+	hooks, err := h.Store.ListWebhooks(r.Context(), h.wid(), repo.ListWebhooksQuery{})
 	if err != nil {
 		return 0, err
 	}

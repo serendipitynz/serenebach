@@ -23,13 +23,13 @@
   </div>
   <div class="panel-body">
     {{if .Rows}}
-    <table class="listing webhook-list">
+    <table class="listing webhook-list listing-sortable">
       <thead><tr>
-        <th class="col-flex">{{T "webhooks.col.url"}}</th>
+        <th class="col-flex"><a href="{{(index .SortLinks `url`).Href}}" class="sort-link {{(index .SortLinks `url`).Class}}">{{T "webhooks.col.url"}}</a></th>
         <th class="col-webhook-events">{{T "webhooks.col.events"}}</th>
-        <th class="col-status">{{T "webhooks.col.active"}}</th>
-        <th class="col-datetime">{{T "webhooks.col.lastDelivery"}}</th>
-        <th class="col-status">{{T "webhooks.col.lastStatus"}}</th>
+        <th class="col-status"><a href="{{(index .SortLinks `active`).Href}}" class="sort-link {{(index .SortLinks `active`).Class}}">{{T "webhooks.col.active"}}</a></th>
+        <th class="col-datetime"><a href="{{(index .SortLinks `lastAt`).Href}}" class="sort-link {{(index .SortLinks `lastAt`).Class}}">{{T "webhooks.col.lastDelivery"}}</a></th>
+        <th class="col-status"><a href="{{(index .SortLinks `lastStatus`).Href}}" class="sort-link {{(index .SortLinks `lastStatus`).Class}}">{{T "webhooks.col.lastStatus"}}</a></th>
         <th class="col-actions">{{T "common.col.action"}}</th>
       </tr></thead>
       <tbody>

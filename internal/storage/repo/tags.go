@@ -63,6 +63,119 @@ func DeriveTagSlug(name string) string {
 	return "t-" + hex.EncodeToString(h[:4])
 }
 
+// TagSortKey is a typed enum of the columns the admin tag list can
+// sort by. Default is name ASC — what users naturally expect from an
+// alphabetical glossary.
+type TagSortKey int
+
+const (
+	TagSortName TagSortKey = iota // default
+	TagSortID
+	TagSortSlug
+	TagSortCount
+)
+
+// orderClause returns the SQL fragment for ORDER BY. Always qualified
+// with the tags alias `t` (or the joined count expression).
+func (k TagSortKey) orderClause() string {
+	switch k {
+	case TagSortID:
+		return "t.id"
+	case TagSortSlug:
+		return "t.slug"
+	case TagSortCount:
+		return "entry_count"
+	default:
+		return "t.name"
+	}
+}
+
+// String returns the URL-form name of the sort key.
+func (k TagSortKey) String() string {
+	switch k {
+	case TagSortID:
+		return "id"
+	case TagSortSlug:
+		return "slug"
+	case TagSortCount:
+		return "count"
+	default:
+		return "name"
+	}
+}
+
+// ParseTagSortKey maps a ?sort= query value to the enum. Both "" and
+// "name" land on TagSortName so the default-landing URL and an
+// explicit ?sort=name produce the same SortBy value.
+func ParseTagSortKey(s string) TagSortKey {
+	switch s {
+	case "id":
+		return TagSortID
+	case "slug":
+		return TagSortSlug
+	case "count":
+		return TagSortCount
+	default:
+		return TagSortName
+	}
+}
+
+// ListTagsQuery bundles the admin tag list's sort parameters. No
+// search / pagination yet — tag lists rarely outgrow a single screen.
+type ListTagsQuery struct {
+	SortBy  TagSortKey
+	SortDir SortDir
+}
+
+// TagWithCount is the row shape ListTagsForAdmin returns: the tag plus
+// its entry_tags row count. The admin list shows the count column and
+// the count is also a sort key, so projecting it via JOIN in one SQL
+// hop replaces the previous per-row TagEntryCount lookup.
+type TagWithCount struct {
+	domain.Tag
+	EntryCount int64
+}
+
+// ListTagsForAdmin returns every tag for the weblog with its
+// entry count. Pulls the count via a single LEFT JOIN against a
+// pre-aggregated subquery so callers don't need a follow-up batch.
+func (s *Store) ListTagsForAdmin(ctx context.Context, wid int64, q ListTagsQuery) ([]TagWithCount, error) {
+	var b strings.Builder
+	b.WriteString(`SELECT ` + tagColumnsQualified + `,
+		COALESCE(c.cnt, 0) AS entry_count
+		FROM tags t
+		LEFT JOIN (
+			SELECT tag_id, COUNT(*) AS cnt FROM entry_tags GROUP BY tag_id
+		) c ON c.tag_id = t.id
+		WHERE t.wid = ?
+		ORDER BY `)
+	b.WriteString(q.SortBy.orderClause())
+	b.WriteByte(' ')
+	b.WriteString(q.SortDir.String())
+	// Stable tie-breaker. (wid+name is UNIQUE in schema, so collisions
+	// on the name sort are theoretical — but the tie-breaker is cheap
+	// and keeps every sort key deterministic.)
+	b.WriteString(`, t.id DESC`)
+	rows, err := s.db.QueryContext(ctx, b.String(), wid)
+	if err != nil {
+		return nil, fmt.Errorf("repo: ListTagsForAdmin: %w", err)
+	}
+	defer rows.Close()
+	var out []TagWithCount
+	for rows.Next() {
+		var twc TagWithCount
+		var createdAt, updatedAt int64
+		if err := rows.Scan(&twc.ID, &twc.WID, &twc.Name, &twc.Slug,
+			&createdAt, &updatedAt, &twc.EntryCount); err != nil {
+			return nil, fmt.Errorf("repo: ListTagsForAdmin scan: %w", err)
+		}
+		twc.CreatedAt = time.Unix(createdAt, 0)
+		twc.UpdatedAt = time.Unix(updatedAt, 0)
+		out = append(out, twc)
+	}
+	return out, rows.Err()
+}
+
 // AllTags returns every tag for the weblog, ordered alphabetically by
 // name — matches user expectation in the admin list and is stable for
 // the static-rebuild tag loop.
