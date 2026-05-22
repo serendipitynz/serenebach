@@ -386,8 +386,8 @@ func handleToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeTokenError(w http.ResponseWriter, err, desc string) {
-	w.WriteHeader(http.StatusBadRequest)
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"error":             err,
 		"error_description": desc,
@@ -458,13 +458,14 @@ func authenticateMCPProxy(w http.ResponseWriter, r *http.Request) bool {
 	}
 	tokenMu.RLock()
 	tr, ok := tokenStore[accessToken]
+	tokenCount := len(tokenStore)
 	tokenMu.RUnlock()
 	if !ok || time.Now().After(tr.ExpiresAt) {
 		http.Error(w, "invalid or expired token", http.StatusUnauthorized)
 		return false
 	}
 	// Best-effort cleanup of expired tokens (probabilistic sweep).
-	if len(tokenStore) > 1000 && randInt(10) == 0 {
+	if tokenCount > 1000 && randInt(10) == 0 {
 		go sweepExpiredTokens()
 	}
 	return true
