@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -29,7 +30,7 @@ type Store struct {
 	db             *sql.DB
 	retentionDays  int
 	cleanupEvery   int // attempt cleanup roughly once every N writes
-	writeCount     int64
+	writeCount     atomic.Int64
 	ownsConnection bool
 }
 
@@ -119,22 +120,22 @@ func (s *Store) Record(ctx context.Context, visitorID, path string, entryID int6
 		VALUES (?, ?, ?, ?)`, visitorID, path, entryID, time.Now().Unix()); err != nil {
 		return fmt.Errorf("analytics: record: %w", err)
 	}
-	s.writeCount++
-	if s.shouldCleanup() {
+	n := s.writeCount.Add(1)
+	if s.shouldCleanup(n) {
 		// Best-effort — never block a request on retention maintenance.
 		_ = s.cleanupOld(ctx)
 	}
 	return nil
 }
 
-func (s *Store) shouldCleanup() bool {
+func (s *Store) shouldCleanup(writeCount int64) bool {
 	if s.retentionDays <= 0 || s.cleanupEvery <= 0 {
 		return false
 	}
 	// Deterministic modulo is fine here: we want the cleanup to run on
 	// roughly 1 in N requests, and spreading it by writeCount keeps a slow
 	// blog from ever running cleanup while a busy one runs it often.
-	return s.writeCount%int64(s.cleanupEvery) == 0
+	return writeCount%int64(s.cleanupEvery) == 0
 }
 
 func (s *Store) cleanupOld(ctx context.Context) error {
