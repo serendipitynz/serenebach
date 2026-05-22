@@ -8,7 +8,7 @@ import (
 // Centralised here (rather than images.go) because every JSON endpoint
 // in the admin surface — image alt, AI compose, MCP token mutations,
 // webhook tests — funnels through this helper. Encode failures are
-// logged: the response is already committed by the time Encode runs,
+// ignored: the response is already committed by the time Encode runs,
 // so the caller has no recovery option.
 func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
