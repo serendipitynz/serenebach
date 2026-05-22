@@ -350,12 +350,6 @@ func acceptsJSON(r *http.Request) bool {
 	return strings.Contains(r.Header.Get("Accept"), "application/json")
 }
 
-func writeJSON(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	_ = encodeJSON(w, payload)
-}
-
 func encodeJSON(w io.Writer, payload any) error {
 	return json.NewEncoder(w).Encode(payload)
 }
