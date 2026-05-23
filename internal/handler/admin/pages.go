@@ -269,7 +269,7 @@ func parsePageForm(r *http.Request, base domain.Page) (domain.Page, string) {
 		return base, tr(r, "flash.formParseError")
 	}
 
-	base.Title = strings.TrimSpace(r.PostFormValue("title"))
+	base.Title = postFormValue(r, "title")
 	base.Body = r.PostFormValue("body")
 	if base.Title == "" {
 		return base, tr(r, "pages.form.error.titleRequired")
@@ -289,11 +289,11 @@ func parsePageForm(r *http.Request, base domain.Page) (domain.Page, string) {
 		return base, errMsg
 	}
 
-	if fmtRaw := strings.TrimSpace(r.PostFormValue("format")); fmtRaw != "" {
+	if fmtRaw := postFormValue(r, "format"); fmtRaw != "" {
 		base.Format = string(format.Normalize(fmtRaw))
 	}
 
-	if tmplRaw := strings.TrimSpace(r.PostFormValue("template_id")); tmplRaw != "" {
+	if tmplRaw := postFormValue(r, "template_id"); tmplRaw != "" {
 		if v, err := strconv.ParseInt(tmplRaw, 10, 64); err == nil {
 			base.TemplateID = v
 		}
@@ -301,7 +301,7 @@ func parsePageForm(r *http.Request, base domain.Page) (domain.Page, string) {
 
 	// Per-page OG background override. Same stored_path convention as
 	// the weblog-level field; empty = inherit the site default.
-	base.OGBGImagePath = strings.TrimSpace(r.PostFormValue("og_bg_image_path"))
+	base.OGBGImagePath = postFormValue(r, "og_bg_image_path")
 
 	status, errMsg := parsePageStatus(r, r.PostFormValue("status"))
 	if errMsg != "" {

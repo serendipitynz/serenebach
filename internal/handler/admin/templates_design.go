@@ -127,7 +127,7 @@ func (h *Handler) templatesSettingsSave(w http.ResponseWriter, r *http.Request) 
 	// Display counts + sort order. Page size is clamped into a
 	// sensible range so a typo doesn't 0-length the home page or ask
 	// for 10000 entries in one render pass.
-	pageSize, _ := strconv.Atoi(strings.TrimSpace(r.PostFormValue("entries_per_page")))
+	pageSize, _ := strconv.Atoi(postFormValue(r, "entries_per_page"))
 	if pageSize < 1 {
 		pageSize = 10
 	}
@@ -173,7 +173,7 @@ func (h *Handler) templatesOGSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	updated := *current
-	updated.OGBGImagePath = strings.TrimSpace(r.PostFormValue("og_bg_image_path"))
+	updated.OGBGImagePath = postFormValue(r, "og_bg_image_path")
 	// og_text_color resolution: the 透明 checkbox wins (hides text via
 	// #00000000). Otherwise honour the hex from the color picker, but
 	// only when the unset-flag is absent — an empty field means "use
@@ -185,7 +185,7 @@ func (h *Handler) templatesOGSave(w http.ResponseWriter, r *http.Request) {
 	case r.PostFormValue("og_text_color_unset") == "1":
 		updated.OGTextColor = ""
 	default:
-		raw := strings.TrimSpace(r.PostFormValue("og_text_color"))
+		raw := postFormValue(r, "og_text_color")
 		if looksLikeHexColor(raw) {
 			updated.OGTextColor = strings.ToLower(raw)
 		} else {
@@ -572,7 +572,7 @@ func (h *Handler) templatesSaveAs(w http.ResponseWriter, r *http.Request) {
 	// original row stays untouched. Fall back to "<name> (コピー)" when
 	// the modal is bypassed (no-JS fallback) so we never clone with the
 	// same display name as the original.
-	newName := strings.TrimSpace(r.PostFormValue("new_name"))
+	newName := postFormValue(r, "new_name")
 	if newName == "" {
 		newName = current.Name + tr(r, "templates.form.copySuffix")
 	}
@@ -617,7 +617,7 @@ func (h *Handler) templatesRename(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bad_form"})
 		return
 	}
-	newName := strings.TrimSpace(r.PostFormValue("name"))
+	newName := postFormValue(r, "name")
 	if newName == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": tr(r, "templates.form.error.nameEmpty")})
 		return
