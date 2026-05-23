@@ -14,6 +14,17 @@ import (
 // Order must match the inline Scan call sites.
 const categoryColumns = `id, wid, parent_id, name, slug, sort_order, description, description_format, template_id, hidden`
 
+// categoryColumnsC is categoryColumns qualified with the c. alias for
+// JOIN queries.
+const categoryColumnsC = `c.id, c.wid, c.parent_id, c.name, c.slug, c.sort_order, c.description, c.description_format, c.template_id, c.hidden`
+
+// CategoryWithCount pairs a category with its entry count so callers
+// can render sidebar lists or admin grids without N+1 queries.
+type CategoryWithCount struct {
+	domain.Category
+	EntryCount int64
+}
+
 // AllCategories returns every category row for the weblog, ordered by
 // sort_order then id.
 func (s *Store) AllCategories(ctx context.Context, wid int64) ([]domain.Category, error) {
@@ -31,6 +42,53 @@ func (s *Store) AllCategories(ctx context.Context, wid int64) ([]domain.Category
 		var c domain.Category
 		if err := rows.Scan(&c.ID, &c.WID, &c.ParentID, &c.Name, &c.Slug, &c.SortOrder, &c.Description, &c.DescriptionFormat, &c.TemplateID, &c.Hidden); err != nil {
 			return nil, fmt.Errorf("repo: scan category: %w", err)
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// AllCategoriesWithEntryCounts returns every category plus the total
+// number of entries in each, counting entries of any status.
+func (s *Store) AllCategoriesWithEntryCounts(ctx context.Context, wid int64) ([]CategoryWithCount, error) {
+	return s.queryCategoriesWithCounts(ctx, wid, 0)
+}
+
+// AllCategoriesWithPublishedEntryCounts returns every category plus the
+// number of published entries in each.
+func (s *Store) AllCategoriesWithPublishedEntryCounts(ctx context.Context, wid int64) ([]CategoryWithCount, error) {
+	return s.queryCategoriesWithCounts(ctx, wid, int(domain.EntryPublished))
+}
+
+func (s *Store) queryCategoriesWithCounts(ctx context.Context, wid int64, statusFilter int) ([]CategoryWithCount, error) {
+	var rows *sql.Rows
+	var err error
+	if statusFilter == 0 {
+		rows, err = s.db.QueryContext(ctx, `
+			SELECT `+categoryColumnsC+`, COUNT(e.id) AS entry_count
+			FROM categories c
+			LEFT JOIN entries e ON e.category_id = c.id AND e.wid = c.wid
+			WHERE c.wid = ?
+			GROUP BY c.id, c.wid, c.parent_id, c.name, c.slug, c.sort_order, c.description, c.description_format, c.template_id, c.hidden
+			ORDER BY c.sort_order, c.id`, wid)
+	} else {
+		rows, err = s.db.QueryContext(ctx, `
+			SELECT `+categoryColumnsC+`, COUNT(e.id) AS entry_count
+			FROM categories c
+			LEFT JOIN entries e ON e.category_id = c.id AND e.wid = c.wid AND e.status = ?
+			WHERE c.wid = ?
+			GROUP BY c.id, c.wid, c.parent_id, c.name, c.slug, c.sort_order, c.description, c.description_format, c.template_id, c.hidden
+			ORDER BY c.sort_order, c.id`, statusFilter, wid)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("repo: queryCategoriesWithCounts: %w", err)
+	}
+	defer rows.Close()
+	var out []CategoryWithCount
+	for rows.Next() {
+		var c CategoryWithCount
+		if err := rows.Scan(&c.ID, &c.WID, &c.ParentID, &c.Name, &c.Slug, &c.SortOrder, &c.Description, &c.DescriptionFormat, &c.TemplateID, &c.Hidden, &c.EntryCount); err != nil {
+			return nil, fmt.Errorf("repo: scan category with count: %w", err)
 		}
 		out = append(out, c)
 	}

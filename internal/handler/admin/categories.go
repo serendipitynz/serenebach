@@ -79,7 +79,7 @@ type categoriesListPageData struct {
 }
 
 func (h *Handler) categoryList(w http.ResponseWriter, r *http.Request) {
-	cats, err := h.Store.AllCategories(r.Context(), h.wid())
+	cats, err := h.Store.AllCategoriesWithEntryCounts(r.Context(), h.wid())
 	if err != nil {
 		log.Printf("admin.categoryList: %v", err)
 		http.Error(w, "failed to list categories", http.StatusInternalServerError)
@@ -94,13 +94,9 @@ func (h *Handler) categoryList(w http.ResponseWriter, r *http.Request) {
 
 	rows := make([]categoryRow, 0, len(cats))
 	for _, c := range cats {
-		count, err := h.Store.CountEntriesByCategory(r.Context(), h.wid(), c.ID)
-		if err != nil {
-			log.Printf("admin.categoryList: count: %v", err)
-		}
 		rows = append(rows, categoryRow{
-			Category:   c,
-			EntryCount: count,
+			Category:   c.Category,
+			EntryCount: c.EntryCount,
 			ParentName: nameByID[c.ParentID],
 		})
 	}

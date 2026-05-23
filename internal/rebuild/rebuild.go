@@ -460,17 +460,13 @@ func loadSidebarData(ctx context.Context, store *repo.Store, wid int64, loc *tim
 		return out, fmt.Errorf("archives: %w", err)
 	}
 	out.Archives = periods
-	cats, err := store.AllCategories(ctx, wid)
+	cats, err := store.AllCategoriesWithPublishedEntryCounts(ctx, wid)
 	if err != nil {
 		return out, fmt.Errorf("categories: %w", err)
 	}
 	tree := make([]content.SidebarCategory, 0, len(cats))
 	for _, c := range cats {
-		count, err := store.CountEntriesByCategory(ctx, wid, c.ID)
-		if err != nil {
-			return out, fmt.Errorf("count category %d: %w", c.ID, err)
-		}
-		tree = append(tree, content.SidebarCategory{Category: c, Count: count})
+		tree = append(tree, content.SidebarCategory{Category: c.Category, Count: c.EntryCount})
 	}
 	out.CategoryTree = tree
 	msgs, err := store.RecentApprovedMessages(ctx, wid, 5)

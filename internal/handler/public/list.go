@@ -144,14 +144,10 @@ func (h *Handler) loadSidebarData(ctx context.Context, logTag string) content.Si
 	} else {
 		log.Printf("%s: archives: %v", logTag, err)
 	}
-	if cats, err := h.Store.AllCategories(ctx, h.WID); err == nil {
+	if cats, err := h.Store.AllCategoriesWithPublishedEntryCounts(ctx, h.WID); err == nil {
 		tree := make([]content.SidebarCategory, 0, len(cats))
 		for _, c := range cats {
-			count, err := h.Store.CountEntriesByCategory(ctx, h.WID, c.ID)
-			if err != nil {
-				log.Printf("%s: category count: %v", logTag, err)
-			}
-			tree = append(tree, content.SidebarCategory{Category: c, Count: count})
+			tree = append(tree, content.SidebarCategory{Category: c.Category, Count: c.EntryCount})
 		}
 		out.CategoryTree = tree
 	} else {
