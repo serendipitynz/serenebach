@@ -86,8 +86,11 @@ func (s *Store) ApprovedMessagesByEntry(ctx context.Context, wid, entryID int64)
 
 // ApprovedMessagesByEntries batches ApprovedMessagesByEntry across many
 // entries so the full-site rebuild can fetch comments for every entry
-// in a single query. The map always has an entry for every input id
-// (empty slice when none approved).
+// with a bounded number of queries. The map always has an entry for every
+// input id (empty slice when none approved).
+//
+// Requests are chunked to stay under SQLite's bind-variable limit
+// (32766), accounting for the two fixed placeholders (wid, status).
 func (s *Store) ApprovedMessagesByEntries(ctx context.Context, wid int64, entryIDs []int64) (map[int64][]domain.Message, error) {
 	out := make(map[int64][]domain.Message, len(entryIDs))
 	for _, id := range entryIDs {
@@ -96,36 +99,50 @@ func (s *Store) ApprovedMessagesByEntries(ctx context.Context, wid int64, entryI
 	if len(entryIDs) == 0 {
 		return out, nil
 	}
-	placeholders := strings.Repeat("?,", len(entryIDs))
-	placeholders = placeholders[:len(placeholders)-1]
-	args := make([]interface{}, 0, len(entryIDs)+2)
-	args = append(args, wid, domain.MessageApproved)
-	for _, id := range entryIDs {
-		args = append(args, id)
-	}
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT `+messageColumns+`
-		FROM messages
-		WHERE wid = ? AND status = ? AND entry_id IN (`+placeholders+`)
-		ORDER BY entry_id ASC, posted_at ASC, id ASC`, args...)
-	if err != nil {
-		return nil, fmt.Errorf("repo: ApprovedMessagesByEntries: %w", err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var m domain.Message
-		var postedAt int64
-		if err := rows.Scan(&m.ID, &m.WID, &m.EntryID, &m.Status, &postedAt,
-			&m.AuthorName, &m.AuthorEmail, &m.AuthorURL, &m.Body,
-			&m.IPAddress, &m.UserAgent); err != nil {
-			return nil, fmt.Errorf("repo: scan message row: %w", err)
+
+	const maxVars = 32766 // SQLite bind-variable limit; wid + status consume 2
+	for start := 0; start < len(entryIDs); start += maxVars - 2 {
+		end := start + maxVars - 2
+		if end > len(entryIDs) {
+			end = len(entryIDs)
 		}
-		m.PostedAt = time.Unix(postedAt, 0)
-		out[m.EntryID] = append(out[m.EntryID], m)
+		chunk := entryIDs[start:end]
+
+		placeholders := strings.Repeat("?,", len(chunk))
+		placeholders = placeholders[:len(placeholders)-1]
+		args := make([]interface{}, 0, len(chunk)+2)
+		args = append(args, wid, domain.MessageApproved)
+		for _, id := range chunk {
+			args = append(args, id)
+		}
+
+		rows, err := s.db.QueryContext(ctx, `
+			SELECT `+messageColumns+`
+			FROM messages
+			WHERE wid = ? AND status = ? AND entry_id IN (`+placeholders+`)
+			ORDER BY entry_id ASC, posted_at ASC, id ASC`, args...)
+		if err != nil {
+			return nil, fmt.Errorf("repo: ApprovedMessagesByEntries: %w", err)
+		}
+		for rows.Next() {
+			var m domain.Message
+			var postedAt int64
+			if err := rows.Scan(&m.ID, &m.WID, &m.EntryID, &m.Status, &postedAt,
+				&m.AuthorName, &m.AuthorEmail, &m.AuthorURL, &m.Body,
+				&m.IPAddress, &m.UserAgent); err != nil {
+				rows.Close()
+				return nil, fmt.Errorf("repo: scan message row: %w", err)
+			}
+			m.PostedAt = time.Unix(postedAt, 0)
+			out[m.EntryID] = append(out[m.EntryID], m)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("repo: ApprovedMessagesByEntries: %w", err)
+		}
+		rows.Close()
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("repo: ApprovedMessagesByEntries: %w", err)
-	}
+
 	return out, nil
 }
 
