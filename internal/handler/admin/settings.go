@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -255,17 +254,17 @@ func parseSettingsForm(r *http.Request, base domain.Weblog) (domain.Weblog, stri
 		return base, tr(r, "flash.formParseError")
 	}
 
-	base.Title = strings.TrimSpace(r.PostFormValue("title"))
+	base.Title = postFormValue(r, "title")
 	if base.Title == "" {
 		return base, tr(r, "settings.basic.error.titleRequired")
 	}
-	base.Description = strings.TrimSpace(r.PostFormValue("description"))
-	base.Lang = strings.TrimSpace(r.PostFormValue("lang"))
+	base.Description = postFormValue(r, "description")
+	base.Lang = postFormValue(r, "lang")
 	if base.Lang == "" {
 		base.Lang = "ja"
 	}
 
-	baseURL := strings.TrimSpace(r.PostFormValue("base_url"))
+	baseURL := postFormValue(r, "base_url")
 	if baseURL != "" {
 		u, err := url.Parse(baseURL)
 		if err != nil || u.Scheme == "" || u.Host == "" {
@@ -274,8 +273,8 @@ func parseSettingsForm(r *http.Request, base domain.Weblog) (domain.Weblog, stri
 	}
 	base.BaseURL = baseURL
 
-	base.LLMSEnabled = strings.TrimSpace(r.PostFormValue("llms_enabled")) == "1"
-	base.AutoRebuildOnPublish = strings.TrimSpace(r.PostFormValue("auto_rebuild_on_publish")) == "1"
+	base.LLMSEnabled = postFormValue(r, "llms_enabled") == "1"
+	base.AutoRebuildOnPublish = postFormValue(r, "auto_rebuild_on_publish") == "1"
 	// OG background / text-colour are edited on /admin/templates/og.
 	// Those fields are not posted to this handler and the corresponding
 	// base.OGBGImagePath / base.OGTextColor values flow through

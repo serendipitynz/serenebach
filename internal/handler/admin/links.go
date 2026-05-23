@@ -286,15 +286,15 @@ func parseLinkForm(r *http.Request, base domain.Link, existing *domain.Link) (do
 	if err := r.ParseForm(); err != nil {
 		return base, tr(r, "flash.formParseError")
 	}
-	base.Name = strings.TrimSpace(r.PostFormValue("name"))
+	base.Name = postFormValue(r, "name")
 	if base.Name == "" {
 		return base, tr(r, "links.form.error.nameRequired")
 	}
-	base.Description = strings.TrimSpace(r.PostFormValue("description"))
+	base.Description = postFormValue(r, "description")
 
 	// Kind: only editable on create. On update we trust the existing row.
 	if existing == nil {
-		kind := strings.TrimSpace(r.PostFormValue("kind"))
+		kind := postFormValue(r, "kind")
 		if kind != domain.LinkKindLink && kind != domain.LinkKindGroup {
 			kind = domain.LinkKindLink
 		}
@@ -316,15 +316,15 @@ func parseLinkForm(r *http.Request, base domain.Link, existing *domain.Link) (do
 	}
 
 	// Link-kind fields.
-	base.URL = strings.TrimSpace(r.PostFormValue("url"))
+	base.URL = postFormValue(r, "url")
 	if base.URL == "" {
 		return base, tr(r, "links.form.error.urlRequired")
 	}
-	base.Target = strings.TrimSpace(r.PostFormValue("target"))
+	base.Target = postFormValue(r, "target")
 
 	base.ParentID = parseOptionalID(r.PostFormValue("parent_id"))
 
-	switch strings.TrimSpace(r.PostFormValue("disp")) {
+	switch postFormValue(r, "disp") {
 	case "hidden", "1":
 		base.Disp = 1
 	default:

@@ -106,7 +106,7 @@ func parseNewUserForm(r *http.Request, wid int64) (domain.User, string, string) 
 	if err := r.ParseForm(); err != nil {
 		return domain.User{}, "", tr(r, "flash.formParseError")
 	}
-	name := strings.TrimSpace(r.PostFormValue("name"))
+	name := postFormValue(r, "name")
 	if name == "" || !repo.IsValidUserName(name) {
 		return domain.User{WID: wid}, "", tr(r, "users.form.error.nameInvalid")
 	}
@@ -125,8 +125,8 @@ func parseNewUserForm(r *http.Request, wid int64) (domain.User, string, string) 
 	u := domain.User{
 		WID:               wid,
 		Name:              name,
-		DisplayName:       strings.TrimSpace(r.PostFormValue("display_name")),
-		Email:             strings.TrimSpace(r.PostFormValue("email")),
+		DisplayName:       postFormValue(r, "display_name"),
+		Email:             postFormValue(r, "email"),
 		Role:              role,
 		ListVisible:       true,
 		DescriptionFormat: "html",
@@ -266,7 +266,7 @@ func (h *Handler) userUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updated := *existing
-	name := strings.TrimSpace(r.PostFormValue("name"))
+	name := postFormValue(r, "name")
 	if name == "" || !repo.IsValidUserName(name) {
 		h.renderUserForm(w, r, updated, tr(r, "users.form.error.nameInvalid"), "")
 		return
@@ -308,11 +308,11 @@ func (h *Handler) userUpdate(w http.ResponseWriter, r *http.Request) {
 // the empty-name path needs a tailored flash; everything here is "take
 // whatever the form gave us" with light normalisation.
 func applyUserProfileFields(updated *domain.User, r *http.Request) {
-	updated.DisplayName = strings.TrimSpace(r.PostFormValue("display_name"))
+	updated.DisplayName = postFormValue(r, "display_name")
 	if updated.DisplayName == "" {
 		updated.DisplayName = updated.Name
 	}
-	updated.Email = strings.TrimSpace(r.PostFormValue("email"))
+	updated.Email = postFormValue(r, "email")
 	updated.Description = r.PostFormValue("description")
 	updated.DescriptionFormat = normaliseDescriptionFormat(r.PostFormValue("description_format"))
 	updated.ListVisible = r.PostFormValue("list_visible") == "on"
