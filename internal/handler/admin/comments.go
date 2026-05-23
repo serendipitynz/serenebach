@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -275,8 +274,8 @@ func (h *Handler) commentHide(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) commentSetStatus(w http.ResponseWriter, r *http.Request, status domain.MessageStatus) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -313,8 +312,8 @@ func (h *Handler) commentDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}

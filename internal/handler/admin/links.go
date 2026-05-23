@@ -58,8 +58,8 @@ func (h *Handler) linkReorder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) linkMemberReorder(w http.ResponseWriter, r *http.Request) {
-	groupID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || groupID <= 0 {
+	groupID, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.Error(w, "bad id", http.StatusBadRequest)
 		return
 	}
@@ -197,8 +197,8 @@ func (h *Handler) linkNewForm(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) linkEditForm(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -358,8 +358,8 @@ func (h *Handler) linkCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) linkUpdate(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -397,8 +397,8 @@ func (h *Handler) linkUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) linkDelete(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}

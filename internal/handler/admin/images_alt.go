@@ -8,11 +8,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
-
-	"github.com/go-chi/chi/v5"
 
 	"github.com/serendipitynz/serenebach/internal/ai"
 	"github.com/serendipitynz/serenebach/internal/domain"
@@ -42,8 +39,8 @@ func (h *Handler) imagesGenerateAlt(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "unauthorized"})
 		return
 	}
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bad id"})
 		return
 	}

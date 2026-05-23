@@ -85,8 +85,8 @@ func (h *Handler) loadEntryForDelete(w http.ResponseWriter, r *http.Request) (*d
 // loadEntryWith is the shared body of loadEntryForEdit / loadEntryForDelete.
 // Kept private so callers stick to the named edit/delete variants.
 func (h *Handler) loadEntryWith(w http.ResponseWriter, r *http.Request, allow func(*domain.User, int64) bool) (*domain.Entry, *domain.User, bool) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return nil, nil, false
 	}
@@ -706,8 +706,8 @@ func (h *Handler) entryOGRegenerate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "og disabled", http.StatusServiceUnavailable)
 		return
 	}
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.Error(w, "bad id", http.StatusBadRequest)
 		return
 	}
@@ -765,8 +765,8 @@ func (h *Handler) entryOGRegenerate(w http.ResponseWriter, r *http.Request) {
 // It responds with JSON so the list page can toggle the badge without a full
 // reload.
 func (h *Handler) entryPin(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.Error(w, "bad id", http.StatusBadRequest)
 		return
 	}
