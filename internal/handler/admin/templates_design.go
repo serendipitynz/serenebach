@@ -439,7 +439,7 @@ func (h *Handler) renderTemplateForm(w http.ResponseWriter, r *http.Request, t d
 func (h *Handler) templatesRecheck(w http.ResponseWriter, r *http.Request) {
 	id, ok := parsePositiveID(r, "id")
 	if !ok {
-		writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "not_found"})
+		http.NotFound(w, r)
 		return
 	}
 	current, err := h.Store.TemplateByID(r.Context(), h.wid(), id)
@@ -600,7 +600,7 @@ func (h *Handler) templatesSaveAs(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) templatesRename(w http.ResponseWriter, r *http.Request) {
 	id, ok := parsePositiveID(r, "id")
 	if !ok {
-		http.NotFound(w, r)
+		writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "not_found"})
 		return
 	}
 	current, err := h.Store.TemplateByID(r.Context(), h.wid(), id)
