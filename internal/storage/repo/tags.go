@@ -378,6 +378,10 @@ func (s *Store) TagsByEntry(ctx context.Context, entryID int64) ([]domain.Tag, e
 // TagsByEntries batches TagsByEntry across many entries so list views
 // can render the tag chip row per entry with one query. The return
 // map always has an entry for every input id (empty slice when none).
+//
+// Requests are chunked to stay under SQLite's bind-variable limit
+// (32766), so the function works correctly even when the entry count
+// is very large.
 func (s *Store) TagsByEntries(ctx context.Context, entryIDs []int64) (map[int64][]domain.Tag, error) {
 	out := make(map[int64][]domain.Tag, len(entryIDs))
 	for _, id := range entryIDs {
@@ -386,34 +390,51 @@ func (s *Store) TagsByEntries(ctx context.Context, entryIDs []int64) (map[int64]
 	if len(entryIDs) == 0 {
 		return out, nil
 	}
-	placeholders := strings.Repeat("?,", len(entryIDs))
-	placeholders = placeholders[:len(placeholders)-1]
-	args := make([]interface{}, 0, len(entryIDs))
-	for _, id := range entryIDs {
-		args = append(args, id)
-	}
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT et.entry_id, t.id, t.wid, t.name, t.slug, t.created_at, t.updated_at
-		FROM entry_tags et
-		JOIN tags t ON t.id = et.tag_id
-		WHERE et.entry_id IN (`+placeholders+`)
-		ORDER BY t.name ASC`, args...)
-	if err != nil {
-		return nil, fmt.Errorf("repo: TagsByEntries: %w", err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var entryID int64
-		var t domain.Tag
-		var createdAt, updatedAt int64
-		if err := rows.Scan(&entryID, &t.ID, &t.WID, &t.Name, &t.Slug, &createdAt, &updatedAt); err != nil {
-			return nil, fmt.Errorf("repo: scan tag row: %w", err)
+
+	const maxVars = 32766 // SQLite bind-variable limit
+	for start := 0; start < len(entryIDs); start += maxVars {
+		end := start + maxVars
+		if end > len(entryIDs) {
+			end = len(entryIDs)
 		}
-		t.CreatedAt = time.Unix(createdAt, 0)
-		t.UpdatedAt = time.Unix(updatedAt, 0)
-		out[entryID] = append(out[entryID], t)
+		chunk := entryIDs[start:end]
+
+		placeholders := strings.Repeat("?,", len(chunk))
+		placeholders = placeholders[:len(placeholders)-1]
+		args := make([]interface{}, 0, len(chunk))
+		for _, id := range chunk {
+			args = append(args, id)
+		}
+
+		rows, err := s.db.QueryContext(ctx, `
+			SELECT et.entry_id, t.id, t.wid, t.name, t.slug, t.created_at, t.updated_at
+			FROM entry_tags et
+			JOIN tags t ON t.id = et.tag_id
+			WHERE et.entry_id IN (`+placeholders+`)
+			ORDER BY t.name ASC`, args...)
+		if err != nil {
+			return nil, fmt.Errorf("repo: TagsByEntries: %w", err)
+		}
+		for rows.Next() {
+			var entryID int64
+			var t domain.Tag
+			var createdAt, updatedAt int64
+			if err := rows.Scan(&entryID, &t.ID, &t.WID, &t.Name, &t.Slug, &createdAt, &updatedAt); err != nil {
+				rows.Close()
+				return nil, fmt.Errorf("repo: scan tag row: %w", err)
+			}
+			t.CreatedAt = time.Unix(createdAt, 0)
+			t.UpdatedAt = time.Unix(updatedAt, 0)
+			out[entryID] = append(out[entryID], t)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("repo: TagsByEntries: %w", err)
+		}
+		rows.Close()
 	}
-	return out, rows.Err()
+
+	return out, nil
 }
 
 // PublishedEntriesByTag returns published entries carrying the given
