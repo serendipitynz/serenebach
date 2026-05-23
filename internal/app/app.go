@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -76,6 +77,9 @@ func New(cfg *config.Config) (*App, error) {
 	if err != nil {
 		_ = db.Close()
 		return nil, err
+	}
+	if analyticsStore != nil {
+		analyticsStore.WithEntryResolver(makeEntryResolver(store, DefaultWID))
 	}
 	auditStore, err := openAuditStore(cfg, db)
 	if err != nil {
@@ -531,6 +535,41 @@ func mcpHTTPHandler(store *repo.Store, srv *mcp.Server) http.HandlerFunc {
 		// attempt returns a tool error.
 		r = r.WithContext(mcp.WithAuth(r.Context(), tok.Scope, tok.ID, tok.AuthorID))
 		srv.HandleHTTP(w, r)
+	}
+}
+
+// makeEntryResolver builds an analytics.EntryResolver that maps slug
+// entry paths to numeric ids via the main repo. Numeric paths fall back
+// to EntryIDFromPath; errors are logged and return 0 so a failing
+// resolver never breaks a public request.
+func makeEntryResolver(store *repo.Store, wid int64) analytics.EntryResolver {
+	return func(ctx context.Context, path string) int64 {
+		const prefix = "/entry/"
+		if !strings.HasPrefix(path, prefix) {
+			return 0
+		}
+		rest := strings.TrimPrefix(path, prefix)
+		key := rest
+		if i := strings.IndexByte(rest, '/'); i >= 0 {
+			key = rest[:i]
+		}
+		if key == "" {
+			return 0
+		}
+		// Numeric keys are handled by EntryIDFromPath; skip the DB hit.
+		if id, err := strconv.ParseInt(key, 10, 64); err == nil && id > 0 {
+			return id
+		}
+		// Slug key — look it up. Errors are best-effort logged; never
+		// propagate to the HTTP response.
+		e, err := store.EntryBySlug(ctx, wid, key)
+		if err != nil {
+			if !errors.Is(err, repo.ErrNotFound) {
+				log.Printf("app: analytics resolver: EntryBySlug %q: %v", key, err)
+			}
+			return 0
+		}
+		return e.ID
 	}
 }
 

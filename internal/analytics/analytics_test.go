@@ -172,6 +172,47 @@ func TestRetentionZeroMeansKeepEverything(t *testing.T) {
 	}
 }
 
+func TestEntryIDForRequestWithResolver(t *testing.T) {
+	s := freshStore(t, 0)
+	resolverCalled := false
+	s.WithEntryResolver(func(_ context.Context, path string) int64 {
+		resolverCalled = true
+		if path == "/entry/my-slug/" {
+			return 42
+		}
+		return 0
+	})
+
+	ctx := context.Background()
+	if got := s.entryIDForRequest(ctx, "/entry/my-slug/"); got != 42 {
+		t.Errorf("entryIDForRequest(/entry/my-slug/) = %d, want 42", got)
+	}
+	if !resolverCalled {
+		t.Error("expected resolver to be called")
+	}
+}
+
+func TestEntryIDForRequestResolverZeroFallsBack(t *testing.T) {
+	s := freshStore(t, 0)
+	s.WithEntryResolver(func(_ context.Context, _ string) int64 { return 0 })
+
+	ctx := context.Background()
+	if got := s.entryIDForRequest(ctx, "/entry/7/"); got != 7 {
+		t.Errorf("entryIDForRequest(/entry/7/) = %d, want 7 (fallback)", got)
+	}
+}
+
+func TestEntryIDForRequestNoResolver(t *testing.T) {
+	s := freshStore(t, 0)
+	ctx := context.Background()
+	if got := s.entryIDForRequest(ctx, "/entry/3/"); got != 3 {
+		t.Errorf("entryIDForRequest(/entry/3/) = %d, want 3", got)
+	}
+	if got := s.entryIDForRequest(ctx, "/entry/abc/"); got != 0 {
+		t.Errorf("entryIDForRequest(/entry/abc/) = %d, want 0", got)
+	}
+}
+
 // itoa is intentionally re-implemented here so the test file is independent
 // of strconv, matching the style used in the app-level tests.
 func itoa(n int) string {
