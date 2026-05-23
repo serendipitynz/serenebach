@@ -165,6 +165,36 @@ func TestAnalyticsSameVisitorReused(t *testing.T) {
 	}
 }
 
+func TestAnalyticsAttributesSlugEntryViews(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+
+	// Give entry 1 a slug so it can be reached via /entry/<slug>/
+	if _, err := a.DB.ExecContext(context.Background(),
+		`UPDATE entries SET slug = 'my-slug' WHERE id = 1`); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("GET", "/entry/my-slug/", nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (reader)")
+	req.RemoteAddr = "10.0.0.1:1"
+	w := httptest.NewRecorder()
+	a.Handler().ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+
+	var entryID int64
+	if err := a.Analytics.DB().QueryRow(
+		`SELECT entry_id FROM page_views WHERE path = '/entry/my-slug/'`).Scan(&entryID); err != nil {
+		t.Fatal(err)
+	}
+	if entryID != 1 {
+		t.Errorf("entry_id = %d, want 1", entryID)
+	}
+}
+
 func TestAdminAnalyticsDashboardRenders(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)

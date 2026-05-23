@@ -24,6 +24,12 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// EntryResolver translates a request path into an entry id. When the
+// canonical URL uses a slug (e.g. /entry/my-slug/) the numeric id can't
+// be extracted from the path alone, so the resolver queries the main
+// repo. A nil or zero-value return falls back to EntryIDFromPath.
+type EntryResolver func(ctx context.Context, path string) int64
+
 // Store wraps the *sql.DB analytics rows live in. Construct one with Open
 // (separate file) or WrapMain (main-DB mode).
 type Store struct {
@@ -32,6 +38,7 @@ type Store struct {
 	cleanupEvery   int // attempt cleanup roughly once every N writes
 	writeCount     atomic.Int64
 	ownsConnection bool
+	entryResolver  EntryResolver
 }
 
 // WrapMain returns a Store backed by the main application database. This is
@@ -86,6 +93,24 @@ func (s *Store) Close() error {
 
 // DB exposes the underlying connection so tests can poke at the rows.
 func (s *Store) DB() *sql.DB { return s.db }
+
+// WithEntryResolver sets the path-to-entry-id translator and returns
+// the same Store so callers can chain it at construction time.
+func (s *Store) WithEntryResolver(resolve EntryResolver) *Store {
+	s.entryResolver = resolve
+	return s
+}
+
+// entryIDForRequest returns the entry id for a request path, using the
+// injected resolver when available and falling back to EntryIDFromPath.
+func (s *Store) entryIDForRequest(ctx context.Context, path string) int64 {
+	if s.entryResolver != nil {
+		if id := s.entryResolver(ctx, path); id > 0 {
+			return id
+		}
+	}
+	return EntryIDFromPath(path)
+}
 
 func (s *Store) ensureSchema(ctx context.Context) error {
 	stmts := []string{

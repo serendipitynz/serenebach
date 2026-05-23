@@ -45,7 +45,7 @@ func (s *Store) Middleware(next http.Handler) http.Handler {
 		}
 
 		// Best effort: log, never block the response.
-		if err := s.Record(r.Context(), visitorID, r.URL.Path, EntryIDFromPath(r.URL.Path)); err != nil {
+		if err := s.Record(r.Context(), visitorID, r.URL.Path, s.entryIDForRequest(r.Context(), r.URL.Path)); err != nil {
 			log.Printf("analytics: record: %v", err)
 		}
 		_ = fresh
