@@ -1101,5 +1101,97 @@ func TestBuildEntryFallsBackToActiveTmplWhenNoCategoryPin(t *testing.T) {
 	}
 }
 
+// TestRebuildPrevNextTiebreakAndHiddenSkip verifies two edge cases:
+//  1. When two entries share the same posted_at, prev/next resolves by
+//     id DESC (matching Prev/NextPublishedEntry SQL).
+//  2. A hidden-category entry between two visible entries is skipped in
+//     the prev/next chain so the visible neighbours link directly.
+func TestRebuildPrevNextTiebreakAndHiddenSkip(t *testing.T) {
+	a := newSeededApp(t)
+	ctx := context.Background()
+
+	// Create a hidden category.
+	now := time.Now().Unix()
+	res, err := a.DB.ExecContext(ctx, `
+		INSERT INTO categories (wid, parent_id, name, slug, sort_order, hidden, created_at, updated_at)
+		VALUES (1, 0, 'Hidden', 'hidden', 0, 1, ?, ?)`, now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hiddenCat, _ := res.LastInsertId()
+
+	// All three entries share the same posted_at so ordering depends on
+	// id tie-break alone. Insert order: visibleA (oldest), hiddenB,
+	// visibleC (newest).
+	sharedPosted := now
+
+	// visibleA — seeded entry 1 is already present, but we need known
+	// ids for assertions, so we insert fresh entries after clearing the
+	// seeded ones.
+	if _, err := a.DB.ExecContext(ctx, `DELETE FROM entries WHERE wid = 1`); err != nil {
+		t.Fatal(err)
+	}
+
+	ra, err := a.DB.ExecContext(ctx, `
+		INSERT INTO entries (wid, author_id, category_id, title, body, more, format, status, posted_at, created_at, updated_at)
+		VALUES (1, 1, 1, 'VISIBLE-A', '<p>a</p>', '', '', 1, ?, ?, ?)`,
+		sharedPosted, now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	visibleAID, _ := ra.LastInsertId()
+
+	rb, err := a.DB.ExecContext(ctx, `
+		INSERT INTO entries (wid, author_id, category_id, title, body, more, format, status, posted_at, created_at, updated_at)
+		VALUES (1, 1, ?, 'HIDDEN-B', '<p>b</p>', '', '', 1, ?, ?, ?)`,
+		hiddenCat, sharedPosted, now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ /*hiddenBID*/, _ = rb.LastInsertId()
+
+	rc, err := a.DB.ExecContext(ctx, `
+		INSERT INTO entries (wid, author_id, category_id, title, body, more, format, status, posted_at, created_at, updated_at)
+		VALUES (1, 1, 1, 'VISIBLE-C', '<p>c</p>', '', '', 1, ?, ?, ?)`,
+		sharedPosted, now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	visibleCID, _ := rc.LastInsertId()
+
+	out := filepath.Join(t.TempDir(), "public")
+	if _, err := rebuild.Build(ctx, a.Store, rebuild.Options{OutDir: out, WID: 1}); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	// visibleC (newest id) is at the front of the DESC list.
+	//   prev = visibleA (older, i+1), next = nil (edge, i-1 out of bounds).
+	pageC, err := os.ReadFile(filepath.Join(out, "entry", strconv.FormatInt(visibleCID, 10), "index.html"))
+	if err != nil {
+		t.Fatalf("read visibleC page: %v", err)
+	}
+	sC := string(pageC)
+	if !strings.Contains(sC, "« VISIBLE-A") { // prev = older
+		t.Errorf("visibleC: expected prev link to VISIBLE-A (older), got:\n%s", sC)
+	}
+	if strings.Contains(sC, "VISIBLE-C »") {
+		t.Errorf("visibleC: must not have next link (newest entry), got:\n%s", sC)
+	}
+
+	// visibleA (oldest id) is at the back of the DESC list.
+	//   prev = nil (edge, i+1 out of bounds), next = visibleC (newer, i-1).
+	pageA, err := os.ReadFile(filepath.Join(out, "entry", strconv.FormatInt(visibleAID, 10), "index.html"))
+	if err != nil {
+		t.Fatalf("read visibleA page: %v", err)
+	}
+	sA := string(pageA)
+	if !strings.Contains(sA, "VISIBLE-C »") { // next = newer
+		t.Errorf("visibleA: expected next link to VISIBLE-C (newer), got:\n%s", sA)
+	}
+	if strings.Contains(sA, "« VISIBLE-A") {
+		t.Errorf("visibleA: must not have prev link (oldest entry), got:\n%s", sA)
+	}
+}
+
 // silence unused import lint when test-only helpers drift
 var _ = sql.Open
