@@ -172,6 +172,7 @@ type buildData struct {
 	profileUsers []domain.User
 	sidebar      content.SidebarData
 	customTags   []domain.CustomTag
+	templates    map[int64]*domain.Template
 }
 
 // prepareBuildEnv resolves opts defaults (WID, TZ, EntryListLimit) and
@@ -252,6 +253,7 @@ func loadBuildData(ctx context.Context, store *repo.Store, wid int64, tz *time.L
 		profileUsers: profileUsers,
 		sidebar:      sidebar,
 		customTags:   customTags,
+		templates:    map[int64]*domain.Template{},
 	}, nil
 }
 
@@ -281,14 +283,14 @@ func writeStagedPages(ctx context.Context, store *repo.Store, stagedOpts Options
 	}
 	rep.Home = true
 
-	if err := writeEntries(ctx, store, stagedOpts, site, env.tmpl, env.weblog, data.all, data.cats, data.users, data.profileUsers, data.sidebar, rep); err != nil {
+	if err := writeEntries(ctx, store, stagedOpts, site, env.tmpl, env.weblog, data, rep); err != nil {
 		return nil, err
 	}
-	pageRoots, err := writePages(ctx, store, stagedOpts, site, data.profileUsers, data.sidebar, rep)
+	pageRoots, err := writePages(ctx, store, stagedOpts, site, data, rep)
 	if err != nil {
 		return nil, err
 	}
-	if err := writeCategories(ctx, store, stagedOpts, site, env.archiveTmpl, data.cats, data.users, data.profileUsers, data.sidebar, rep); err != nil {
+	if err := writeCategories(ctx, store, stagedOpts, site, env.archiveTmpl, data, rep); err != nil {
 		return nil, err
 	}
 	if err := writeTags(ctx, store, stagedOpts, site, env.archiveTmpl, data.cats, data.users, data.profileUsers, data.sidebar, rep); err != nil {
@@ -555,6 +557,26 @@ func buildVisibleIndex(all []domain.Entry, cats map[int64]domain.Category) ([]do
 	return visible, idx
 }
 
+// Template resolves a template by id, caching the result so multiple
+// writers (entries, categories, pages) share the same lookup. A zero
+// id returns nil without querying. Errors are logged and fall back to
+// nil so the caller can use its own default.
+func (bd *buildData) Template(ctx context.Context, store *repo.Store, wid, id int64) *domain.Template {
+	if id == 0 {
+		return nil
+	}
+	if t, ok := bd.templates[id]; ok {
+		return t
+	}
+	t, err := store.TemplateByID(ctx, wid, id)
+	if err != nil {
+		log.Printf("rebuild: template %d missing, falling back: %v", id, err)
+		return nil
+	}
+	bd.templates[id] = t
+	return t
+}
+
 // adjacentFromIndex resolves prev/next from a pre-built visible index.
 // Hidden-category entries are absent from the index, so the lookup
 // naturally returns nil, nil for them — matching the SQL behaviour.
@@ -583,31 +605,35 @@ func adjacentFromIndex(visible []domain.Entry, idx map[int64]int, e domain.Entry
 	return prev, next
 }
 
-func writeEntries(ctx context.Context, store *repo.Store, opts Options, site content.Site, tmpl *domain.Template, weblog *domain.Weblog, all []domain.Entry, cats map[int64]domain.Category, users map[int64]domain.User, profileUsers []domain.User, sidebar content.SidebarData, rep *Report) error {
+func writeEntries(ctx context.Context, store *repo.Store, opts Options, site content.Site, tmpl *domain.Template, weblog *domain.Weblog, data *buildData, rep *Report) error {
 	// Entry template priority mirrors SB3:
 	// entry's main category template -> active template.
-	templateCache := map[int64]*domain.Template{}
-	tagMap := tagsForEntries(ctx, store, all)
-	visible, visIdx := buildVisibleIndex(all, cats)
+	tagMap := tagsForEntries(ctx, store, data.all)
+	visible, visIdx := buildVisibleIndex(data.all, data.cats)
 
-	for i := range all {
-		e := all[i]
+	entryIDs := make([]int64, 0, len(data.all))
+	for _, e := range data.all {
+		entryIDs = append(entryIDs, e.ID)
+	}
+	msgMap, err := store.ApprovedMessagesByEntries(ctx, opts.WID, entryIDs)
+	if err != nil {
+		return fmt.Errorf("rebuild: bulk comments: %w", err)
+	}
+
+	for i := range data.all {
+		e := data.all[i]
 		var catPtr *domain.Category
-		if c, ok := cats[e.CategoryID]; ok {
+		if c, ok := data.cats[e.CategoryID]; ok {
 			catPtr = &c
 		}
 		var authorPtr *domain.User
-		if u, ok := users[e.AuthorID]; ok {
+		if u, ok := data.users[e.AuthorID]; ok {
 			authorPtr = &u
 		}
 
 		prev, next := adjacentFromIndex(visible, visIdx, e, catPtr)
 
-		// Approved comments for the entry so static pages also show them.
-		msgs, err := store.ApprovedMessagesByEntry(ctx, opts.WID, e.ID)
-		if err != nil {
-			return fmt.Errorf("rebuild: comments entry %d: %w", e.ID, err)
-		}
+		msgs := msgMap[e.ID]
 		if weblog.CommentSortOrder == "desc" {
 			for i, j := 0, len(msgs)-1; i < j; i, j = i+1, j-1 {
 				msgs[i], msgs[j] = msgs[j], msgs[i]
@@ -618,13 +644,8 @@ func writeEntries(ctx context.Context, store *repo.Store, opts Options, site con
 
 		entryTmpl := tmpl
 		if catPtr != nil && catPtr.TemplateID != 0 {
-			if cached, ok := templateCache[catPtr.TemplateID]; ok {
-				entryTmpl = cached
-			} else if t, err := store.TemplateByID(ctx, opts.WID, catPtr.TemplateID); err == nil {
-				templateCache[catPtr.TemplateID] = t
+			if t := data.Template(ctx, store, opts.WID, catPtr.TemplateID); t != nil {
 				entryTmpl = t
-			} else {
-				log.Printf("rebuild: category template pin %d missing, falling back: %v", catPtr.TemplateID, err)
 			}
 		}
 
@@ -634,8 +655,8 @@ func writeEntries(ctx context.Context, store *repo.Store, opts Options, site con
 			Messages:     msgs,
 			CommentMode:  weblog.CommentMode,
 			Tags:         entryTags,
-			ProfileUsers: profileUsers,
-			Sidebar:      sidebar,
+			ProfileUsers: data.profileUsers,
+			Sidebar:      data.sidebar,
 		}).Render()
 		if err != nil {
 			return fmt.Errorf("rebuild: render entry %d: %w", e.ID, err)
@@ -653,7 +674,7 @@ func writeEntries(ctx context.Context, store *repo.Store, opts Options, site con
 	return nil
 }
 
-func writeCategories(ctx context.Context, store *repo.Store, opts Options, site content.Site, tmpl *domain.Template, cats map[int64]domain.Category, users map[int64]domain.User, profileUsers []domain.User, sidebar content.SidebarData, rep *Report) error {
+func writeCategories(ctx context.Context, store *repo.Store, opts Options, site content.Site, tmpl *domain.Template, data *buildData, rep *Report) error {
 	allCats, err := store.AllCategories(ctx, opts.WID)
 	if err != nil {
 		return fmt.Errorf("rebuild: list categories: %w", err)
@@ -681,16 +702,16 @@ func writeCategories(ctx context.Context, store *repo.Store, opts Options, site 
 		// pin doesn't break the snapshot.
 		pageTmpl := tmpl
 		if cat.TemplateID != 0 {
-			if t, err := store.TemplateByID(ctx, opts.WID, cat.TemplateID); err == nil {
+			if t := data.Template(ctx, store, opts.WID, cat.TemplateID); t != nil {
 				pageTmpl = t
 			}
 		}
 		body, err := (content.ListView{
-			Site: site, Template: pageTmpl, Entries: entries, Categories: cats, Users: users,
+			Site: site, Template: pageTmpl, Entries: entries, Categories: data.cats, Users: data.users,
 			Tags:         tagsForEntries(ctx, store, entries),
 			Category:     &cat,
-			ProfileUsers: profileUsers,
-			Sidebar:      sidebar,
+			ProfileUsers: data.profileUsers,
+			Sidebar:      data.sidebar,
 			PageTitle:    "Category: " + cat.Name,
 			Mode:         "cat",
 			ModeContext:  strconv.FormatInt(cat.ID, 10),
@@ -881,31 +902,29 @@ func readPagesManifest(path string) (map[string]struct{}, error) {
 // feed write failure is fatal for the same reason a home-page failure is
 // — partial snapshots are worse than no rebuild. Feed content is capped
 // inside the builder, so handing it the full entry list is safe.
-func writePages(ctx context.Context, store *repo.Store, opts Options, site content.Site, profileUsers []domain.User, sidebar content.SidebarData, rep *Report) (map[string]struct{}, error) {
+func writePages(ctx context.Context, store *repo.Store, opts Options, site content.Site, data *buildData, rep *Report) (map[string]struct{}, error) {
 	pages, err := store.PublishedPages(ctx, opts.WID)
 	if err != nil {
 		return nil, fmt.Errorf("rebuild: list pages: %w", err)
 	}
 	roots := make(map[string]struct{}, len(pages))
 	for _, p := range pages {
-		var tmpl *domain.Template
+		var pageTmpl *domain.Template
 		if p.TemplateID != 0 {
-			if t, err := store.TemplateByID(ctx, opts.WID, p.TemplateID); err == nil {
-				tmpl = t
-			}
+			pageTmpl = data.Template(ctx, store, opts.WID, p.TemplateID)
 		}
-		if tmpl == nil {
-			tmpl, err = store.ActiveTemplate(ctx, opts.WID)
+		if pageTmpl == nil {
+			pageTmpl, err = store.ActiveTemplate(ctx, opts.WID)
 			if err != nil {
 				return nil, fmt.Errorf("rebuild: load active template for page %d: %w", p.ID, err)
 			}
 		}
 		body, err := (content.PageView{
 			Site:         site,
-			Template:     tmpl,
+			Template:     pageTmpl,
 			Page:         p,
-			ProfileUsers: profileUsers,
-			Sidebar:      sidebar,
+			ProfileUsers: data.profileUsers,
+			Sidebar:      data.sidebar,
 		}).Render()
 		if err != nil {
 			return nil, fmt.Errorf("rebuild: render page %d: %w", p.ID, err)
