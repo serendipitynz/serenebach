@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -52,7 +51,7 @@ func (h *Handler) mcpTokensCreate(w http.ResponseWriter, r *http.Request) {
 		h.renderSettingsAI(w, r, "", 0, tr(r, "flash.formParseError"))
 		return
 	}
-	name := strings.TrimSpace(r.PostFormValue("name"))
+	name := postFormValue(r, "name")
 	if name == "" {
 		h.renderSettingsAI(w, r, "", 0, tr(r, "settings.ops.mcp.error.nameRequired"))
 		return
@@ -69,7 +68,7 @@ func (h *Handler) mcpTokensCreate(w http.ResponseWriter, r *http.Request) {
 	var scope domain.MCPScope
 	if r.PostFormValue("scope_write") != "" {
 		scope = domain.MCPScopeWrite
-	} else if legacy := strings.TrimSpace(r.PostFormValue("scope")); legacy != "" {
+	} else if legacy := postFormValue(r, "scope"); legacy != "" {
 		scope = domain.MCPScope(legacy)
 	} else {
 		scope = domain.MCPScopeRead
@@ -81,7 +80,7 @@ func (h *Handler) mcpTokensCreate(w http.ResponseWriter, r *http.Request) {
 	// author_id: required. Reject zero / unknown / unparseable up front so
 	// no token row lands unbound. Validate against the current user list
 	// rather than UserByID so a typo'd id surfaces the same error.
-	authorID, _ := strconv.ParseInt(strings.TrimSpace(r.PostFormValue("author_id")), 10, 64)
+	authorID, _ := strconv.ParseInt(postFormValue(r, "author_id"), 10, 64)
 	if authorID <= 0 {
 		h.renderSettingsAI(w, r, "", 0, tr(r, "settings.ops.mcp.error.author"))
 		return

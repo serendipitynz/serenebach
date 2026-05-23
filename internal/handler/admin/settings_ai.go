@@ -284,7 +284,7 @@ func (h *Handler) settingsAISave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	kindRaw := strings.TrimSpace(r.PostFormValue("ai_kind"))
+	kindRaw := postFormValue(r, "ai_kind")
 	if !aiEnabledByForm(r, kindRaw) {
 		h.disableUserAIConfig(w, r, actor.ID, *existing)
 		return
@@ -298,8 +298,8 @@ func (h *Handler) settingsAISave(w http.ResponseWriter, r *http.Request) {
 
 	updated := *existing
 	updated.AIKind = string(kind)
-	updated.AIBaseURL = strings.TrimSpace(r.PostFormValue("ai_base_url"))
-	updated.AIModel = strings.TrimSpace(r.PostFormValue("ai_model"))
+	updated.AIBaseURL = postFormValue(r, "ai_base_url")
+	updated.AIModel = postFormValue(r, "ai_model")
 	updated.AIAutoAlt = r.PostFormValue("ai_auto_alt") == "on"
 	updated.AITimeoutSeconds = parseAITimeoutSeconds(r.PostFormValue("ai_timeout_seconds"))
 
@@ -368,7 +368,7 @@ func parseAITimeoutSeconds(raw string) int {
 // Returns an i18n error key when encryption fails so the caller can
 // surface it as a flash.
 func (h *Handler) applyAIAPIKey(r *http.Request, updated *domain.User) string {
-	newKey := strings.TrimSpace(r.PostFormValue("ai_api_key"))
+	newKey := postFormValue(r, "ai_api_key")
 	if newKey == "" {
 		return ""
 	}

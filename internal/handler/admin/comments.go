@@ -66,7 +66,7 @@ func (h *Handler) commentSettingsSubmit(w http.ResponseWriter, r *http.Request) 
 		h.renderCommentSettingsWith(w, r, *current, tr(r, "flash.formParseError"), false)
 		return
 	}
-	mode := domain.CommentMode(strings.TrimSpace(r.PostFormValue("comment_mode")))
+	mode := domain.CommentMode(postFormValue(r, "comment_mode"))
 	if !mode.Valid() {
 		h.renderCommentSettingsWith(w, r, *current, tr(r, "comments.settings.error.modeInvalid"), false)
 		return

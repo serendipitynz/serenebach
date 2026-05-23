@@ -252,7 +252,7 @@ func parseCategoryForm(r *http.Request, base domain.Category) (domain.Category, 
 		return base, tr(r, "flash.formParseError")
 	}
 
-	base.Name = strings.TrimSpace(r.PostFormValue("name"))
+	base.Name = postFormValue(r, "name")
 	if base.Name == "" {
 		return base, tr(r, "categories.form.error.nameRequired")
 	}
@@ -261,12 +261,12 @@ func parseCategoryForm(r *http.Request, base domain.Category) (domain.Category, 
 	// so the rest of the pipeline (router, rebuild, sbtemplate) can rely
 	// on a URL-safe value. Duplicate detection happens at the caller so
 	// it can pass the row id being edited as the exception.
-	base.Slug = strings.TrimSpace(r.PostFormValue("slug"))
+	base.Slug = postFormValue(r, "slug")
 	if base.Slug != "" && !domain.IsValidSlug(base.Slug) {
 		return base, tr(r, "categories.form.error.slugInvalid")
 	}
 
-	if raw := strings.TrimSpace(r.PostFormValue("parent_id")); raw != "" {
+	if raw := postFormValue(r, "parent_id"); raw != "" {
 		v, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
 			return base, tr(r, "categories.form.error.parentInvalid")
@@ -277,7 +277,7 @@ func parseCategoryForm(r *http.Request, base domain.Category) (domain.Category, 
 		base.ParentID = v
 	}
 
-	if raw := strings.TrimSpace(r.PostFormValue("sort_order")); raw != "" {
+	if raw := postFormValue(r, "sort_order"); raw != "" {
 		v, err := strconv.Atoi(raw)
 		if err != nil {
 			return base, tr(r, "categories.form.error.sortOrderInvalid")
@@ -287,7 +287,7 @@ func parseCategoryForm(r *http.Request, base domain.Category) (domain.Category, 
 
 	base.Description = strings.TrimRight(r.PostFormValue("description"), " \t\r\n")
 	base.DescriptionFormat = normaliseDescriptionFormat(r.PostFormValue("description_format"))
-	if raw := strings.TrimSpace(r.PostFormValue("template_id")); raw != "" && raw != "0" {
+	if raw := postFormValue(r, "template_id"); raw != "" && raw != "0" {
 		v, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || v < 0 {
 			return base, tr(r, "categories.form.error.templateInvalid")

@@ -389,7 +389,7 @@ func (h *Handler) parseEntryForm(r *http.Request, base domain.Entry) (domain.Ent
 		return base, tr(r, "flash.formParseError")
 	}
 
-	base.Title = strings.TrimSpace(r.PostFormValue("title"))
+	base.Title = postFormValue(r, "title")
 	base.Body = r.PostFormValue("body")
 	base.More = r.PostFormValue("more")
 	if base.Title == "" {
@@ -400,21 +400,21 @@ func (h *Handler) parseEntryForm(r *http.Request, base domain.Entry) (domain.Ent
 	// canonical path in that case. When filled, validate the format here
 	// so DB-level uniqueness is the only failure mode left to surface
 	// back to the form.
-	base.Slug = strings.TrimSpace(r.PostFormValue("slug"))
+	base.Slug = postFormValue(r, "slug")
 	if base.Slug != "" && !domain.IsValidSlug(base.Slug) {
 		return base, tr(r, "entries.form.error.slugInvalid")
 	}
 
 	base.Keywords = normaliseEntryKeywords(r.PostFormValue("keywords"))
 
-	if fmtRaw := strings.TrimSpace(r.PostFormValue("format")); fmtRaw != "" {
+	if fmtRaw := postFormValue(r, "format"); fmtRaw != "" {
 		base.Format = string(format.Normalize(fmtRaw))
 	}
 
 	// Per-entry OG background override. Same stored_path convention as
 	// the weblog-level field; empty = inherit the site default. No
 	// validation — unresolvable paths fall back at render.
-	base.OGBGImagePath = strings.TrimSpace(r.PostFormValue("og_bg_image_path"))
+	base.OGBGImagePath = postFormValue(r, "og_bg_image_path")
 
 	// Checkbox: present = pinned, absent = not pinned.
 	base.Pinned = r.PostFormValue("pinned") == "1"

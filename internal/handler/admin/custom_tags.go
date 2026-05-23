@@ -89,7 +89,7 @@ func (h *Handler) customTagCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
-	name := strings.TrimSpace(r.PostFormValue("name"))
+	name := postFormValue(r, "name")
 	value := r.PostFormValue("value")
 
 	if !strings.HasPrefix(name, "custom_") {
@@ -141,7 +141,7 @@ func (h *Handler) customTagUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
-	name := strings.TrimSpace(r.PostFormValue("name"))
+	name := postFormValue(r, "name")
 	value := r.PostFormValue("value")
 
 	if !strings.HasPrefix(name, "custom_") {
