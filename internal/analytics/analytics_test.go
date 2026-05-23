@@ -2,9 +2,12 @@ package analytics
 
 import (
 	"context"
+	"database/sql"
 	"path/filepath"
 	"testing"
 	"time"
+
+	_ "modernc.org/sqlite"
 )
 
 func TestEntryIDFromPath(t *testing.T) {
@@ -26,6 +29,25 @@ func TestEntryIDFromPath(t *testing.T) {
 			t.Errorf("EntryIDFromPath(%q) = %d, want %d", c.path, got, c.want)
 		}
 	}
+}
+
+func freshMainDB(t *testing.T) *sql.DB {
+	t.Helper()
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open main db: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if _, err := db.Exec(`
+		CREATE TABLE entries (
+			id INTEGER PRIMARY KEY,
+			likes_count INTEGER NOT NULL DEFAULT 0,
+			stamps_count INTEGER NOT NULL DEFAULT 0
+		)
+	`); err != nil {
+		t.Fatalf("create entries table: %v", err)
+	}
+	return db
 }
 
 func freshStore(t *testing.T, retentionDays int) *Store {
@@ -92,6 +114,96 @@ func TestTopEntries(t *testing.T) {
 	}
 	if top[1].EntryID != 2 || top[1].Views != 2 {
 		t.Errorf("top[1] = %+v, want EntryID=2 Views=2", top[1])
+	}
+}
+
+func TestTopEntriesViewsSortLimit(t *testing.T) {
+	s := freshStore(t, 0)
+	ctx := context.Background()
+
+	for i := 0; i < 5; i++ {
+		_ = s.Record(ctx, "v"+itoa(i), "/entry/1/", 1)
+	}
+	for i := 0; i < 4; i++ {
+		_ = s.Record(ctx, "v"+itoa(i+10), "/entry/2/", 2)
+	}
+	for i := 0; i < 3; i++ {
+		_ = s.Record(ctx, "v"+itoa(i+20), "/entry/3/", 3)
+	}
+
+	top, err := s.TopEntries(ctx, nil, time.Now().Add(-time.Hour), 2, SortByViews)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(top) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(top))
+	}
+	if top[0].EntryID != 1 || top[0].Views != 5 {
+		t.Errorf("top[0] = %+v, want EntryID=1 Views=5", top[0])
+	}
+	if top[1].EntryID != 2 || top[1].Views != 4 {
+		t.Errorf("top[1] = %+v, want EntryID=2 Views=4", top[1])
+	}
+}
+
+func TestTopEntriesViewsSortTieBreak(t *testing.T) {
+	s := freshStore(t, 0)
+	ctx := context.Background()
+
+	for i := 0; i < 3; i++ {
+		_ = s.Record(ctx, "v"+itoa(i), "/entry/1/", 1)
+	}
+	for i := 0; i < 3; i++ {
+		_ = s.Record(ctx, "v"+itoa(i+10), "/entry/2/", 2)
+	}
+	_ = s.Record(ctx, "other", "/entry/3/", 3)
+
+	top, err := s.TopEntries(ctx, nil, time.Now().Add(-time.Hour), 2, SortByViews)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(top) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(top))
+	}
+	// tie break: entry_id desc, so 2 > 1
+	if top[0].EntryID != 2 {
+		t.Errorf("top[0].EntryID = %d, want 2 (tie break id desc)", top[0].EntryID)
+	}
+	if top[1].EntryID != 1 {
+		t.Errorf("top[1].EntryID = %d, want 1 (tie break id desc)", top[1].EntryID)
+	}
+}
+
+func TestTopEntriesViewsSortWithEngagement(t *testing.T) {
+	s := freshStore(t, 0)
+	mainDB := freshMainDB(t)
+	ctx := context.Background()
+
+	if _, err := mainDB.Exec(`
+		INSERT INTO entries (id, likes_count, stamps_count) VALUES (1, 5, 10), (2, 3, 7)
+	`); err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 5; i++ {
+		_ = s.Record(ctx, "v"+itoa(i), "/entry/1/", 1)
+	}
+	for i := 0; i < 2; i++ {
+		_ = s.Record(ctx, "v"+itoa(i+10), "/entry/2/", 2)
+	}
+
+	top, err := s.TopEntries(ctx, mainDB, time.Now().Add(-time.Hour), 10, SortByViews)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(top) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(top))
+	}
+	if top[0].EntryID != 1 || top[0].Views != 5 || top[0].Likes != 5 || top[0].Stamps != 10 {
+		t.Errorf("top[0] = %+v, want EntryID=1 Views=5 Likes=5 Stamps=10", top[0])
+	}
+	if top[1].EntryID != 2 || top[1].Views != 2 || top[1].Likes != 3 || top[1].Stamps != 7 {
+		t.Errorf("top[1] = %+v, want EntryID=2 Views=2 Likes=3 Stamps=7", top[1])
 	}
 }
 

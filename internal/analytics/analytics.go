@@ -253,12 +253,28 @@ func (s *Store) TopEntries(ctx context.Context, mainDB *sql.DB, since time.Time,
 	if s == nil || s.db == nil {
 		return nil, nil
 	}
+	sort, orderClause := resolveTopEntrySort(sort, mainDB)
+
+	if sort == SortByViews {
+		ids, viewsByID, err := s.collectTopEntryViews(ctx, since, limit)
+		if err != nil {
+			return nil, err
+		}
+		likesByID := map[int64]int64{}
+		stampsByID := map[int64]int64{}
+		if mainDB != nil && len(ids) > 0 {
+			if err := loadEngagementByIDs(ctx, mainDB, ids, likesByID, stampsByID); err != nil {
+				return nil, err
+			}
+		}
+		return buildEntryHits(ids, viewsByID, likesByID, stampsByID), nil
+	}
+
 	viewsByID, err := s.collectEntryViews(ctx, since)
 	if err != nil {
 		return nil, err
 	}
-	sort, orderClause := resolveTopEntrySort(sort, mainDB)
-	ids, likesByID, stampsByID, err := loadTopEntryIDs(ctx, mainDB, sort, orderClause, viewsByID, limit)
+	ids, likesByID, stampsByID, err := loadTopEntryIDs(ctx, mainDB, orderClause, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -292,6 +308,40 @@ func (s *Store) collectEntryViews(ctx context.Context, since time.Time) (map[int
 	return viewsByID, nil
 }
 
+// collectTopEntryViews returns the top N entry ids by view count together
+// with a map of id -> views. The SQL does the ordering and limiting so
+// we avoid sorting the full set in Go.
+func (s *Store) collectTopEntryViews(ctx context.Context, since time.Time, limit int) ([]int64, map[int64]int64, error) {
+	if limit <= 0 {
+		return nil, map[int64]int64{}, nil
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT entry_id, COUNT(*) AS c
+		FROM page_views
+		WHERE entry_id > 0 AND created_at >= ?
+		GROUP BY entry_id
+		ORDER BY c DESC, entry_id DESC
+		LIMIT ?`, since.Unix(), limit)
+	if err != nil {
+		return nil, nil, fmt.Errorf("analytics: top entry views: %w", err)
+	}
+	defer rows.Close()
+	var ids []int64
+	viewsByID := map[int64]int64{}
+	for rows.Next() {
+		var id, c int64
+		if err := rows.Scan(&id, &c); err != nil {
+			return nil, nil, fmt.Errorf("analytics: scan top entry views: %w", err)
+		}
+		ids = append(ids, id)
+		viewsByID[id] = c
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
+	}
+	return ids, viewsByID, nil
+}
+
 // resolveTopEntrySort normalises sort and returns the matching ORDER BY
 // clause. Engagement sorts silently degrade to views when mainDB is
 // nil — without the main DB we cannot read likes_count / stamps_count,
@@ -314,29 +364,19 @@ func resolveTopEntrySort(sort TopEntrySort, mainDB *sql.DB) (TopEntrySort, strin
 }
 
 // loadTopEntryIDs returns the ordered entry id list plus likes/stamps
-// maps for the chosen sort mode. For likes/stamps sort we pull the
+// maps for engagement-sorted modes (likes / stamps). It pulls the
 // candidate pool via the main DB so an entry with zero views but many
-// reactions still appears; for views sort we only need entries present
-// in viewsByID.
+// reactions still appears.
 func loadTopEntryIDs(
 	ctx context.Context,
 	mainDB *sql.DB,
-	sort TopEntrySort,
 	orderClause string,
-	viewsByID map[int64]int64,
 	limit int,
 ) ([]int64, map[int64]int64, map[int64]int64, error) {
 	likesByID := map[int64]int64{}
 	stampsByID := map[int64]int64{}
-	if sort == SortByLikes || sort == SortByStamps {
-		var ids []int64
-		if err := loadEngagementByOrder(ctx, mainDB, orderClause, limit, &ids, likesByID, stampsByID); err != nil {
-			return nil, nil, nil, err
-		}
-		return ids, likesByID, stampsByID, nil
-	}
-	ids, err := collectViewsSortedIDs(ctx, mainDB, viewsByID, limit, likesByID, stampsByID)
-	if err != nil {
+	var ids []int64
+	if err := loadEngagementByOrder(ctx, mainDB, orderClause, limit, &ids, likesByID, stampsByID); err != nil {
 		return nil, nil, nil, err
 	}
 	return ids, likesByID, stampsByID, nil
@@ -360,22 +400,6 @@ func buildEntryHits(ids []int64, viewsByID, likesByID, stampsByID map[int64]int6
 		})
 	}
 	return out
-}
-
-// sortByValueDesc sorts ids in place by descending values[id]; ties
-// break on id descending so the ordering is deterministic.
-func sortByValueDesc(ids []int64, values map[int64]int64) {
-	// Simple insertion sort — top-entries limit is small (default ~10).
-	for i := 1; i < len(ids); i++ {
-		for j := i; j > 0; j-- {
-			a, b := ids[j-1], ids[j]
-			if values[b] > values[a] || (values[b] == values[a] && b > a) {
-				ids[j-1], ids[j] = b, a
-			} else {
-				break
-			}
-		}
-	}
 }
 
 // DayPoint is one bucket for a daily PV chart (date formatted YYYY-MM-DD).
@@ -421,31 +445,6 @@ func NewVisitorID() (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(b), nil
-}
-
-// collectViewsSortedIDs returns the entry ids visible in viewsByID, sorted
-// by view count descending and capped at `limit`. Views-sort still wants
-// likes_count / stamps_count populated so the table can show those
-// columns; when mainDB is nil (tests / analytics-only callers) the
-// engagement columns stay at zero and the views ranking is unaffected.
-func collectViewsSortedIDs(ctx context.Context, mainDB *sql.DB, viewsByID map[int64]int64, limit int, likesByID, stampsByID map[int64]int64) ([]int64, error) {
-	ids := make([]int64, 0, len(viewsByID))
-	for id := range viewsByID {
-		ids = append(ids, id)
-	}
-	if len(ids) == 0 {
-		return nil, nil
-	}
-	if mainDB != nil {
-		if err := loadEngagementByIDs(ctx, mainDB, ids, likesByID, stampsByID); err != nil {
-			return nil, err
-		}
-	}
-	sortByValueDesc(ids, viewsByID)
-	if len(ids) > limit {
-		ids = ids[:limit]
-	}
-	return ids, nil
 }
 
 // loadEngagementByOrder reads ids + likes_count + stamps_count from the
