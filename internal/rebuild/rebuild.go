@@ -12,7 +12,6 @@ package rebuild
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -528,25 +527,55 @@ func tagsForEntries(ctx context.Context, store *repo.Store, entries []domain.Ent
 	return out
 }
 
-// adjacentEntries resolves prev/next for a rebuild target. When the
-// target's category is hidden, both are skipped — matching the dynamic
-// permalink handler at internal/handler/public/entry.go so the static
-// deploy never chains a hidden-category entry back into the visible
-// feed. ErrNotFound is collapsed to nil (no neighbour); any other
-// error bubbles up so the rebuild fails loudly.
-func adjacentEntries(ctx context.Context, store *repo.Store, wid int64, e domain.Entry, cat *domain.Category) (*domain.Entry, *domain.Entry, error) {
+// buildVisibleIndex returns (1) a slice of entries whose category is not
+// hidden, sorted by posted_at DESC, id DESC — matching the order Prev/
+// NextPublishedEntry uses on the SQL side; and (2) an id-to-index map
+// for O(1) neighbour lookup. Hidden-category entries are intentionally
+// absent so an attempt to look one up yields ok=false, mirroring the
+// current adjacentEntries behaviour where hidden entries report nil
+// neighbours.
+func buildVisibleIndex(all []domain.Entry, cats map[int64]domain.Category) ([]domain.Entry, map[int64]int) {
+	visible := make([]domain.Entry, 0, len(all))
+	for _, e := range all {
+		if c, ok := cats[e.CategoryID]; ok && c.Hidden {
+			continue
+		}
+		visible = append(visible, e)
+	}
+	sort.SliceStable(visible, func(i, j int) bool {
+		if !visible[i].PostedAt.Equal(visible[j].PostedAt) {
+			return visible[i].PostedAt.After(visible[j].PostedAt)
+		}
+		return visible[i].ID > visible[j].ID
+	})
+	idx := make(map[int64]int, len(visible))
+	for i, e := range visible {
+		idx[e.ID] = i
+	}
+	return visible, idx
+}
+
+// adjacentFromIndex resolves prev/next from a pre-built visible index.
+// Hidden-category entries are absent from the index, so the lookup
+// naturally returns nil, nil for them — matching the SQL behaviour.
+func adjacentFromIndex(visible []domain.Entry, idx map[int64]int, e domain.Entry, cat *domain.Category) (*domain.Entry, *domain.Entry) {
 	if cat != nil && cat.Hidden {
-		return nil, nil, nil
+		return nil, nil
 	}
-	prev, err := store.PrevPublishedEntry(ctx, wid, e)
-	if err != nil && !errors.Is(err, repo.ErrNotFound) {
-		return nil, nil, fmt.Errorf("rebuild: prev entry %d: %w", e.ID, err)
+	i, ok := idx[e.ID]
+	if !ok {
+		return nil, nil
 	}
-	next, err := store.NextPublishedEntry(ctx, wid, e)
-	if err != nil && !errors.Is(err, repo.ErrNotFound) {
-		return nil, nil, fmt.Errorf("rebuild: next entry %d: %w", e.ID, err)
+	var prev, next *domain.Entry
+	if i > 0 {
+		p := visible[i-1]
+		prev = &p
 	}
-	return prev, next, nil
+	if i+1 < len(visible) {
+		n := visible[i+1]
+		next = &n
+	}
+	return prev, next
 }
 
 func writeEntries(ctx context.Context, store *repo.Store, opts Options, site content.Site, tmpl *domain.Template, weblog *domain.Weblog, all []domain.Entry, cats map[int64]domain.Category, users map[int64]domain.User, profileUsers []domain.User, sidebar content.SidebarData, rep *Report) error {
@@ -554,6 +583,7 @@ func writeEntries(ctx context.Context, store *repo.Store, opts Options, site con
 	// entry's main category template -> active template.
 	templateCache := map[int64]*domain.Template{}
 	tagMap := tagsForEntries(ctx, store, all)
+	visible, visIdx := buildVisibleIndex(all, cats)
 
 	for i := range all {
 		e := all[i]
@@ -566,10 +596,7 @@ func writeEntries(ctx context.Context, store *repo.Store, opts Options, site con
 			authorPtr = &u
 		}
 
-		prev, next, err := adjacentEntries(ctx, store, opts.WID, e, catPtr)
-		if err != nil {
-			return err
-		}
+		prev, next := adjacentFromIndex(visible, visIdx, e, catPtr)
 
 		// Approved comments for the entry so static pages also show them.
 		msgs, err := store.ApprovedMessagesByEntry(ctx, opts.WID, e.ID)
