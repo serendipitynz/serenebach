@@ -3,6 +3,7 @@ package admin
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -28,6 +29,17 @@ func parsePositiveID(r *http.Request, name string) (int64, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+// postFormValue reads a POST-only form field with leading/trailing
+// whitespace trimmed. Mirrors the recurring
+// `strings.TrimSpace(r.PostFormValue(key))` pattern.
+//
+// PostFormValue (not FormValue) is intentional: the admin surface
+// rejects URL-query-string values to avoid accidental leakage from
+// GET parameters into write-path handlers.
+func postFormValue(r *http.Request, key string) string {
+	return strings.TrimSpace(r.PostFormValue(key))
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
