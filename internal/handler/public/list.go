@@ -25,15 +25,9 @@ const defaultEntryListSize = 10
 // `useArchiveTemplate` routes category + archive pages through the pinned
 // archive template (when configured via デザイン > 設定); home pages
 // leave it false and always use the active template.
-func (h *Handler) renderList(w http.ResponseWriter, r *http.Request, entries []domain.Entry, pageTitle, logTag string, useArchiveTemplate bool, cat *domain.Category, mode, modeCtx string, pg content.Pagination) {
+func (h *Handler) renderList(w http.ResponseWriter, r *http.Request, weblog *domain.Weblog, entries []domain.Entry, pageTitle, logTag string, useArchiveTemplate bool, cat *domain.Category, mode, modeCtx string, pg content.Pagination) {
 	ctx := r.Context()
 
-	weblog, err := h.Store.WeblogByID(ctx, h.WID)
-	if err != nil {
-		log.Printf("%s: load weblog: %v", logTag, err)
-		http.Error(w, "site not configured", http.StatusInternalServerError)
-		return
-	}
 	preview := previewFromRequest(r)
 	tmpl, err := h.resolveListTemplate(ctx, logTag, preview, cat, useArchiveTemplate, weblog.ArchiveTemplateID)
 	if err != nil {
@@ -196,7 +190,13 @@ func (h *Handler) home(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	size, asc := h.listTuning(ctx)
+	weblog, err := h.Store.WeblogByID(ctx, h.WID)
+	if err != nil {
+		log.Printf("public.home: load weblog: %v", err)
+		http.Error(w, "site not configured", http.StatusInternalServerError)
+		return
+	}
+	size, asc := listTuning(weblog)
 	total, err := h.Store.CountPublishedEntries(ctx, h.WID)
 	if err != nil {
 		log.Printf("public.home: count: %v", err)
@@ -217,15 +217,14 @@ func (h *Handler) home(w http.ResponseWriter, r *http.Request) {
 	if asc {
 		reverseEntries(entries)
 	}
-	h.renderList(w, r, entries, "", "public.home", false, nil, "page", "", pg)
+	h.renderList(w, r, weblog, entries, "", "public.home", false, nil, "page", "", pg)
 }
 
 // listTuning reads the weblog's display-size + sort preferences. Falls
 // back to (defaultEntryListSize, false) on any error so a missing
 // weblog row still produces a page — preferring degraded UX over a 500.
-func (h *Handler) listTuning(ctx context.Context) (size int, sortAsc bool) {
-	weblog, err := h.Store.WeblogByID(ctx, h.WID)
-	if err != nil {
+func listTuning(weblog *domain.Weblog) (size int, sortAsc bool) {
+	if weblog == nil {
 		return defaultEntryListSize, false
 	}
 	size = weblog.EntriesPerPage
@@ -304,7 +303,13 @@ func (h *Handler) category(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	size, asc := h.listTuning(ctx)
+	weblog, err := h.Store.WeblogByID(ctx, h.WID)
+	if err != nil {
+		log.Printf("public.category: load weblog: %v", err)
+		http.Error(w, "site not configured", http.StatusInternalServerError)
+		return
+	}
+	size, asc := listTuning(weblog)
 	total, err := h.Store.CountPublishedEntriesByCategory(ctx, h.WID, cat.ID)
 	if err != nil {
 		log.Printf("public.category: count: %v", err)
@@ -327,7 +332,7 @@ func (h *Handler) category(w http.ResponseWriter, r *http.Request) {
 		reverseEntries(entries)
 	}
 	pageTitle := "Category: " + cat.Name
-	h.renderList(w, r, entries, pageTitle, "public.category", true, cat, "cat", strconv.FormatInt(cat.ID, 10), pg)
+	h.renderList(w, r, weblog, entries, pageTitle, "public.category", true, cat, "cat", strconv.FormatInt(cat.ID, 10), pg)
 }
 
 func (h *Handler) tag(w http.ResponseWriter, r *http.Request) {
@@ -348,7 +353,13 @@ func (h *Handler) tag(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	size, asc := h.listTuning(ctx)
+	weblog, err := h.Store.WeblogByID(ctx, h.WID)
+	if err != nil {
+		log.Printf("public.tag: load weblog: %v", err)
+		http.Error(w, "site not configured", http.StatusInternalServerError)
+		return
+	}
+	size, asc := listTuning(weblog)
 	total, err := h.Store.CountPublishedEntriesByTag(ctx, h.WID, t.ID)
 	if err != nil {
 		log.Printf("public.tag: count: %v", err)
@@ -373,7 +384,7 @@ func (h *Handler) tag(w http.ResponseWriter, r *http.Request) {
 	// Tag pages render through the archive template when one is pinned
 	// — same convention as categories and date archives, matching reader
 	// expectation that "browse by …" pages share one look.
-	h.renderList(w, r, entries, "Tag: "+t.Name, "public.tag", true, nil, "tag", t.Slug, pg)
+	h.renderList(w, r, weblog, entries, "Tag: "+t.Name, "public.tag", true, nil, "tag", t.Slug, pg)
 }
 
 func (h *Handler) archiveYear(w http.ResponseWriter, r *http.Request) {
@@ -388,7 +399,13 @@ func (h *Handler) archiveYear(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	size, asc := h.listTuning(ctx)
+	weblog, err := h.Store.WeblogByID(ctx, h.WID)
+	if err != nil {
+		log.Printf("public.archiveYear: load weblog: %v", err)
+		http.Error(w, "site not configured", http.StatusInternalServerError)
+		return
+	}
+	size, asc := listTuning(weblog)
 	from := time.Date(year, time.January, 1, 0, 0, 0, 0, h.tz())
 	to := from.AddDate(1, 0, 0)
 	total, err := h.Store.CountPublishedEntriesInRange(ctx, h.WID, from, to)
@@ -413,7 +430,7 @@ func (h *Handler) archiveYear(w http.ResponseWriter, r *http.Request) {
 		reverseEntries(entries)
 	}
 	pageTitle := "Archive: " + strconv.Itoa(year)
-	h.renderList(w, r, entries, pageTitle, "public.archiveYear", true, nil, "arc", strconv.Itoa(year), pg)
+	h.renderList(w, r, weblog, entries, pageTitle, "public.archiveYear", true, nil, "arc", strconv.Itoa(year), pg)
 }
 
 func (h *Handler) archiveMonth(w http.ResponseWriter, r *http.Request) {
@@ -429,7 +446,13 @@ func (h *Handler) archiveMonth(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	size, asc := h.listTuning(ctx)
+	weblog, err := h.Store.WeblogByID(ctx, h.WID)
+	if err != nil {
+		log.Printf("public.archiveMonth: load weblog: %v", err)
+		http.Error(w, "site not configured", http.StatusInternalServerError)
+		return
+	}
+	size, asc := listTuning(weblog)
 	from := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, h.tz())
 	to := from.AddDate(0, 1, 0)
 	total, err := h.Store.CountPublishedEntriesInRange(ctx, h.WID, from, to)
@@ -454,5 +477,5 @@ func (h *Handler) archiveMonth(w http.ResponseWriter, r *http.Request) {
 		reverseEntries(entries)
 	}
 	pageTitle := "Archive: " + strconv.Itoa(year) + "/" + padMonth(month)
-	h.renderList(w, r, entries, pageTitle, "public.archiveMonth", true, nil, "arc", fmt.Sprintf("%04d%s", year, padMonth(month)), pg)
+	h.renderList(w, r, weblog, entries, pageTitle, "public.archiveMonth", true, nil, "arc", fmt.Sprintf("%04d%s", year, padMonth(month)), pg)
 }
