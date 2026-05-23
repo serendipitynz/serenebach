@@ -553,6 +553,8 @@ func writeEntries(ctx context.Context, store *repo.Store, opts Options, site con
 	// Entry template priority mirrors SB3:
 	// entry's main category template -> active template.
 	templateCache := map[int64]*domain.Template{}
+	tagMap := tagsForEntries(ctx, store, all)
+
 	for i := range all {
 		e := all[i]
 		var catPtr *domain.Category
@@ -580,10 +582,7 @@ func writeEntries(ctx context.Context, store *repo.Store, opts Options, site con
 			}
 		}
 
-		entryTags, err := store.TagsByEntry(ctx, e.ID)
-		if err != nil {
-			return fmt.Errorf("rebuild: tags entry %d: %w", e.ID, err)
-		}
+		entryTags := tagMap[e.ID]
 
 		entryTmpl := tmpl
 		if catPtr != nil && catPtr.TemplateID != 0 {

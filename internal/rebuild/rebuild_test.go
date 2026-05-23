@@ -871,12 +871,12 @@ func TestBuildLeavesNoStagingOrBackupDirsOnSuccess(t *testing.T) {
 // to a static host; leftover staging would either ship to
 // production or trigger noisy "unexpected files" warnings.
 //
-// To exercise the post-MkdirTemp failure path we drop entry_tags
+// To exercise the post-MkdirTemp failure path we drop messages
 // after a successful first build. Pre-staging fetches in Build
 // (weblog / template / entries / sidebar / custom tags) do not
-// touch entry_tags, so MkdirTemp succeeds and writeHome's
+// touch messages, so MkdirTemp succeeds and writeHome's
 // tagsForEntries logs-and-continues; writeEntries then fails on
-// TagsByEntry, which returns an error — exactly the contract we
+// ApprovedMessagesByEntry, which returns an error — exactly the contract we
 // want the defer to clean up after.
 func TestBuildCleansStagingDirOnFailure(t *testing.T) {
 	a := newSeededApp(t)
@@ -887,12 +887,12 @@ func TestBuildCleansStagingDirOnFailure(t *testing.T) {
 		t.Fatalf("initial Build: %v", err)
 	}
 
-	// Drop entry_tags so writeEntries fails after staging is created.
-	if _, err := a.DB.ExecContext(context.Background(), `DROP TABLE entry_tags`); err != nil {
+	// Drop messages so writeEntries fails after staging is created.
+	if _, err := a.DB.ExecContext(context.Background(), `DROP TABLE messages`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := rebuild.Build(context.Background(), a.Store, rebuild.Options{OutDir: out, WID: 1}); err == nil {
-		t.Fatal("expected Build to fail with entry_tags dropped")
+		t.Fatal("expected Build to fail with messages dropped")
 	}
 
 	dirEntries, err := os.ReadDir(out)
