@@ -558,6 +558,11 @@ func buildVisibleIndex(all []domain.Entry, cats map[int64]domain.Category) ([]do
 // adjacentFromIndex resolves prev/next from a pre-built visible index.
 // Hidden-category entries are absent from the index, so the lookup
 // naturally returns nil, nil for them — matching the SQL behaviour.
+//
+// visible is sorted by (posted_at DESC, id DESC), so for current index i:
+//
+//	prev (older)  = i+1
+//	next (newer)  = i-1
 func adjacentFromIndex(visible []domain.Entry, idx map[int64]int, e domain.Entry, cat *domain.Category) (*domain.Entry, *domain.Entry) {
 	if cat != nil && cat.Hidden {
 		return nil, nil
@@ -567,12 +572,12 @@ func adjacentFromIndex(visible []domain.Entry, idx map[int64]int, e domain.Entry
 		return nil, nil
 	}
 	var prev, next *domain.Entry
-	if i > 0 {
-		p := visible[i-1]
+	if i+1 < len(visible) {
+		p := visible[i+1]
 		prev = &p
 	}
-	if i+1 < len(visible) {
-		n := visible[i+1]
+	if i > 0 {
+		n := visible[i-1]
 		next = &n
 	}
 	return prev, next

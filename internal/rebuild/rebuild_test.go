@@ -1164,22 +1164,32 @@ func TestRebuildPrevNextTiebreakAndHiddenSkip(t *testing.T) {
 		t.Fatalf("Build: %v", err)
 	}
 
-	// --- visibleC (newest id) should have prev=visibleA ---
+	// visibleC (newest id) is at the front of the DESC list.
+	//   prev = visibleA (older, i+1), next = nil (edge, i-1 out of bounds).
 	pageC, err := os.ReadFile(filepath.Join(out, "entry", strconv.FormatInt(visibleCID, 10), "index.html"))
 	if err != nil {
 		t.Fatalf("read visibleC page: %v", err)
 	}
-	if !strings.Contains(string(pageC), strconv.FormatInt(visibleAID, 10)) {
-		t.Errorf("visibleC prev/next must link to visibleA; body:\n%s", string(pageC))
+	sC := string(pageC)
+	if !strings.Contains(sC, "« VISIBLE-A") { // prev = older
+		t.Errorf("visibleC: expected prev link to VISIBLE-A (older), got:\n%s", sC)
+	}
+	if strings.Contains(sC, "VISIBLE-C »") {
+		t.Errorf("visibleC: must not have next link (newest entry), got:\n%s", sC)
 	}
 
-	// --- visibleA (oldest id) should have next=visibleC ---
+	// visibleA (oldest id) is at the back of the DESC list.
+	//   prev = nil (edge, i+1 out of bounds), next = visibleC (newer, i-1).
 	pageA, err := os.ReadFile(filepath.Join(out, "entry", strconv.FormatInt(visibleAID, 10), "index.html"))
 	if err != nil {
 		t.Fatalf("read visibleA page: %v", err)
 	}
-	if !strings.Contains(string(pageA), strconv.FormatInt(visibleCID, 10)) {
-		t.Errorf("visibleA prev/next must link to visibleC; body:\n%s", string(pageA))
+	sA := string(pageA)
+	if !strings.Contains(sA, "VISIBLE-C »") { // next = newer
+		t.Errorf("visibleA: expected next link to VISIBLE-C (newer), got:\n%s", sA)
+	}
+	if strings.Contains(sA, "« VISIBLE-A") {
+		t.Errorf("visibleA: must not have prev link (oldest entry), got:\n%s", sA)
 	}
 }
 
