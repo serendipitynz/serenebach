@@ -254,7 +254,7 @@ func (h *Handler) loginSubmit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
-	name := strings.TrimSpace(r.PostFormValue("name"))
+	name := postFormValue(r, "name")
 	pw := r.PostFormValue("password")
 	nextParam := r.URL.Query().Get("next")
 	token := csrf.Token(r.Context())

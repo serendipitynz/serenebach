@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -115,8 +114,8 @@ func (h *Handler) tagUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
-	name := strings.TrimSpace(r.PostFormValue("name"))
-	slug := strings.TrimSpace(r.PostFormValue("slug"))
+	name := postFormValue(r, "name")
+	slug := postFormValue(r, "slug")
 	if name == "" || slug == "" {
 		http.Error(w, "name and slug required", http.StatusBadRequest)
 		return

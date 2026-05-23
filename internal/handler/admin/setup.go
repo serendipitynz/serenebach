@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -90,11 +89,11 @@ func (h *Handler) setupSubmit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
-	name := strings.TrimSpace(r.PostFormValue("name"))
-	email := strings.TrimSpace(r.PostFormValue("email"))
+	name := postFormValue(r, "name")
+	email := postFormValue(r, "email")
 	pw := r.PostFormValue("password")
 	pwConfirm := r.PostFormValue("password_confirm")
-	weblogTitle := strings.TrimSpace(r.PostFormValue("weblog_title"))
+	weblogTitle := postFormValue(r, "weblog_title")
 	if weblogTitle == "" {
 		weblogTitle = "Serene Bach"
 	}

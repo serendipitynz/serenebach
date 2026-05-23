@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -77,17 +76,17 @@ func (h *Handler) profileSave(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updated := *existing
-	name := strings.TrimSpace(r.PostFormValue("name"))
+	name := postFormValue(r, "name")
 	if name == "" || !repo.IsValidUserName(name) {
 		h.renderProfileForm(w, r, updated, tr(r, "profile.form.error.nameInvalid"), "")
 		return
 	}
 	updated.Name = name
-	updated.DisplayName = strings.TrimSpace(r.PostFormValue("display_name"))
+	updated.DisplayName = postFormValue(r, "display_name")
 	if updated.DisplayName == "" {
 		updated.DisplayName = updated.Name
 	}
-	updated.Email = strings.TrimSpace(r.PostFormValue("email"))
+	updated.Email = postFormValue(r, "email")
 	updated.Description = r.PostFormValue("description")
 	updated.DescriptionFormat = normaliseDescriptionFormat(r.PostFormValue("description_format"))
 	updated.ListVisible = r.PostFormValue("list_visible") == "on"

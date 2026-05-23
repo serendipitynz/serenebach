@@ -436,7 +436,7 @@ func (h *Handler) fireTestDelivery(ctx context.Context, hw *domain.Webhook, payl
 // row (or a zero value for create). Returns (best-effort row, "") on
 // success or (best-effort row, error key) on validation failure.
 func parseWebhookForm(r *http.Request, base domain.Webhook) (domain.Webhook, string) {
-	urlVal := strings.TrimSpace(r.PostFormValue("url"))
+	urlVal := postFormValue(r, "url")
 	if urlVal == "" {
 		return base, "webhooks.error.urlRequired"
 	}
@@ -467,7 +467,7 @@ func parseWebhookForm(r *http.Request, base domain.Webhook) (domain.Webhook, str
 	}
 	base.Events = events
 
-	if f := strings.TrimSpace(r.PostFormValue("payload_format")); f != "" {
+	if f := postFormValue(r, "payload_format"); f != "" {
 		if !webhook.IsKnownPayloadFormat(f) {
 			return base, "webhooks.error.formatInvalid"
 		}
