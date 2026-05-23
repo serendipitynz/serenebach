@@ -19,9 +19,10 @@ import (
 
 const defaultEntryListSize = 10
 
-// renderList is the shared "load weblog + template, enrich with category/user
+// renderList is the shared "resolve template, enrich with category/user
 // maps, render ListView" tail used by home/category/archive handlers. The
-// caller supplies the already-filtered entry slice and an optional PageTitle.
+// caller supplies the already-loaded weblog, the filtered entry slice, and
+// an optional PageTitle.
 // `useArchiveTemplate` routes category + archive pages through the pinned
 // archive template (when configured via デザイン > 設定); home pages
 // leave it false and always use the active template.
@@ -220,9 +221,9 @@ func (h *Handler) home(w http.ResponseWriter, r *http.Request) {
 	h.renderList(w, r, weblog, entries, "", "public.home", false, nil, "page", "", pg)
 }
 
-// listTuning reads the weblog's display-size + sort preferences. Falls
-// back to (defaultEntryListSize, false) on any error so a missing
-// weblog row still produces a page — preferring degraded UX over a 500.
+// listTuning reads the supplied weblog's display-size + sort preferences.
+// Falls back to (defaultEntryListSize, false) when weblog is nil or
+// EntriesPerPage is not positive.
 func listTuning(weblog *domain.Weblog) (size int, sortAsc bool) {
 	if weblog == nil {
 		return defaultEntryListSize, false
