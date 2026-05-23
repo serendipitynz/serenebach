@@ -84,6 +84,51 @@ func (s *Store) ApprovedMessagesByEntry(ctx context.Context, wid, entryID int64)
 	return scanMessages(rows)
 }
 
+// ApprovedMessagesByEntries batches ApprovedMessagesByEntry across many
+// entries so the full-site rebuild can fetch comments for every entry
+// in a single query. The map always has an entry for every input id
+// (empty slice when none approved).
+func (s *Store) ApprovedMessagesByEntries(ctx context.Context, wid int64, entryIDs []int64) (map[int64][]domain.Message, error) {
+	out := make(map[int64][]domain.Message, len(entryIDs))
+	for _, id := range entryIDs {
+		out[id] = []domain.Message{}
+	}
+	if len(entryIDs) == 0 {
+		return out, nil
+	}
+	placeholders := strings.Repeat("?,", len(entryIDs))
+	placeholders = placeholders[:len(placeholders)-1]
+	args := make([]interface{}, 0, len(entryIDs)+2)
+	args = append(args, wid, domain.MessageApproved)
+	for _, id := range entryIDs {
+		args = append(args, id)
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT `+messageColumns+`
+		FROM messages
+		WHERE wid = ? AND status = ? AND entry_id IN (`+placeholders+`)
+		ORDER BY entry_id ASC, posted_at ASC, id ASC`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("repo: ApprovedMessagesByEntries: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var m domain.Message
+		var postedAt int64
+		if err := rows.Scan(&m.ID, &m.WID, &m.EntryID, &m.Status, &postedAt,
+			&m.AuthorName, &m.AuthorEmail, &m.AuthorURL, &m.Body,
+			&m.IPAddress, &m.UserAgent); err != nil {
+			return nil, fmt.Errorf("repo: scan message row: %w", err)
+		}
+		m.PostedAt = time.Unix(postedAt, 0)
+		out[m.EntryID] = append(out[m.EntryID], m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("repo: ApprovedMessagesByEntries: %w", err)
+	}
+	return out, nil
+}
+
 // MessageSortKey is a typed enum of the columns the admin comment list
 // can sort by. Default is posted_at DESC — the moderation queue's
 // natural order.
