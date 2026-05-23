@@ -380,8 +380,8 @@ func newTemplateLintSummary(body string) templateLintSummary {
 }
 
 func (h *Handler) templatesEditForm(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -437,8 +437,8 @@ func (h *Handler) renderTemplateForm(w http.ResponseWriter, r *http.Request, t d
 // dirty based on what the browser already tracked, and the save
 // button is still the only way to commit.
 func (h *Handler) templatesRecheck(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -516,8 +516,8 @@ func validateTemplateSource(r *http.Request, src string) error {
 }
 
 func (h *Handler) templatesSave(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -548,8 +548,8 @@ func (h *Handler) templatesSave(w http.ResponseWriter, r *http.Request) {
 // leaving the original untouched. Useful for branching a layout — tweak,
 // Save As "wide v2", activate when ready.
 func (h *Handler) templatesSaveAs(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -598,8 +598,8 @@ func (h *Handler) templatesSaveAs(w http.ResponseWriter, r *http.Request) {
 // re-reading the row before writing back. Responds with JSON so the
 // browser can update the page header in place.
 func (h *Handler) templatesRename(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "not_found"})
 		return
 	}
@@ -740,8 +740,8 @@ func (h *Handler) templatesList(w http.ResponseWriter, r *http.Request) {
 // ---- activate ----------------------------------------------------------
 
 func (h *Handler) templatesActivate(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -760,12 +760,12 @@ func (h *Handler) templatesActivate(w http.ResponseWriter, r *http.Request) {
 // ---- delete ------------------------------------------------------------
 
 func (h *Handler) templatesDelete(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	err = h.Store.DeleteTemplate(r.Context(), h.wid(), id)
+	err := h.Store.DeleteTemplate(r.Context(), h.wid(), id)
 	switch {
 	case errors.Is(err, repo.ErrNotFound):
 		http.NotFound(w, r)

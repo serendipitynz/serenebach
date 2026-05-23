@@ -185,8 +185,8 @@ func (h *Handler) pageNewForm(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) pageEditForm(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -436,8 +436,8 @@ func (h *Handler) pageCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) pageUpdate(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -491,8 +491,8 @@ func (h *Handler) pageUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) pageDelete(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -585,8 +585,8 @@ func (h *Handler) pageOGRegenerate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "og disabled", http.StatusServiceUnavailable)
 		return
 	}
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.Error(w, "bad id", http.StatusBadRequest)
 		return
 	}

@@ -203,8 +203,8 @@ type userFormPageData struct {
 }
 
 func (h *Handler) userEditForm(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -245,8 +245,8 @@ func (h *Handler) renderUserForm(w http.ResponseWriter, r *http.Request, u domai
 }
 
 func (h *Handler) userUpdate(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -378,8 +378,8 @@ func (h *Handler) updateUserPasswordIfChanged(w http.ResponseWriter, r *http.Req
 // ---- delete -------------------------------------------------------------
 
 func (h *Handler) userDelete(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}

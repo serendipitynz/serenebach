@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
-
 	"github.com/serendipitynz/serenebach/internal/csrf"
 	"github.com/serendipitynz/serenebach/internal/domain"
 	"github.com/serendipitynz/serenebach/internal/session"
@@ -134,8 +132,8 @@ func (h *Handler) customTagCreate(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) customTagUpdate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -156,7 +154,7 @@ func (h *Handler) customTagUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.Store.UpdateCustomTag(ctx, domain.CustomTag{
+	err := h.Store.UpdateCustomTag(ctx, domain.CustomTag{
 		ID:    id,
 		WID:   h.wid(),
 		Name:  name,
@@ -180,8 +178,8 @@ func (h *Handler) customTagUpdate(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) customTagDelete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}

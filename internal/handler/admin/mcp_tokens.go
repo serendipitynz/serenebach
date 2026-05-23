@@ -121,8 +121,8 @@ func (h *Handler) mcpTokensCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) mcpTokensRevoke(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}

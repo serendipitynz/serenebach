@@ -405,8 +405,8 @@ func (h *Handler) webhookDeliveries(w http.ResponseWriter, r *http.Request) {
 // on success. Failures (bad id, not found, fetch error) write the
 // appropriate HTTP response so the caller only checks the boolean.
 func (h *Handler) loadWebhook(w http.ResponseWriter, r *http.Request) (*domain.Webhook, bool) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return nil, false
 	}

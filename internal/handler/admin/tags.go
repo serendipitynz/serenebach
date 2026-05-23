@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -107,8 +106,8 @@ func (h *Handler) tagList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) tagUpdate(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -126,7 +125,7 @@ func (h *Handler) tagUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid slug format", http.StatusBadRequest)
 		return
 	}
-	err = h.Store.UpdateTag(r.Context(), domain.Tag{
+	err := h.Store.UpdateTag(r.Context(), domain.Tag{
 		ID: id, WID: h.wid(), Name: name, Slug: slug,
 	})
 	if err != nil {
@@ -146,8 +145,8 @@ func (h *Handler) tagUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) tagDelete(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}

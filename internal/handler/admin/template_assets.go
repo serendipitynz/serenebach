@@ -115,8 +115,8 @@ func (h *Handler) templateAssetUpload(w http.ResponseWriter, r *http.Request) {
 // the template row exists in this weblog. ok=false means the response
 // has already been written (404 or 500) and the caller must stop.
 func (h *Handler) loadTemplateForAssetUpload(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	tplID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || tplID <= 0 {
+	tplID, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return 0, false
 	}
@@ -199,8 +199,8 @@ func (h *Handler) persistTemplateAssetFile(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *Handler) templateAssetDelete(w http.ResponseWriter, r *http.Request) {
-	tplID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || tplID <= 0 {
+	tplID, ok := parsePositiveID(r, "id")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
