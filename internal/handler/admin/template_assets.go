@@ -34,15 +34,18 @@ func (h *Handler) mountTemplateAssets(r chi.Router) {
 // going to reference from HTML / CSS. Broader than the entry-image
 // allowlist on purpose: templates reach for .svg / .js / .woff too.
 var allowedTemplateAssetMIME = map[string]bool{
-	"image/jpeg":    true,
-	"image/png":     true,
-	"image/gif":     true,
-	"image/webp":    true,
-	"image/svg+xml": true,
-	"text/css":      true,
-	"text/plain":    true,
-	// JS + fonts land under the generic app/* + font/* families; extend
-	// when a template in the wild actually needs them.
+	"image/jpeg":      true,
+	"image/png":       true,
+	"image/gif":       true,
+	"image/webp":      true,
+	"image/svg+xml":   true,
+	"text/css":        true,
+	"text/plain":      true,
+	"text/javascript": true,
+	"font/woff":       true,
+	"font/woff2":      true,
+	"font/ttf":        true,
+	"font/otf":        true,
 }
 
 // templateAssetUpload handles a multipart POST from the template editor.
@@ -146,6 +149,16 @@ func detectTemplateAssetMIME(w http.ResponseWriter, r *http.Request, file io.Rea
 	if idx := strings.IndexByte(mt, ';'); idx >= 0 {
 		mt = strings.TrimSpace(mt[:idx])
 	}
+
+	// When sniff yields a generic ambiguous type, prefer the extension-derived
+	// MIME so .js is recorded as text/javascript (not text/plain) and .woff2
+	// as font/woff2 (not application/octet-stream).
+	if isAmbiguousSniff(mt) {
+		if byExt := mimeFromExt(header.Filename); byExt != "" && allowedTemplateAssetMIME[byExt] {
+			mt = byExt
+		}
+	}
+
 	if !allowedTemplateAssetMIME[mt] {
 		mt = templateAssetMIMEFromExt(mt, header.Filename)
 	}
@@ -154,6 +167,27 @@ func detectTemplateAssetMIME(w http.ResponseWriter, r *http.Request, file io.Rea
 		return "", false
 	}
 	return mt, true
+}
+
+func isAmbiguousSniff(mt string) bool {
+	switch mt {
+	case "text/plain", "application/octet-stream":
+		return true
+	}
+	return false
+}
+
+// mimeFromExt returns the MIME type for the given filename's extension
+// without checking the allowlist. It strips any charset parameter.
+func mimeFromExt(filename string) string {
+	byExt := mime.TypeByExtension(strings.ToLower(filepath.Ext(filename)))
+	if byExt == "" {
+		return ""
+	}
+	if idx := strings.IndexByte(byExt, ';'); idx >= 0 {
+		byExt = strings.TrimSpace(byExt[:idx])
+	}
+	return byExt
 }
 
 // sanitiseTemplateAssetFilename strips any path components, drops NUL
