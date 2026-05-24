@@ -76,7 +76,7 @@ Templates are edited in the browser at `/admin/templates`. The sidebar entry is 
 - **OG card** — the blog-wide default OG card background and text colour. Per-entry overrides on the entry editor take precedence.
 - **Import** — upload an SB3 `template.txt` (multipart/mixed bundle with base.html / style.css / optional entry.html / binary assets). Each imported asset lands under `SB_TEMPLATE_DIR/<new_id>/`.
 
-Per-template assets (logos, background images, webfonts, etc.) upload to the same editor via drag-and-drop. They are served read-only at `/template/<template_id>/<filename>`, and the sbtemplate tag `{site_parts}` resolves to that prefix for the currently-rendered template so HTML / CSS can reference them as `{site_parts}logo.png`.
+Per-template assets (logos, background images, CSS, JavaScript, web fonts, etc.) upload to the same editor via drag-and-drop. They are served read-only at `/template/<template_id>/<filename>`, and the sbtemplate tag `{site_parts}` resolves to that prefix for the currently-rendered template so HTML / CSS can reference them as `{site_parts}logo.png`.
 
 Export reproduces the bundle as a downloadable `template.txt` — exported files round-trip through the parser and through the legacy SB3 template importer.
 

@@ -19,6 +19,7 @@
 - 常駐 HTTP サーバ・もしくは従来型レンタルサーバの CGI として動作
 - 管理画面 UI / MCP サーバ / 管理画面ヘルプ もすべてバイナリに同梱
 - ハイブリッド配信向けの静的サイト生成 (CDN 前段 + 動的管理画面)
+- テンプレートから JS / Web フォントファイルも参照可能（画像・CSS と同様にアップロードして利用）
 - 旧 Serene Bach v2 (テキストファイル) / v3 (SQLite) (Perl 版) からのインポートに対応。YAML front-matter 付き markdown ファイル群からの取り込みもサポート
 - Outbound Webhooks: 記事公開 / コメント受信 / 画像アップロード で Slack / Discord / Zapier / n8n に通知
 

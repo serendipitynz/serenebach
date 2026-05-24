@@ -26,6 +26,8 @@ Template assets such as images can be uploaded and referenced with `{site_parts}
 <img src="{site_parts}logo.png" alt="">
 ```
 
+`.js` / `.woff` / `.woff2` / `.ttf` / `.otf` files can also be uploaded and referenced from `{site_parts}`.
+
 ## HTML template syntax
 
 HTML templates are ordinary HTML with two special constructs: **blocks** and **tags**.
