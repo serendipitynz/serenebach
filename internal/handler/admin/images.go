@@ -281,6 +281,7 @@ func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 			"filename":           stored.Filename,
 			"url":                root(r) + imagesPathPrefix + stored.StoredPath,
 			"thumb_url":          thumbURL(stored, root(r)),
+			"kind":               kind,
 			"width":              stored.Width,
 			"height":             stored.Height,
 			"size":               stored.SizeBytes,
