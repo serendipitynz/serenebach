@@ -92,6 +92,7 @@ CI でも push / PR ごとに同じコマンドが走ります:
 | ツール | 用途 |
 |---|---|
 | `./bin/serenebach mcp serve` | stdio 経由で MCP サーバを起動 (Claude Code / Cursor / Zed 向け) |
+| `./bin/serenebach backup` | DB・画像・テンプレートの整合 ZIP スナップショットを作成。`--include-analytics` / `--include-public` オプション付き |
 | `task build-proxy` | MCP OAuth プロキシ (`bin/mcp-oauth-proxy`) をビルド。ChatGPT の OAuth 専用 MCP クライアントと、Serene Bach の Bearer トークン認証 `/mcp` エンドポイントを中継します。環境変数や ChatGPT 設定方法は `cmd/mcp-oauth-proxy/README.md` を参照してください。 |
 
 ## ドキュメント

@@ -85,6 +85,7 @@ Everything below is a `go run` or `go build` under the hood, so the Taskfile is 
 | `task build-proxy` | Build the MCP OAuth proxy at `./bin/mcp-oauth-proxy`. Bridges ChatGPT's OAuth-only MCP client to Serene Bach's Bearer-token `/mcp` endpoint. See `cmd/mcp-oauth-proxy/README.md` for env vars and ChatGPT configuration. |
 | `./bin/serenebach mcp serve` | Start the MCP server over stdio — exposes the read tools to Claude Code / Cursor / Zed |
 | `./bin/serenebach extract-assets` | Write embedded admin assets (`admin.css`, `admin.js`, logos, favicon) to disk so Apache can serve them directly in CGI mode. See [docs/deployment.md](docs/deployment.md) |
+| `./bin/serenebach backup` | Create a consistent ZIP snapshot of the database, images, templates, and optional analytics / static output. See **Backup** below |
 | `task lint` | Run `golangci-lint` against `.golangci.yml` (covers `staticcheck` plus the project lint set, including `gocyclo` at the goreportcard threshold of 15) |
 | `task test` | `go test ./...` |
 | `task tidy` | `go mod tidy` |
@@ -102,5 +103,28 @@ The admin Settings page edits per-weblog content values (title, description, bas
 | Base URL / `lang` | `SB_UPLOAD_MAX_MB`, `SB_IMAGE_DIR` |
 | Comment mode | `SB_REBUILD_OUT` |
 | Spam-words list / IP blacklist | `SB_ANALYTICS_*` |
+
+## Backup
+
+`serenebach backup` writes a ZIP archive containing the database snapshot (via SQLite `VACUUM INTO`), uploaded images, template assets, and a `manifest.json` with checksums and table row counts.
+
+```bash
+./serenebach backup --out ./backup-$(date +%F).zip
+./serenebach -db ./data/prod.db backup --out ./backup.zip
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--out <path>` | `backup-YYYY-MM-DD-HHMMSS.zip` | Output path. Use `-` for stdout |
+| `--include-analytics` | off | Include `SB_ANALYTICS_DB` and `SB_MCP_AUDIT_DB` if configured as separate files |
+| `--include-public` | off | Include `SB_REBUILD_OUT` (static rebuild output) |
+| `--exclude <names>` | (none) | Comma-separated: `images`, `templates` |
+| `--quiet` | off | Suppress progress output |
+
+**Notes:**
+- Analytics and MCP audit DBs are included **only** when they are configured as separate files (`SB_ANALYTICS_DB` / `SB_MCP_AUDIT_DB`). If they live in the main DB, they are already captured by the snapshot and `--include-analytics` is a no-op.
+- `--include-public` is silently skipped if the rebuild output directory does not exist.
+- In CGI mode `--out` is required because the working directory is unpredictable.
+- The output file is created with `0o600` permissions.
 
 Changes take effect immediately for dynamic rendering. After editing content settings, run a static rebuild (`/admin/rebuild`) to regenerate the on-disk HTML with the new values.
