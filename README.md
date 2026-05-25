@@ -92,6 +92,7 @@ CI runs the same checks on every push and pull request:
 | Tool | What it does |
 |---|---|
 | `./bin/serenebach mcp serve` | Start the MCP server over stdio for Claude Code / Cursor / Zed |
+| `./bin/serenebach backup` | Create a consistent ZIP snapshot of the database, images, and templates. Optional `--include-analytics` and `--include-public` flags |
 | `task build-proxy` | Build the MCP OAuth proxy (`bin/mcp-oauth-proxy`) — bridges ChatGPT's OAuth-only MCP client to Serene Bach's Bearer-token `/mcp` endpoint. See `cmd/mcp-oauth-proxy/README.md` for env vars and ChatGPT configuration. |
 
 ## Documentation
