@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -48,6 +50,9 @@ func (h *Handler) mountImages(r chi.Router) {
 	// an upload when the user's AIAutoAlt flag is on; also usable
 	// manually for older uploads that predate the auto-alt feature.
 	r.Post("/images/{id}/alt", h.imagesGenerateAlt)
+	// Rename updates the human-facing filename label without touching
+	// the on-disk stored_path (so past entry links stay valid).
+	r.Post("/images/{id}/rename", h.imagesRename)
 }
 
 // ---- gallery page ------------------------------------------------------
@@ -87,7 +92,7 @@ func (h *Handler) imagesList(w http.ResponseWriter, r *http.Request) {
 	}
 	page, totalPages, offset := listPagination(q.Get("page"), total, adminImagePageSize)
 
-	items, err := h.Store.ListImagesForAdmin(r.Context(), h.wid(), adminImagePageSize, offset)
+	items, err := h.Store.ListImagesForAdmin(r.Context(), h.wid(), "", adminImagePageSize, offset)
 	if err != nil {
 		log.Printf("admin.imagesList: %v", err)
 		http.Error(w, "failed to list images", http.StatusInternalServerError)
@@ -126,7 +131,7 @@ func (h *Handler) imagesList(w http.ResponseWriter, r *http.Request) {
 // adminImageListLimit rows — the picker does its own client-side
 // filtering and doesn't page.
 func (h *Handler) imagesListJSON(w http.ResponseWriter, r *http.Request) {
-	items, err := h.Store.ListImagesForAdmin(r.Context(), h.wid(), adminImageListLimit, 0)
+	items, err := h.Store.ListImagesForAdmin(r.Context(), h.wid(), "", adminImageListLimit, 0)
 	if err != nil {
 		log.Printf("admin.imagesList: %v", err)
 		http.Error(w, "failed to list images", http.StatusInternalServerError)
@@ -140,9 +145,14 @@ func (h *Handler) imagesListJSON(w http.ResponseWriter, r *http.Request) {
 			"filename":    img.Filename,
 			"stored_path": img.StoredPath,
 			"url":         imgPrefix + img.StoredPath,
-			"width":       img.Width,
-			"height":      img.Height,
+			"kind":        img.Kind,
 			"alt":         img.AltText,
+		}
+		if img.Width.Valid {
+			entry["width"] = img.Width.Int64
+		}
+		if img.Height.Valid {
+			entry["height"] = img.Height.Int64
 		}
 		if img.ThumbPath != "" {
 			entry["thumb_url"] = imgPrefix + img.ThumbPath
@@ -160,6 +170,8 @@ func (h *Handler) imagesListJSON(w http.ResponseWriter, r *http.Request) {
 // client sets Accept: application/json (the drop-zone fetch does), and
 // otherwise redirects back to the gallery so a progressive-enhancement
 // `<form>` without JS still round-trips cleanly.
+//
+//nolint:gocyclo
 func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 	wantsJSON := acceptsJSON(r)
 
@@ -189,12 +201,14 @@ func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	mime, err := detectImageMIME(file, header)
+	mime, err := detectUploadMIME(file, header)
 	if err != nil {
 		respondUpload(w, wantsJSON, http.StatusUnsupportedMediaType,
 			tr(r, "common.error.unsupportedImage"), root(r))
 		return
 	}
+
+	kind := images.KindFor(mime)
 
 	store := h.imageStore()
 	stored, err := store.SaveUpload(file, header.Filename, mime, time.Now())
@@ -205,17 +219,23 @@ func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	u := session.UserFrom(r.Context())
-	id, err := h.Store.CreateImage(r.Context(), domain.Image{
+	img := domain.Image{
 		WID:        h.wid(),
 		UploadedBy: u.ID,
+		Kind:       kind,
 		Filename:   stored.Filename,
 		StoredPath: stored.StoredPath,
 		ThumbPath:  stored.ThumbPath,
 		MimeType:   mime,
 		SizeBytes:  stored.SizeBytes,
-		Width:      stored.Width,
-		Height:     stored.Height,
-	})
+	}
+	if stored.Width > 0 {
+		img.Width = sql.NullInt64{Int64: int64(stored.Width), Valid: true}
+	}
+	if stored.Height > 0 {
+		img.Height = sql.NullInt64{Int64: int64(stored.Height), Valid: true}
+	}
+	id, err := h.Store.CreateImage(r.Context(), img)
 	if err != nil {
 		log.Printf("admin.imagesUpload: db insert: %v", err)
 		// Orphan file — best effort clean up so the disk doesn't grow on a
@@ -229,15 +249,22 @@ func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 		ID:         id,
 		WID:        h.wid(),
 		UploadedBy: u.ID,
+		Kind:       kind,
 		Filename:   stored.Filename,
 		StoredPath: stored.StoredPath,
 		ThumbPath:  stored.ThumbPath,
 		MimeType:   mime,
 		SizeBytes:  stored.SizeBytes,
-		Width:      stored.Width,
-		Height:     stored.Height,
 	}
-	h.dispatchImageUploaded(r.Context(), uploadedImage, imagesPathPrefix+stored.StoredPath)
+	if stored.Width > 0 {
+		uploadedImage.Width = sql.NullInt64{Int64: int64(stored.Width), Valid: true}
+	}
+	if stored.Height > 0 {
+		uploadedImage.Height = sql.NullInt64{Int64: int64(stored.Height), Valid: true}
+	}
+	if kind == domain.KindImage {
+		h.dispatchImageUploaded(r.Context(), uploadedImage, imagesPathPrefix+stored.StoredPath)
+	}
 
 	if wantsJSON {
 		// When the uploader opted into auto-alt and has a usable AI
@@ -324,10 +351,12 @@ func (h *Handler) uploadMaxBytes() int64 {
 	return h.UploadMaxBytes
 }
 
-// detectImageMIME rewinds the uploaded file after peeking at the first
+// detectUploadMIME rewinds the uploaded file after peeking at the first
 // 512 bytes through http.DetectContentType. We trust the detector over the
 // client-supplied Content-Type because browsers can be tricked / wrong.
-func detectImageMIME(f multipart.File, _ *multipart.FileHeader) (string, error) {
+// Extension-based normalisation is applied for edge cases the stdlib
+// detector gets wrong (text/markdown, audio/mp4, audio/ogg).
+func detectUploadMIME(f multipart.File, h *multipart.FileHeader) (string, error) {
 	head := make([]byte, 512)
 	n, _ := f.Read(head)
 	if _, err := f.Seek(0, 0); err != nil {
@@ -339,6 +368,18 @@ func detectImageMIME(f multipart.File, _ *multipart.FileHeader) (string, error) 
 	if idx := strings.IndexByte(ct, ';'); idx >= 0 {
 		ct = strings.TrimSpace(ct[:idx])
 	}
+
+	// Extension-based normalisation for formats the stdlib misdetects.
+	ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(h.Filename), "."))
+	switch {
+	case ct == "text/plain" && ext == "md":
+		ct = "text/markdown"
+	case ct == "video/mp4" && ext == "m4a":
+		ct = "audio/mp4"
+	case ct == "application/ogg" && ext == "ogg":
+		ct = "audio/ogg"
+	}
+
 	if !images.AllowedMIMEs[ct] {
 		return "", fmt.Errorf("mime %q not allowed", ct)
 	}
@@ -365,6 +406,64 @@ func respondUpload(w http.ResponseWriter, asJSON bool, status int, msg, basePath
 	}
 	w.Header().Set("Location", basePath+"/admin/images?err="+urlEscape(msg))
 	w.WriteHeader(http.StatusFound)
+}
+
+// imagesRename updates the human-facing filename label for an upload.
+// Only the DB filename column is touched; stored_path stays the same so
+// past entry links don't break.
+func (h *Handler) imagesRename(w http.ResponseWriter, r *http.Request) {
+	id, ok := parsePositiveID(r, "id")
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	img, err := h.Store.ImageByID(r.Context(), h.wid(), id)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		log.Printf("admin.imagesRename: load: %v", err)
+		http.Error(w, "failed to load image", http.StatusInternalServerError)
+		return
+	}
+	u := session.UserFrom(r.Context())
+	if u == nil || !u.CanDeleteImage(img.UploadedBy) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	newName := strings.TrimSpace(r.FormValue("filename"))
+	if newName == "" || strings.ContainsAny(newName, "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f") {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid filename"})
+		return
+	}
+	if len(newName) > 255 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "filename too long"})
+		return
+	}
+
+	if err := h.Store.UpdateImageFilename(r.Context(), h.wid(), id, newName); err != nil {
+		log.Printf("admin.imagesRename: update: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "save failed"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "filename": newName})
+}
+
+// humanSize formats a byte count as B / KB / MB.
+// Registered as a template func so the linter cannot see the call site.
+//
+//nolint:unused
+func humanSize(b int64) string {
+	switch {
+	case b < 1024:
+		return fmt.Sprintf("%d B", b)
+	case b < 1024*1024:
+		return fmt.Sprintf("%.1f KB", float64(b)/1024)
+	default:
+		return fmt.Sprintf("%.1f MB", float64(b)/(1024*1024))
+	}
 }
 
 // thumbURL returns the URL for the thumbnail, or the full image when no

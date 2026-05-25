@@ -54,6 +54,10 @@ func (h *Handler) imagesGenerateAlt(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if img.Kind != domain.KindImage {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "not an image"})
+		return
+	}
 
 	// Read the stored bytes off disk. The thumbnail would be smaller
 	// (faster) but the stored file is what actually ships in the entry,
