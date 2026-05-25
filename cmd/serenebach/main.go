@@ -95,17 +95,21 @@ func main() {
 		return
 	}
 
-	// extract-assets is a pure file-extraction command: it never
-	// touches the database, so dispatch it before newApp to avoid
-	// creating / migrating a DB that the operator doesn't need.
+	// extract-assets and backup are pure file commands: they never
+	// need the HTTP stack or migrations, so dispatch them before
+	// newApp to avoid creating a DB the operator doesn't need.
 	if subcmd == "extract-assets" {
 		runExtractAssets(subArgs)
+		return
+	}
+	if subcmd == "backup" {
+		runBackup(cfg, subArgs)
 		return
 	}
 
 	handler, ok := subcommands[subcmd]
 	if !ok {
-		log.Fatalf("unknown subcommand: %q (want: serve | seed | migrate | import | build | extract-assets)", subcmd)
+		log.Fatalf("unknown subcommand: %q (want: serve | seed | migrate | import | build | extract-assets | backup)", subcmd)
 	}
 
 	a, err := newApp(cfg)
