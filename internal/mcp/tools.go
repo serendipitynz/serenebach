@@ -118,12 +118,13 @@ func allToolDescriptors() []toolDescriptor {
 		},
 		{
 			Name:        "list_images",
-			Description: "List uploaded images newest-first. Returns filename / stored path / size / mime / created_at so an agent can reference them in drafts via /img/<stored_path>.",
+			Description: "List uploaded files newest-first. Optional `kind` filter narrows to image / audio / document / movie.",
 			InputSchema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
 					"limit":  map[string]any{"type": "integer", "minimum": 1, "maximum": maxListLimit, "default": defaultListLimit},
 					"offset": map[string]any{"type": "integer", "minimum": 0, "default": 0},
+					"kind":   map[string]any{"type": "string", "enum": []string{"image", "audio", "document", "movie"}},
 				},
 			},
 		},
@@ -498,8 +499,9 @@ func (s *Server) toolGetAnalytics(ctx context.Context, raw json.RawMessage) (str
 
 func (s *Server) toolListImages(ctx context.Context, raw json.RawMessage) (string, error) {
 	args := struct {
-		Limit  int `json:"limit"`
-		Offset int `json:"offset"`
+		Limit  int    `json:"limit"`
+		Offset int    `json:"offset"`
+		Kind   string `json:"kind"`
 	}{Limit: defaultListLimit, Offset: 0}
 	if len(raw) > 0 {
 		if err := json.Unmarshal(raw, &args); err != nil {
@@ -512,7 +514,10 @@ func (s *Server) toolListImages(ctx context.Context, raw json.RawMessage) (strin
 	if args.Limit > maxListLimit {
 		args.Limit = maxListLimit
 	}
-	images, err := s.Store.ListImagesForAdmin(ctx, s.WID, args.Limit, args.Offset)
+	if args.Offset < 0 {
+		args.Offset = 0
+	}
+	images, err := s.Store.ListImagesForAdmin(ctx, s.WID, args.Kind, args.Limit, args.Offset)
 	if err != nil {
 		return "", err
 	}
@@ -522,10 +527,11 @@ func (s *Server) toolListImages(ctx context.Context, raw json.RawMessage) (strin
 		Stored    string `json:"stored_path"`
 		URL       string `json:"url"`
 		Thumb     string `json:"thumb_url,omitempty"`
+		Kind      string `json:"kind"`
 		MimeType  string `json:"mime_type"`
 		SizeBytes int64  `json:"size_bytes"`
-		Width     int    `json:"width,omitempty"`
-		Height    int    `json:"height,omitempty"`
+		Width     int64  `json:"width,omitempty"`
+		Height    int64  `json:"height,omitempty"`
 		CreatedAt int64  `json:"created_at"`
 	}
 	out := make([]row, 0, len(images))
@@ -533,14 +539,19 @@ func (s *Server) toolListImages(ctx context.Context, raw json.RawMessage) (strin
 		r := row{
 			ID: img.ID, Filename: img.Filename, Stored: img.StoredPath,
 			URL:       "/img/" + img.StoredPath,
+			Kind:      img.Kind,
 			MimeType:  img.MimeType,
 			SizeBytes: img.SizeBytes,
-			Width:     img.Width,
-			Height:    img.Height,
 			CreatedAt: img.CreatedAt.Unix(),
 		}
 		if img.ThumbPath != "" {
 			r.Thumb = "/img/" + img.ThumbPath
+		}
+		if img.Width.Valid {
+			r.Width = img.Width.Int64
+		}
+		if img.Height.Valid {
+			r.Height = img.Height.Int64
 		}
 		out = append(out, r)
 	}
