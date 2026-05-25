@@ -45,7 +45,7 @@ type fileEntry struct {
 	SHA256 string `json:"sha256"`
 }
 
-func buildManifest(ctx context.Context, opts *Options) (*manifest, error) {
+func buildManifest(opts *Options) *manifest {
 	mf := &manifest{
 		FormatVersion:     1,
 		SerenebachVersion: version.Public,
@@ -75,9 +75,16 @@ func buildManifest(ctx context.Context, opts *Options) (*manifest, error) {
 		mf.CreatedAt = time.Now().UTC().Format(time.RFC3339)
 	}
 
-	db, err := sqlite.Open(opts.DBPath)
+	return mf
+}
+
+// fillTableCounts reads row counts from the snapshot DB (which was
+// produced by VACUUM INTO) so the manifest always matches the archived
+// database.
+func fillTableCounts(ctx context.Context, snapshotPath string, mf *manifest) error {
+	db, err := sqlite.Open(snapshotPath)
 	if err != nil {
-		return nil, fmt.Errorf("manifest: open db: %w", err)
+		return fmt.Errorf("manifest: open snapshot: %w", err)
 	}
 	defer db.Close()
 
@@ -88,7 +95,7 @@ func buildManifest(ctx context.Context, opts *Options) (*manifest, error) {
 	for _, t := range tables {
 		var n int
 		if err := db.QueryRowContext(ctx, fmt.Sprintf("SELECT count(*) FROM %s", t)).Scan(&n); err != nil {
-			return nil, fmt.Errorf("manifest: count %s: %w", t, err)
+			return fmt.Errorf("manifest: count %s: %w", t, err)
 		}
 		mf.Tables[t] = n
 	}
@@ -98,7 +105,7 @@ func buildManifest(ctx context.Context, opts *Options) (*manifest, error) {
 	_ = db.QueryRowContext(ctx, "SELECT count(*) FROM redirects").Scan(&redirects)
 	mf.Tables["redirects"] = redirects
 
-	return mf, nil
+	return nil
 }
 
 func (m *manifest) addFile(path string, size int64) {

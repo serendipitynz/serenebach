@@ -57,12 +57,14 @@ func Run(ctx context.Context, opts Options) (*Report, error) {
 	}
 	defer removeTempDir(tmpDir)
 
-	manifest, err := buildManifest(ctx, &opts)
-	if err != nil {
+	manifest := buildManifest(&opts)
+
+	if err := snapshotDBs(ctx, &opts, tmpDir, manifest); err != nil {
 		return nil, err
 	}
 
-	if err := snapshotDBs(ctx, &opts, tmpDir, manifest); err != nil {
+	snapshotDBPath := filepath.Join(tmpDir, "serenebach.db")
+	if err := fillTableCounts(ctx, snapshotDBPath, manifest); err != nil {
 		return nil, err
 	}
 
