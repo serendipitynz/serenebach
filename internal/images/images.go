@@ -32,10 +32,39 @@ const ThumbMaxEdge = 240
 // AllowedMIMEs is the whitelist consulted by the upload handler. Anything
 // else is rejected before we even touch disk.
 var AllowedMIMEs = map[string]bool{
+	// image
 	"image/jpeg": true,
 	"image/png":  true,
 	"image/gif":  true,
 	"image/webp": true,
+	// audio
+	"audio/mpeg": true,
+	"audio/ogg":  true,
+	"audio/mp4":  true,
+	// document
+	"application/pdf": true,
+	"text/plain":      true,
+	"text/markdown":   true,
+	// movie
+	"video/mp4":  true,
+	"video/webm": true,
+}
+
+// KindFor maps a whitelisted MIME type to its upload kind.
+func KindFor(mime string) string {
+	switch {
+	case strings.HasPrefix(mime, "image/"):
+		return "image"
+	case strings.HasPrefix(mime, "audio/"):
+		return "audio"
+	case strings.HasPrefix(mime, "video/"):
+		return "movie"
+	case mime == "application/pdf",
+		mime == "text/plain",
+		mime == "text/markdown":
+		return "document"
+	}
+	return ""
 }
 
 // ExtensionFor maps a mime type to a canonical file extension. The upload
@@ -51,6 +80,22 @@ func ExtensionFor(mime string) string {
 		return "gif"
 	case "image/webp":
 		return "webp"
+	case "audio/mpeg":
+		return "mp3"
+	case "audio/ogg":
+		return "ogg"
+	case "audio/mp4":
+		return "m4a"
+	case "application/pdf":
+		return "pdf"
+	case "text/plain":
+		return "txt"
+	case "text/markdown":
+		return "md"
+	case "video/mp4":
+		return "mp4"
+	case "video/webm":
+		return "webm"
 	}
 	return ""
 }
@@ -73,6 +118,7 @@ type Stored struct {
 	StoredPath string // relative to Root, forward slashes (URL-safe)
 	ThumbPath  string // "" when thumbnail generation failed / skipped
 	SizeBytes  int64
+	Kind       string // image / audio / document / movie
 	Width      int
 	Height     int
 }
@@ -87,6 +133,8 @@ func (s *Store) SaveUpload(src io.Reader, originalName, mime string, now time.Ti
 		return nil, fmt.Errorf("images: unsupported mime %q", mime)
 	}
 
+	kind := KindFor(mime)
+
 	yearMonth := filepath.Join(fmt.Sprintf("%04d", now.Year()), fmt.Sprintf("%02d", int(now.Month())))
 	absDir := filepath.Join(s.Root, yearMonth)
 	if err := os.MkdirAll(absDir, 0o755); err != nil {
@@ -95,7 +143,7 @@ func (s *Store) SaveUpload(src io.Reader, originalName, mime string, now time.Ti
 
 	slug := sanitiseSlug(strings.TrimSuffix(originalName, filepath.Ext(originalName)))
 	if slug == "" {
-		slug = "image"
+		slug = "upload"
 	}
 	short, err := shortID()
 	if err != nil {
@@ -122,6 +170,13 @@ func (s *Store) SaveUpload(src io.Reader, originalName, mime string, now time.Ti
 		Filename:   filepath.Base(sanitiseFilename(originalName)),
 		StoredPath: relPath,
 		SizeBytes:  size,
+		Kind:       kind,
+	}
+
+	// Only images get decoded and thumbnailed; other kinds skip this step
+	// so Width/Height stay at zero (the DB will store NULL via the handler).
+	if kind != "image" {
+		return stored, nil
 	}
 
 	img, _, decodeErr := image.Decode(bytes.NewReader(buf.Bytes()))
