@@ -12,10 +12,10 @@ Every knob the running binary respects, plus the `task` shortcuts the dev workfl
 | `SB_ADMIN_PASSWORD` | Seed / default admin password |
 | `SB_ADMIN_EMAIL` | Seed / default admin email |
 | `SB_SEED_NO_SAMPLES` | Set to `1` to skip demo entries during `task seed` |
-| `SB_IMAGE_DIR` | Directory uploaded images are written to and served from at `/img/*` (default `./data/img`) |
+| `SB_IMAGE_DIR` | Directory uploaded files (images, audio, documents, movies) are written to and served from at `/img/*` (default `./data/img`) |
 | `SB_TEMPLATE_DIR` | Directory per-template assets are written to and served from at `/template/<id>/*` (default `./data/templates`) |
 | `SB_REBUILD_OUT` | Directory the admin-triggered static rebuild writes to (default `./data/public`) |
-| `SB_UPLOAD_MAX_MB` | Maximum size (megabytes) for a single image upload (default `10`) |
+| `SB_UPLOAD_MAX_MB` | Maximum size (megabytes) for a single file upload (default `10`) |
 | `SB_TURNSTILE_SITEKEY` | Cloudflare Turnstile public key (leave unset to disable the challenge) |
 | `SB_TURNSTILE_SECRET` | Cloudflare Turnstile secret key (leave unset to disable the challenge) |
 | `SB_ANALYTICS_DISABLED` | Set to `1` to turn off pageview recording and the admin dashboard |

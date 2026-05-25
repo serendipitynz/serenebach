@@ -22,6 +22,7 @@
 - テンプレートから JS / Web フォントファイルも参照可能（画像・CSS と同様にアップロードして利用）
 - 旧 Serene Bach v2 (テキストファイル) / v3 (SQLite) (Perl 版) からのインポートに対応。YAML front-matter 付き markdown ファイル群からの取り込みもサポート
 - Outbound Webhooks: 記事公開 / コメント受信 / 画像アップロード で Slack / Discord / Zapier / n8n に通知
+- 画像だけでなく音声・文書・動画もライブラリで管理・アップロード可能（Markdown/HTML 記事への挿入に対応）
 
 ## クイックスタート
 

@@ -3,6 +3,7 @@ package mcp
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -217,6 +218,8 @@ type uploadImageArgs struct {
 // uses. Decoding loosely: stdlib base64 variants all land through
 // RawStdEncoding / StdEncoding — try StdEncoding first and fall back so
 // callers that strip padding still work.
+//
+//nolint:gocyclo
 func (s *Server) toolUploadImage(ctx context.Context, raw json.RawMessage) (string, error) {
 	if s.ImageStore == nil {
 		return "", errors.New("upload_image: server has no image store configured")
@@ -252,6 +255,9 @@ func (s *Server) toolUploadImage(ctx context.Context, raw json.RawMessage) (stri
 	if !images.AllowedMIMEs[mime] {
 		return "", fmt.Errorf("unsupported mime %q (accepted: image/jpeg, image/png, image/gif, image/webp)", mime)
 	}
+	if images.KindFor(mime) != domain.KindImage {
+		return "", fmt.Errorf("upload_image accepts only image MIMEs (jpeg, png, gif, webp); got %q", mime)
+	}
 
 	filename := strings.TrimSpace(args.Filename)
 	if filename == "" {
@@ -264,17 +270,23 @@ func (s *Server) toolUploadImage(ctx context.Context, raw json.RawMessage) (stri
 	}
 
 	uploader := authorIDForCtx(ctx)
-	id, err := s.Store.CreateImage(ctx, domain.Image{
+	img := domain.Image{
 		WID:        s.WID,
 		UploadedBy: uploader,
+		Kind:       stored.Kind,
 		Filename:   stored.Filename,
 		StoredPath: stored.StoredPath,
 		ThumbPath:  stored.ThumbPath,
 		MimeType:   mime,
 		SizeBytes:  stored.SizeBytes,
-		Width:      stored.Width,
-		Height:     stored.Height,
-	})
+	}
+	if stored.Width > 0 {
+		img.Width = sql.NullInt64{Int64: int64(stored.Width), Valid: true}
+	}
+	if stored.Height > 0 {
+		img.Height = sql.NullInt64{Int64: int64(stored.Height), Valid: true}
+	}
+	id, err := s.Store.CreateImage(ctx, img)
 	if err != nil {
 		// Best-effort: clean up the orphaned file so repeated failures
 		// don't grow the disk.

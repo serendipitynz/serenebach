@@ -1077,8 +1077,26 @@
     btn.addEventListener('click', function () {
       var url = btn.getAttribute('data-copy-url') || '';
       if (!url) return;
-      var abs = new URL(url, window.location.origin).toString();
-      copyViaClipboard(abs, btn);
+      var kind = btn.getAttribute('data-copy-kind') || btn.closest('[data-kind]')?.getAttribute('data-kind') || 'image';
+      var filename = btn.getAttribute('data-copy-filename') || btn.closest('[data-filename]')?.getAttribute('data-filename') || '';
+      var text;
+      switch (kind) {
+        case 'image':
+          text = '<img src="' + url + '" alt="' + (filename || '') + '">';
+          break;
+        case 'audio':
+          text = '<audio controls src="' + url + '"></audio>';
+          break;
+        case 'movie':
+          text = '<video controls src="' + url + '"></video>';
+          break;
+        case 'document':
+          text = '<a href="' + url + '" download>' + (filename || url.split('/').pop() || 'file') + '</a>';
+          break;
+        default:
+          text = url;
+      }
+      copyViaClipboard(text, btn);
     });
   });
 
@@ -1534,16 +1552,32 @@
     if (!items.length) { pickerBody.textContent = sbT('js.picker.empty'); return; }
     var ul = document.createElement('ul');
     ul.className = 'image-gallery';
-    items.forEach(function (img) {
+    // OG background picker only shows images; the regular picker shows everything.
+    var visibleItems = ogBgTargetInput ? items.filter(function (i) {
+      return (i.kind || 'image') === 'image';
+    }) : items;
+    visibleItems.forEach(function (img) {
       var li = document.createElement('li');
       li.className = 'image-tile';
-      var image = document.createElement('img');
-      image.src = img.thumb_url || img.url;
-      image.alt = img.filename || '';
-      image.draggable = true;
-      image.dataset.fullUrl = img.url;
-      image.dataset.filename = img.filename || '';
-      image.addEventListener('click', function () {
+      var tile;
+      if ((img.kind || 'image') === 'image') {
+        tile = document.createElement('img');
+        tile.src = img.thumb_url || img.url;
+        tile.alt = img.filename || '';
+        tile.draggable = true;
+      } else {
+        tile = document.createElement('div');
+        tile.className = 'upload-icon-wrap';
+        tile.textContent = img.filename || '';
+        tile.style.display = 'flex';
+        tile.style.alignItems = 'center';
+        tile.style.justifyContent = 'center';
+        tile.style.minHeight = '80px';
+      }
+      tile.dataset.fullUrl = img.url;
+      tile.dataset.filename = img.filename || '';
+      tile.dataset.kind = img.kind || 'image';
+      tile.addEventListener('click', function () {
         // OG background picker divert: when the caller opened the
         // modal via [data-og-bg-picker] the next tile click fills the
         // bound input instead of inserting an <img> into a body
@@ -1552,18 +1586,20 @@
           applyOGBGPick(img);
           return;
         }
-        insertImageMarkup(img.url, img.alt || img.filename || '');
+        insertFileMarkup(img.url, img.alt || img.filename || '', img.kind || 'image');
       });
-      image.addEventListener('dragstart', function (e) {
-        if (!e.dataTransfer) return;
-        e.dataTransfer.setData('text/uri-list', img.url);
-        e.dataTransfer.setData('text/plain', img.url);
-        e.dataTransfer.setData('application/x-sb-image', JSON.stringify({
-          url: img.url, filename: img.filename || '', alt: img.alt || ''
-        }));
-        e.dataTransfer.effectAllowed = 'copy';
-      });
-      li.appendChild(image);
+      if (tile.draggable) {
+        tile.addEventListener('dragstart', function (e) {
+          if (!e.dataTransfer) return;
+          e.dataTransfer.setData('text/uri-list', img.url);
+          e.dataTransfer.setData('text/plain', img.url);
+          e.dataTransfer.setData('application/x-sb-image', JSON.stringify({
+            url: img.url, filename: img.filename || '', alt: img.alt || '', kind: img.kind || 'image'
+          }));
+          e.dataTransfer.effectAllowed = 'copy';
+        });
+      }
+      li.appendChild(tile);
       ul.appendChild(li);
     });
     pickerBody.appendChild(ul);
@@ -1583,21 +1619,38 @@
     });
   }
 
-  function insertImageMarkup(url, alt) {
-    // Markdown-aware insert: when the currently focused editor sits in
-    // a form whose format select is "markdown", emit the Markdown img
-    // syntax instead of raw HTML. Keeps copy-pasted descriptions
-    // consistent with what the author sees rendered.
+  function insertFileMarkup(url, alt, kind) {
+    // Markdown-aware insert: kind determines the emitted snippet.
+    // Non-image kinds produce links in Markdown (raw <audio>/<video>
+    // would be escaped by the renderer unless WithUnsafe is on).
     var safeAlt = alt.replace(/"/g, '&quot;');
     var target = lastFocusedTextarea || imageTargets[0];
     if (!target) return;
-    var tag = '<img src="' + url + '" alt="' + safeAlt + '">';
     var form = target.closest && target.closest('form');
+    var isMarkdown = false;
     if (form) {
       var fmt = form.querySelector('select[data-code-editor-format]');
       if (fmt && fmt.value === 'markdown') {
-        tag = '![' + alt + '](' + url + ')';
+        isMarkdown = true;
       }
+    }
+    var filename = alt || url.split('/').pop() || 'file';
+    var tag;
+    switch (kind || 'image') {
+      case 'image':
+        tag = isMarkdown ? '![' + alt + '](' + url + ')' : '<img src="' + url + '" alt="' + safeAlt + '">';
+        break;
+      case 'audio':
+        tag = isMarkdown ? '[' + filename + '](' + url + ')' : '<audio controls src="' + url + '"></audio>';
+        break;
+      case 'movie':
+        tag = isMarkdown ? '[' + filename + '](' + url + ')' : '<video controls src="' + url + '"></video>';
+        break;
+      case 'document':
+        tag = isMarkdown ? '[' + filename + '](' + url + ')' : '<a href="' + url + '" download>' + filename + '</a>';
+        break;
+      default:
+        tag = isMarkdown ? '[' + filename + '](' + url + ')' : '<a href="' + url + '">' + filename + '</a>';
     }
     if (target.__aceEditor) {
       target.__aceEditor.focus();
@@ -1651,15 +1704,15 @@
           e.preventDefault();
           try {
             var parsed = JSON.parse(payload);
-            insertImageMarkup(parsed.url, parsed.alt || parsed.filename || '');
+            insertFileMarkup(parsed.url, parsed.alt || parsed.filename || '', parsed.kind || 'image');
           } catch (err) { /* ignore malformed payload */ }
           return;
         }
         // Fallback: a URL-like drop (e.g. copy-paste from another tab).
         var url = dt.getData('text/uri-list') || dt.getData('text/plain');
-        if (url && isLikelyImageURL(url)) {
+        if (url) {
           e.preventDefault();
-          insertImageMarkup(url, '');
+          insertFileMarkup(url, '', 'image');
         }
         return;
       }
@@ -1672,7 +1725,7 @@
         return chain.then(function () {
           return uploadFile(file, token).then(function (result) {
             if (result.ok && result.body && result.body.url) {
-              insertImageMarkup(result.body.url, result.body.filename || '');
+              insertFileMarkup(result.body.url, result.body.filename || '', result.body.kind || 'image');
             } else {
               alert((file.name || 'file') + ': ' + (result.body && result.body.error || ('HTTP ' + result.status)));
             }
@@ -1693,6 +1746,55 @@
 
   function isLikelyImageURL(s) {
     return /^\/?img\//.test(s) || /\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(s);
+  }
+
+  // ---- rename modal ----------------------------------------------------
+  var renameModal = document.getElementById('rename-modal');
+  var renameForm = document.getElementById('rename-form');
+  var renameInput = document.getElementById('rename-filename');
+  if (renameModal && renameForm && renameInput) {
+    renameForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var id = renameForm.getAttribute('data-id');
+      if (!id) return;
+      var body = new URLSearchParams({ csrf_token: readCSRFToken(), filename: renameInput.value });
+      fetch('/admin/images/' + id + '/rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+        body: body,
+        credentials: 'same-origin'
+      }).then(function (res) { return res.ok ? res.json() : Promise.reject(res); })
+        .then(function (data) {
+          if (data.ok) {
+            renameModal.hidden = true;
+            showToast(sbT('js.save.done'));
+            // Refresh the page so the new filename renders server-side.
+            window.location.reload();
+          } else {
+            showToast(data.error || 'Error');
+          }
+        }).catch(function () { showToast(sbT('js.save.error')); });
+    });
+    renameModal.querySelectorAll('[data-modal-close]').forEach(function (btn) {
+      btn.addEventListener('click', function () { renameModal.hidden = true; });
+    });
+    renameModal.addEventListener('click', function (e) {
+      if (e.target === renameModal) renameModal.hidden = true;
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !renameModal.hidden) renameModal.hidden = true;
+    });
+    document.querySelectorAll('[data-rename-id]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var id = btn.getAttribute('data-rename-id');
+        var current = btn.getAttribute('data-rename-current') || '';
+        renameForm.setAttribute('data-id', id);
+        renameForm.setAttribute('action', '/admin/images/' + id + '/rename');
+        renameInput.value = current;
+        renameModal.hidden = false;
+        renameInput.focus();
+      });
+    });
   }
 
   // ---- sortable admin lists (drag-and-drop reorder) -------------------

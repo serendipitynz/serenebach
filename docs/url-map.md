@@ -25,7 +25,7 @@ Every route the running server exposes, split between the public surface and the
 | `/llms-full.txt` | Full Markdown dump (up to 500 entries) for agents that want the knowledge base in one request. Same opt-in toggle as /llms.txt |
 | `/style.css` | Active template's stylesheet (alias kept for backward compat) |
 | `/template/{id}/style.css` | Per-template stylesheet — pages rendered through a pinned template (`{site_css}`) load their own CSS here |
-| `/img/*` | Uploaded images served from `SB_IMAGE_DIR` (default `./data/img`) |
+| `/img/*` | Uploaded files (images, audio, documents, movies) served from `SB_IMAGE_DIR` (default `./data/img`) |
 
 ## Admin (requires login)
 
@@ -39,9 +39,10 @@ Every route the running server exposes, split between the public surface and the
 | `/admin/entries/new` | New entry form (GET + POST) |
 | `/admin/entries/{id}/edit` | Edit form (GET + POST) |
 | `/admin/entries/{id}/delete` | Delete (POST) |
-| `/admin/images` | Image library + drop-zone upload (GET = gallery, POST = upload, `?format=json` for the editor picker) |
-| `/admin/images/{id}/delete` | Delete an image + its files on disk (POST) |
-| `/admin/images/{id}/alt` | POST — vision-generated alt text. Fires automatically after upload when the uploader has enabled auto-alt |
+| `/admin/images` | File library (images / audio / documents / movies) + drop-zone upload (GET = gallery, POST = upload, `?format=json` for the editor picker) |
+| `/admin/images/{id}/delete` | Delete a file + its files on disk (POST) |
+| `/admin/images/{id}/alt` | POST — vision-generated alt text. Fires automatically after upload when the uploader has enabled auto-alt (image kind only) |
+| `/admin/images/{id}/rename` | POST — rename the display filename (stored_path is untouched so past links stay valid) |
 | `/admin/categories` | Category list (name, slug, parent, sort order, entry count) |
 | `/admin/categories/new` | New category form (GET + POST) |
 | `/admin/categories/{id}/edit` | Edit form (GET + POST) |

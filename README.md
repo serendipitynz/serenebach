@@ -22,6 +22,7 @@ A self-hostable Go weblog engine — a lighter path between WordPress and Hugo. 
 - Templates can reference uploaded JS and web font files alongside images and CSS
 - Imports content from legacy Serene Bach v2 (flat-file) and v3 (SQLite) installations, and from a directory of markdown files with YAML front-matter
 - Outbound webhooks (entry / comment / image events) for Slack / Discord / Zapier / n8n
+- Upload and manage audio, documents, and movies alongside images in the library, with insertion into HTML or Markdown entries
 
 ## Quick start
 

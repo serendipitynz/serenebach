@@ -291,14 +291,15 @@ func TestMCPUploadImageRejectsUnsupportedMIME(t *testing.T) {
 	cookies := login(t, a.Handler(), "admin", "changeme")
 	token, _ := issueMCPTokenWithScope(t, a, cookies, "bad-mime", "write")
 
-	// Plain-text bytes → http.DetectContentType returns text/plain, which
-	// the whitelist rejects. Exercise the default-sniff branch at the
-	// same time by omitting mime_type.
+	// Plain-text bytes → http.DetectContentType returns text/plain.
+	// AllowedMIMEs now accepts text/plain, but upload_image has an
+	// image-only guard so it still fails with a clear error.
 	env := callTool(t, a.Handler(), token, "upload_image", map[string]any{
 		"data": base64.StdEncoding.EncodeToString([]byte("hello, I am not an image")),
 	})
-	if msg := toolCallErrorText(env); !strings.Contains(msg, "unsupported mime") {
-		t.Fatalf("expected unsupported mime error, got %q", msg)
+	msg := toolCallErrorText(env)
+	if !strings.Contains(msg, "upload_image accepts only image") {
+		t.Fatalf("expected image-only error, got %q", msg)
 	}
 }
 

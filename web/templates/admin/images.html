@@ -16,7 +16,7 @@
       <label class="drop-zone" data-drop-zone>
         <span class="drop-zone-text">{{T "images.dropZone"}}</span>
         <span class="drop-zone-progress" hidden></span>
-        <input type="file" name="file" accept="image/jpeg,image/png,image/gif,image/webp" data-drop-input>
+        <input type="file" name="file" accept=".png,.jpg,.jpeg,.gif,.webp,.mp3,.ogg,.m4a,.pdf,.txt,.md,.mp4,.webm" data-drop-input>
       </label>
       <noscript>
         <div class="form-actions" style="justify-content:flex-start;padding-top:0.5rem;border:none;margin:0">
@@ -54,16 +54,28 @@
         <tr class="image-row"
             data-filename="{{.Filename}}"
             data-image-url="{{$.ImagesPrefix}}{{.StoredPath}}"
-            data-image-alt="{{.Filename}}">
+            data-image-alt="{{.Filename}}"
+            data-kind="{{.Kind}}">
           <td class="num col-id col-hide-mobile">{{.ID}}</td>
           <td class="col-icon">
+            {{if eq .Kind "image"}}
             <img class="image-row-icon" src="{{if .ThumbPath}}{{$.ImagesPrefix}}{{.ThumbPath}}{{else}}{{$.ImagesPrefix}}{{.StoredPath}}{{end}}" alt="{{.Filename}}" loading="lazy">
+            {{else}}
+            {{uploadIcon .Kind}}
+            {{end}}
           </td>
           <td class="col-flex-wide cell-clamp-host col-primary" title="{{.Filename}}"><div class="cell-clamp-2">{{.Filename}}</div></td>
-          <td class="col-flex" data-label="{{T `images.col.size`}}">{{if .Width}}{{.Width}}×{{.Height}} / {{end}}{{.SizeBytes}} B</td>
+          <td class="col-flex" data-label="{{T `images.col.size`}}">
+            {{humanSize .SizeBytes}}
+            {{if and .Width.Valid .Height.Valid}} / {{.Width.Int64}}×{{.Height.Int64}}{{end}}
+          </td>
           <td class="col-actions">
-            <button type="button" class="btn-icon" data-copy-url="{{$.ImagesPrefix}}{{.StoredPath}}" aria-label="{{T `images.copyUrl`}}" title="{{T `images.copyUrl`}}">{{iconCopy}}</button>
             {{- $canDeleteImg := $.User.CanDeleteImage .UploadedBy -}}
+            <button type="button" class="btn-icon" data-rename-id="{{.ID}}" data-rename-current="{{.Filename}}" aria-label="{{T `images.edit`}}" title="{{T `images.edit`}}">{{iconEdit}}</button>
+            <button type="button" class="btn-icon" data-copy-url="{{$.ImagesPrefix}}{{.StoredPath}}" aria-label="{{T `images.copyUrl`}}" title="{{T `images.copyUrl`}}">{{iconCopy}}</button>
+            {{if ne .Kind "image"}}
+            <a href="{{$.ImagesPrefix}}{{.StoredPath}}" target="_blank" class="btn-icon" aria-label="{{T `images.openNewTab`}}" title="{{T `images.openNewTab`}}">{{iconExternal}}</a>
+            {{end}}
             <form method="post" action="{{Root}}/admin/images/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `images.delete.confirm`}}')">
               <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
               <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{if $canDeleteImg}}{{T `action.delete`}}{{else}}{{T `action.delete.forbiddenOwner`}}{{end}}"{{if not $canDeleteImg}} disabled{{end}}>{{iconTrash}}</button>
@@ -76,18 +88,28 @@
     {{else}}
     <ul class="image-gallery" data-gallery data-image-filterable>
       {{range .Images}}
-      <li class="image-tile" data-filename="{{.Filename}}" data-image-url="{{$.ImagesPrefix}}{{.StoredPath}}" data-image-alt="{{.Filename}}">
+      <li class="image-tile" data-filename="{{.Filename}}" data-image-url="{{$.ImagesPrefix}}{{.StoredPath}}" data-image-alt="{{.Filename}}" data-kind="{{.Kind}}">
         <figure>
+          {{if eq .Kind "image"}}
           <img src="{{if .ThumbPath}}{{$.ImagesPrefix}}{{.ThumbPath}}{{else}}{{$.ImagesPrefix}}{{.StoredPath}}{{end}}"
-               alt="{{.Filename}}" loading="lazy">
+               alt="{{.Filename}}" loading="lazy" data-zoom>
+          {{else}}
+          <div class="upload-icon-wrap">
+            {{uploadIcon .Kind}}
+          </div>
+          {{end}}
           <figcaption>
             <span class="name" title="{{.Filename}}">{{.Filename}}</span>
-            <span class="dim">{{if .Width}}{{.Width}}×{{.Height}}{{end}}</span>
+            <span class="dim">{{humanSize .SizeBytes}}{{if and .Width.Valid .Height.Valid}} / {{.Width.Int64}}×{{.Height.Int64}}{{end}}</span>
           </figcaption>
         </figure>
         <div class="image-actions">
-          <button type="button" class="link" data-copy-url="{{$.ImagesPrefix}}{{.StoredPath}}">{{T "images.copyUrl"}}</button>
           {{- $canDeleteImg := $.User.CanDeleteImage .UploadedBy -}}
+          <button type="button" class="btn-icon" data-rename-id="{{.ID}}" data-rename-current="{{.Filename}}" aria-label="{{T `images.edit`}}" title="{{T `images.edit`}}">{{iconEdit}}</button>
+          <button type="button" class="btn-icon" data-copy-url="{{$.ImagesPrefix}}{{.StoredPath}}" aria-label="{{T `images.copyUrl`}}" title="{{T `images.copyUrl`}}">{{iconCopy}}</button>
+          {{if ne .Kind "image"}}
+          <a href="{{$.ImagesPrefix}}{{.StoredPath}}" target="_blank" class="btn-icon" aria-label="{{T `images.openNewTab`}}" title="{{T `images.openNewTab`}}">{{iconExternal}}</a>
+          {{end}}
           <form method="post" action="{{Root}}/admin/images/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T `images.delete.confirm`}}')">
             <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
             <button type="submit" class="btn-icon danger" aria-label="{{T `action.delete`}}" title="{{if $canDeleteImg}}{{T `action.delete`}}{{else}}{{T `action.delete.forbiddenOwner`}}{{end}}"{{if not $canDeleteImg}} disabled{{end}}>{{iconTrash}}</button>
@@ -108,6 +130,27 @@
     {{else}}
       <p class="hint">{{T "images.empty"}}</p>
     {{end}}
+  </div>
+</div>
+
+<!-- rename modal -->
+<div class="modal-backdrop" id="rename-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rename-title">
+    <div class="modal-head">
+      <h3 id="rename-title">{{T "images.edit"}}</h3>
+      <button type="button" class="btn-icon" data-modal-close aria-label="Close">&times;</button>
+    </div>
+    <form id="rename-form" method="post" action="">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="modal-body">
+        <label for="rename-filename">Filename</label>
+        <input type="text" id="rename-filename" name="filename" required maxlength="255">
+      </div>
+      <div class="modal-foot form-actions">
+        <button type="submit" class="primary">{{T "action.save"}}</button>
+        <button type="button" class="secondary" data-modal-close>{{T "action.cancel"}}</button>
+      </div>
+    </form>
   </div>
 </div>
 {{end}}

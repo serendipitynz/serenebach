@@ -29,7 +29,7 @@ The "how it works under the hood" reference. Useful for contributors, operators 
 - [Reactions: likes + stamps](#reactions-likes--stamps)
 - [Open Graph cards](#open-graph-cards)
 - [Entry body formats](#entry-body-formats)
-- [Image uploads](#image-uploads)
+- [File uploads](#file-uploads)
 - [First-party analytics](#first-party-analytics)
 - [AI integration](#ai-integration)
 - [MCP server](#mcp-server)
@@ -138,18 +138,30 @@ Every entry carries a `format` field that decides how the stored body and 追記
 
 The format choice is per-entry, so a blog can mix HTML legacy posts with new Markdown drafts without a migration.
 
-## Image uploads
+## File uploads
 
-The admin UI includes a drop-zone gallery at `/admin/images`. Drag one or more files onto the zone (or click to pick from the OS dialog) and they land in `SB_IMAGE_DIR` under a `YYYY/MM/<slug>-<shortid>.<ext>` layout, with a same-tree `.thumb.jpg` sibling for the gallery preview. The upload is served read-only at `/img/<stored_path>`.
+The admin UI includes a drop-zone gallery at `/admin/images` (labelled "ライブラリ" in the UI). Drag one or more files onto the zone (or click to pick from the OS dialog) and they land in `SB_IMAGE_DIR` under a `YYYY/MM/<slug>-<shortid>.<ext>` layout. The upload is served read-only at `/img/<stored_path>`.
 
-- **Accepted formats**: JPEG, PNG, GIF, WebP. Everything else is rejected via `http.DetectContentType` on the first 512 bytes — the browser's `Content-Type` header is *not* trusted.
+| Kind     | Extensions              | MIME types                              |
+| -------- | ----------------------- | --------------------------------------- |
+| image    | `.png`, `.jpg`, `.gif`, `.webp` | `image/png`, `image/jpeg`, `image/gif`, `image/webp` |
+| audio    | `.mp3`, `.ogg`, `.m4a`  | `audio/mpeg`, `audio/ogg`, `audio/mp4`  |
+| document | `.pdf`, `.txt`, `.md`   | `application/pdf`, `text/plain`, `text/markdown` |
+| movie    | `.mp4`, `.webm`         | `video/mp4`, `video/webm`               |
+
+- **MIME detection**: `http.DetectContentType` on the first 512 bytes, with extension-based normalisation for edge cases (`text/plain` + `.md` → `text/markdown`, `video/mp4` + `.m4a` → `audio/mp4`, `application/ogg` + `.ogg` → `audio/ogg`). The browser's `Content-Type` header is *not* trusted.
 - **Size cap**: `SB_UPLOAD_MAX_MB`, default 10 MB. Both the pre-flight `Content-Length` check and `http.MaxBytesReader` enforce the ceiling.
-- **Thumbnails**: generated in pure Go (`image/jpeg`, `image/png`, `image/gif`, `golang.org/x/image/webp` + `golang.org/x/image/draw`). No cgo, no vips — the single-binary story stays intact. Longest edge is capped at 240 px.
-- **Editor integration**: the entry form has a *画像を挿入* button that opens a picker showing every uploaded image. Clicking one inserts an `<img>` (or Markdown image) tag at the textarea cursor. Dragging a file straight onto the textarea uploads *and* inserts in one step.
+- **Thumbnails**: generated for images only in pure Go (`image/jpeg`, `image/png`, `image/gif`, `golang.org/x/image/webp` + `golang.org/x/image/draw`). No cgo, no vips — the single-binary story stays intact. Longest edge is capped at 240 px. Non-image kinds get an inline SVG icon instead.
+- **Editor integration**: the entry form has a *ファイルを挿入* button that opens a picker showing every upload. Clicking one inserts the appropriate tag (`<img>`, `<audio>`, `<video>`, or `<a download>` for HTML entries; Markdown image/link syntax for Markdown entries) at the textarea cursor. Dragging a file straight onto the textarea uploads *and* inserts in one step.
 - **Static rebuild**: `SB_IMAGE_DIR` is mirrored into `<SB_REBUILD_OUT>/img/` during rebuild so a static deployment carries its media alongside the HTML.
 - **CSRF**: uploads go through the global middleware. The drop-zone JS sends `X-CSRF-Token`; the no-JS fallback `<form enctype="multipart/form-data">` submits a hidden `csrf_token` field.
 
-Admin can scope per-author delete: regular-tier users may only remove images they uploaded themselves; power and admin can remove any.
+Admin can scope per-author delete: regular-tier users may only remove files they uploaded themselves; power and admin can remove any.
+
+### Outbound webhooks
+
+- **Events** — `entry.published`, `entry.updated`, `comment.approved`, and `image.uploaded`.
+- **`image.uploaded` fires only for image uploads** (`kind == image`). Audio, document, and movie uploads do not trigger this event (a future `file.uploaded` event may be added once the contract is designed).
 
 ## First-party analytics
 
@@ -188,7 +200,9 @@ Every write operation lands in an audit log (`mcp_audit_log` in the main DB; red
 
 ## Outbound webhooks
 
-Serene Bach can POST a JSON payload to operator-specified URLs when domain events fire — entry publish / update / delete, comment received / approved, image uploaded. Designed as the cheapest integration surface: a single binary still, no queue, no daemon.
+Serene Bach can POST a JSON payload to operator-specified URLs when domain events fire — entry publish / update / delete, comment received / approved, image uploaded (image kind only). Designed as the cheapest integration surface: a single binary still, no queue, no daemon.
+
+- **`image.uploaded` fires only for image uploads** (`kind == image`). Audio, document, and movie uploads do not trigger this event (a future `file.uploaded` event may be added once the contract is designed).
 
 - **Configuration** — `/admin/settings/webhooks` (requires `power_user` role). Each subscription has a URL, an optional HMAC-SHA256 secret, a per-event checkbox grid, a payload-format selector, and an active toggle. Up to 50 subscriptions per weblog.
 - **Payload formats** — `envelope` (default) sends the full nested JSON (`id` / `event` / `timestamp` / `weblog` / `data`). `flat` applies the [slack.dev recommendation](https://slack.dev/flatten-json-for-workflow-builder/): nested keys are joined with `_` and array indices participate in the path (`data.title` → `data_title`, `data.tags[0]` → `data_tags_0`). The flat payload additionally embeds a one-line human-readable summary under `text` (Slack Incoming Webhooks) and `content` (Discord Incoming Webhooks), so a single subscription works as a direct Slack / Discord channel post and as a Slack Workflow Builder trigger (which reads each flat key as a variable). Slack and Discord both silently ignore unknown top-level keys, so the same body satisfies all three receivers.

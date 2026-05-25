@@ -3,6 +3,7 @@
 package domain
 
 import (
+	"database/sql"
 	"regexp"
 	"time"
 )
@@ -523,13 +524,14 @@ type Image struct {
 	ID         int64
 	WID        int64
 	UploadedBy int64
+	Kind       string // "image" | "audio" | "document" | "movie"
 	Filename   string
 	StoredPath string
 	ThumbPath  string
 	MimeType   string
 	SizeBytes  int64
-	Width      int
-	Height     int
+	Width      sql.NullInt64 // NULL = image 以外 or 未取得
+	Height     sql.NullInt64
 	// AltText is the descriptive text used by screen-reader / missing-
 	// image fallback. Populated by the vision provider when the
 	// uploader's AIAutoAlt preference is on; the image picker and
@@ -539,6 +541,15 @@ type Image struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
+
+// Upload kind constants. Kept in domain so every layer can reference
+// them without depending on internal/images.
+const (
+	KindImage    = "image"
+	KindAudio    = "audio"
+	KindDocument = "document"
+	KindMovie    = "movie"
+)
 
 // Page is a standalone flat page (not an entry) reachable at a custom
 // slug path such as /about or /privacy. It does not appear in feeds,

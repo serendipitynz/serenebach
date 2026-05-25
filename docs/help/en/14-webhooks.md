@@ -19,7 +19,7 @@ Configure subscriptions at **`/admin/settings/webhooks`**. The page requires the
 | `entry.deleted`     | An entry is deleted                                                 |
 | `comment.received`  | A comment is stored (including ones waiting for moderation)         |
 | `comment.approved`  | A comment is approved (auto-approval or admin approval)             |
-| `image.uploaded`    | An image is uploaded                                                |
+| `image.uploaded`    | An image (image kind) is uploaded                                   |
 
 A single webhook can subscribe to any combination of events via the checkbox grid.
 

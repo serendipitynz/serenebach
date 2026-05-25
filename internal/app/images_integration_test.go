@@ -170,9 +170,9 @@ func TestImageUploadRejectsWrongMIME(t *testing.T) {
 	a := newTestApp(t)
 	cookies := login(t, a.Handler(), "admin", "changeme")
 
-	// Plain-text body with a `.png` name. DetectContentType will see
-	// "text/plain; charset=utf-8" and the allowlist will refuse.
-	w := postUpload(t, a.Handler(), cookies, "nope.png", []byte("hello world"), true)
+	// ZIP body with a `.png` name. DetectContentType will see
+	// "application/zip" and the allowlist will refuse.
+	w := postUpload(t, a.Handler(), cookies, "nope.png", []byte("PK\x03\x04"), true)
 	if w.Code != http.StatusUnsupportedMediaType {
 		t.Fatalf("status = %d, want 415; body:\n%s", w.Code, w.Body.String())
 	}

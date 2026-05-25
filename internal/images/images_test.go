@@ -40,6 +40,9 @@ func TestSaveUploadWritesFileAndThumbnail(t *testing.T) {
 		t.Fatalf("SaveUpload: %v", err)
 	}
 
+	if stored.Kind != "image" {
+		t.Errorf("Kind = %q, want image", stored.Kind)
+	}
 	if !strings.HasPrefix(stored.StoredPath, "2026/04/") {
 		t.Errorf("StoredPath = %q, want YYYY/MM prefix", stored.StoredPath)
 	}
@@ -114,12 +117,42 @@ func TestSaveUploadSkipsThumbnailForBadBytes(t *testing.T) {
 	}
 }
 
+func TestSaveUploadAcceptsAudio(t *testing.T) {
+	root := t.TempDir()
+	s := NewStore(root)
+	stored, err := s.SaveUpload(strings.NewReader(strings.Repeat("x", 1024)), "song.mp3", "audio/mpeg", time.Now())
+	if err != nil {
+		t.Fatalf("SaveUpload: %v", err)
+	}
+	if stored.Kind != "audio" {
+		t.Errorf("Kind = %q, want audio", stored.Kind)
+	}
+	if stored.ThumbPath != "" {
+		t.Errorf("ThumbPath = %q; want empty for non-image", stored.ThumbPath)
+	}
+	if stored.Width != 0 || stored.Height != 0 {
+		t.Errorf("dims = %dx%d; want 0x0 for non-image", stored.Width, stored.Height)
+	}
+}
+
+func TestSaveUploadAcceptsDocument(t *testing.T) {
+	root := t.TempDir()
+	s := NewStore(root)
+	stored, err := s.SaveUpload(strings.NewReader("# hello"), "notes.md", "text/markdown", time.Now())
+	if err != nil {
+		t.Fatalf("SaveUpload: %v", err)
+	}
+	if stored.Kind != "document" {
+		t.Errorf("Kind = %q, want document", stored.Kind)
+	}
+}
+
 func TestSaveUploadRejectsUnsupportedMIME(t *testing.T) {
 	root := t.TempDir()
 	s := NewStore(root)
-	_, err := s.SaveUpload(strings.NewReader("..."), "file.txt", "text/plain", time.Now())
+	_, err := s.SaveUpload(strings.NewReader("..."), "file.zip", "application/zip", time.Now())
 	if err == nil {
-		t.Fatalf("want error for text/plain upload")
+		t.Fatalf("want error for unsupported mime upload")
 	}
 }
 

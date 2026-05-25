@@ -12,7 +12,7 @@ import (
 
 // imageColumns is the canonical column list for the images table.
 // Order must match scanImages and the inline Scan in ImageByID.
-const imageColumns = `id, wid, uploaded_by, filename, stored_path, thumb_path, mime_type, size_bytes, width, height, alt_text, created_at, updated_at`
+const imageColumns = `id, wid, uploaded_by, kind, filename, stored_path, thumb_path, mime_type, size_bytes, width, height, alt_text, created_at, updated_at`
 
 // CreateImage inserts a new image row and returns its id. Timestamps default
 // to now. Callers write the file + thumbnail to disk before calling this so
@@ -20,9 +20,9 @@ const imageColumns = `id, wid, uploaded_by, filename, stored_path, thumb_path, m
 func (s *Store) CreateImage(ctx context.Context, img domain.Image) (int64, error) {
 	now := time.Now().Unix()
 	res, err := s.db.ExecContext(ctx, `
-		INSERT INTO images (wid, uploaded_by, filename, stored_path, thumb_path, mime_type, size_bytes, width, height, alt_text, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		img.WID, img.UploadedBy, img.Filename, img.StoredPath, img.ThumbPath,
+		INSERT INTO images (wid, uploaded_by, kind, filename, stored_path, thumb_path, mime_type, size_bytes, width, height, alt_text, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		img.WID, img.UploadedBy, img.Kind, img.Filename, img.StoredPath, img.ThumbPath,
 		img.MimeType, img.SizeBytes, img.Width, img.Height, img.AltText, now, now)
 	if err != nil {
 		return 0, fmt.Errorf("repo: CreateImage: %w", err)
@@ -34,21 +34,32 @@ func (s *Store) CreateImage(ctx context.Context, img domain.Image) (int64, error
 	return id, nil
 }
 
-// ListImagesForAdmin returns the weblog's images newest first, with basic
-// pagination. limit<=0 defaults to 60.
-func (s *Store) ListImagesForAdmin(ctx context.Context, wid int64, limit, offset int) ([]domain.Image, error) {
+// ListImagesForAdmin returns the weblog's uploads newest first, with basic
+// pagination. limit<=0 defaults to 60. kind=="" returns all kinds.
+func (s *Store) ListImagesForAdmin(ctx context.Context, wid int64, kind string, limit, offset int) ([]domain.Image, error) {
 	if limit <= 0 {
 		limit = 60
 	}
 	if offset < 0 {
 		offset = 0
 	}
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT `+imageColumns+`
-		FROM images
-		WHERE wid = ?
-		ORDER BY created_at DESC, id DESC
-		LIMIT ? OFFSET ?`, wid, limit, offset)
+	var rows *sql.Rows
+	var err error
+	if kind != "" {
+		rows, err = s.db.QueryContext(ctx, `
+			SELECT `+imageColumns+`
+			FROM images
+			WHERE wid = ? AND kind = ?
+			ORDER BY created_at DESC, id DESC
+			LIMIT ? OFFSET ?`, wid, kind, limit, offset)
+	} else {
+		rows, err = s.db.QueryContext(ctx, `
+			SELECT `+imageColumns+`
+			FROM images
+			WHERE wid = ?
+			ORDER BY created_at DESC, id DESC
+			LIMIT ? OFFSET ?`, wid, limit, offset)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("repo: ListImagesForAdmin: %w", err)
 	}
@@ -74,7 +85,7 @@ func (s *Store) ImageByID(ctx context.Context, wid, id int64) (*domain.Image, er
 		FROM images WHERE wid = ? AND id = ?`, wid, id)
 	var img domain.Image
 	var createdAt, updatedAt int64
-	if err := row.Scan(&img.ID, &img.WID, &img.UploadedBy, &img.Filename, &img.StoredPath,
+	if err := row.Scan(&img.ID, &img.WID, &img.UploadedBy, &img.Kind, &img.Filename, &img.StoredPath,
 		&img.ThumbPath, &img.MimeType, &img.SizeBytes, &img.Width, &img.Height,
 		&img.AltText, &createdAt, &updatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -102,6 +113,17 @@ func (s *Store) UpdateImageAltText(ctx context.Context, wid, id int64, alt strin
 	return nil
 }
 
+// UpdateImageFilename overwrites the display filename for one upload.
+func (s *Store) UpdateImageFilename(ctx context.Context, wid, id int64, filename string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE images SET filename = ?, updated_at = ? WHERE wid = ? AND id = ?`,
+		filename, time.Now().Unix(), wid, id)
+	if err != nil {
+		return fmt.Errorf("repo: UpdateImageFilename: %w", err)
+	}
+	return nil
+}
+
 // DeleteImage removes an image row. The on-disk file/thumbnail cleanup is
 // the caller's responsibility (best-effort unlink) — we keep repo pure SQL.
 func (s *Store) DeleteImage(ctx context.Context, wid, id int64) error {
@@ -121,7 +143,7 @@ func scanImages(rows *sql.Rows) ([]domain.Image, error) {
 	for rows.Next() {
 		var img domain.Image
 		var createdAt, updatedAt int64
-		if err := rows.Scan(&img.ID, &img.WID, &img.UploadedBy, &img.Filename, &img.StoredPath,
+		if err := rows.Scan(&img.ID, &img.WID, &img.UploadedBy, &img.Kind, &img.Filename, &img.StoredPath,
 			&img.ThumbPath, &img.MimeType, &img.SizeBytes, &img.Width, &img.Height,
 			&img.AltText, &createdAt, &updatedAt); err != nil {
 			return nil, fmt.Errorf("repo: scan image: %w", err)

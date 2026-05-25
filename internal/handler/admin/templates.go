@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -83,6 +84,30 @@ var tmplFuncs = template.FuncMap{
 	},
 	"iconEdit": func() template.HTML {
 		return template.HTML(`<svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M13.5 2.5l4 4-10 10H3.5v-4l10-10z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`)
+	},
+	"iconExternal": func() template.HTML {
+		return template.HTML(`<svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M10 2h6v6m-1-5l-7 7M4 4v12h12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`)
+	},
+	"uploadIcon": func(kind string) template.HTML {
+		switch kind {
+		case "audio":
+			return template.HTML(`<svg class="icon-upload" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 2h-4v10.5a4.5 4.5 0 1 0 4 0V2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10v2a6 6 0 0 0 12 0v-2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`)
+		case "document":
+			return template.HTML(`<svg class="icon-upload" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 2v6h6M8 13h8M8 17h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`)
+		case "movie":
+			return template.HTML(`<svg class="icon-upload" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2" y="4" width="20" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 9l5 3-5 3V9z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`)
+		}
+		return template.HTML(``)
+	},
+	"humanSize": func(b int64) string {
+		switch {
+		case b < 1024:
+			return fmt.Sprintf("%d B", b)
+		case b < 1024*1024:
+			return fmt.Sprintf("%.1f KB", float64(b)/1024)
+		default:
+			return fmt.Sprintf("%.1f MB", float64(b)/(1024*1024))
+		}
 	},
 	// T / Tf / THTML / Locale — stubs registered at parse time so
 	// templates can reference {{ T "key" }} without tripping the
