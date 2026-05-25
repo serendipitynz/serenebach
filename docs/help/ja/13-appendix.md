@@ -37,10 +37,10 @@ sqlite3 /var/lib/serenebach/blog.db ".backup /backup/blog.db"
 | `SB_ADMIN_PASSWORD` | seed 時に作成する管理ユーザーのパスワード |
 | `SB_ADMIN_EMAIL` | seed 時に作成する管理ユーザーのメールアドレス |
 | `SB_SEED_NO_SAMPLES` | `1` にするとサンプル記事を作成しません |
-| `SB_IMAGE_DIR` | アップロード画像の保存先 |
+| `SB_IMAGE_DIR` | アップロードファイルの保存先 |
 | `SB_TEMPLATE_DIR` | テンプレート用ファイルの保存先 |
 | `SB_REBUILD_OUT` | 静的再構築の出力先 |
-| `SB_UPLOAD_MAX_MB` | 画像 1 ファイルのアップロード上限 |
+| `SB_UPLOAD_MAX_MB` | ファイル 1 つあたりのアップロード上限 |
 | `SB_TURNSTILE_SITEKEY` | Cloudflare Turnstile のサイトキー |
 | `SB_TURNSTILE_SECRET` | Cloudflare Turnstile のシークレット |
 | `SB_ANALYTICS_DISABLED` | `1` でアクセス解析を停止します |

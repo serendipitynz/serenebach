@@ -37,10 +37,10 @@ The image and template directories can be backed up with a regular file copy or 
 | `SB_ADMIN_PASSWORD` | Admin password created during seed |
 | `SB_ADMIN_EMAIL` | Admin email created during seed |
 | `SB_SEED_NO_SAMPLES` | Set to `1` to skip sample entries during seed |
-| `SB_IMAGE_DIR` | Where uploaded images are stored |
+| `SB_IMAGE_DIR` | Where uploaded files are stored |
 | `SB_TEMPLATE_DIR` | Where template assets are stored |
 | `SB_REBUILD_OUT` | Where the static rebuild writes output |
-| `SB_UPLOAD_MAX_MB` | Per-file image upload size cap |
+| `SB_UPLOAD_MAX_MB` | Per-file upload size cap |
 | `SB_TURNSTILE_SITEKEY` | Cloudflare Turnstile site key |
 | `SB_TURNSTILE_SECRET` | Cloudflare Turnstile secret |
 | `SB_ANALYTICS_DISABLED` | Set to `1` to stop recording analytics |

@@ -19,7 +19,7 @@ order: 130
 | `entry.deleted`     | 記事を削除したとき                                      |
 | `comment.received`  | コメントを受信したとき (承認前を含む)                    |
 | `comment.approved`  | コメントが承認されたとき (自動承認・手動承認の両方)      |
-| `image.uploaded`    | 画像をアップロードしたとき                              |
+| `image.uploaded`    | 画像（image kind）をアップロードしたとき               |
 
 Webhook 1 つにつき複数のイベントを購読できます。チェックボックスで選択してください。
 
