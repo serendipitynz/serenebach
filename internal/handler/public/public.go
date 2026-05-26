@@ -178,6 +178,9 @@ func (h *Handler) Mount(r chi.Router) {
 	// flipped the opt-in toggle on the 基本設定 tab.
 	r.Get("/llms.txt", h.llmsIndex)
 	r.Get("/llms-full.txt", h.llmsFull)
+	// sitemap.xml / robots.txt. 404 when the corresponding toggle is off.
+	r.Get("/sitemap.xml", h.sitemap)
+	r.Get("/robots.txt", h.robotsTxt)
 	r.Get("/style.css", h.styleCSS)
 	// Per-template CSS endpoint. {site_css} in a page rendered through
 	// template N emits this path so category / archive / profile pages
