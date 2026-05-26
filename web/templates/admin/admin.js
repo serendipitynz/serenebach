@@ -1145,31 +1145,6 @@ if (languageSelect) {
     btn.textContent = msg;
     setTimeout(function () { btn.textContent = original; }, 1200);
   }
-  function showToast(msg, variant) {
-    var el = document.createElement('div');
-    el.className = variant === 'error' ? 'toast error' : 'toast';
-    el.textContent = msg;
-    document.body.appendChild(el);
-    // Trigger the transition: add .visible on the next frame so the
-    // initial transform/opacity apply before the transition starts.
-    requestAnimationFrame(function () { el.classList.add('visible'); });
-    // Dwell time scales with message length so long error messages
-    // (e.g. the reasoning-exhausted hint) are actually readable. Base
-    // values stay unchanged for short messages; the extra ~50 ms per
-    // character above ~20 chars lifts a 100-char error from 3.0 s to
-    // ~7.0 s without dragging short toasts off-screen.
-    var len = (msg || '').length;
-    var base = variant === 'error' ? 3000 : 1800;
-    var perChar = variant === 'error' ? 60 : 40;
-    var dwell = base + Math.max(0, len - 20) * perChar;
-    var ceiling = variant === 'error' ? 12000 : 6000;
-    if (dwell > ceiling) dwell = ceiling;
-    setTimeout(function () {
-      el.classList.remove('visible');
-      setTimeout(function () { el.remove(); }, 200);
-    }, dwell);
-  }
-
   // ---- entry-form save-mode buttons (draft / dynamic) ------------------
   // Left button is a constant "save as draft regardless of dropdown"
   // escape hatch; right button is normally "公開して保存" (primary)
@@ -2436,4 +2411,4 @@ if (languageSelect) {
       }).then(restore);
     });
   }
-
+}
