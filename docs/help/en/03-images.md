@@ -1,10 +1,10 @@
 ---
-title: File uploads
+title: Library
 slug: images
-order: 100
+order: 30
 ---
 
-# File uploads
+# Library
 
 The **Library** screen manages the files you use in entries and on OG cards. Uploaded files are served from the public site under `/img/...`.
 
@@ -59,4 +59,4 @@ When you run a static rebuild, uploaded files are copied to the output directory
 ## Related pages
 
 - [Writing and managing entries](entries)
-- [Publishing settings and OG cards](settings-publishing)
+- [Blog design and OG cards](design)

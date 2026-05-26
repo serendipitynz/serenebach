@@ -1,7 +1,7 @@
 ---
 title: Preview mode
 slug: preview
-order: 70
+order: 100
 ---
 
 # Preview mode

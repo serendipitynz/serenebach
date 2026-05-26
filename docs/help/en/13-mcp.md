@@ -1,7 +1,7 @@
 ---
 title: AI integration and MCP
 slug: mcp
-order: 50
+order: 130
 ---
 
 # AI integration and MCP
@@ -81,5 +81,5 @@ Unused tokens can be revoked from the **AI Settings** screen. After revocation, 
 ## Related pages
 
 - [Users and roles](users-roles)
-- [Publishing settings and OG cards](settings-publishing)
-- [Image uploads](images)
+- [Publishing and screen settings](settings-publishing)
+- [Library](images)

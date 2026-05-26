@@ -1,7 +1,7 @@
 ---
 title: Migrating from SB2 / SB3 and feature differences
 slug: sb3-migration
-order: 60
+order: 150
 ---
 
 # Migrating from SB2 / SB3 and feature differences
@@ -151,5 +151,5 @@ SB2 typically ran in EUC-JP and SB3 typically in UTF-8, but operators frequently
 ## Related pages
 
 - [Template editing](templates)
-- [Image uploads](images)
-- [Publishing settings and OG cards](settings-publishing)
+- [Library](images)
+- [Blog design and OG cards](design)

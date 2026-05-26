@@ -1,7 +1,7 @@
 ---
 title: ユーザーと権限
 slug: users-roles
-order: 110
+order: 90
 ---
 
 # ユーザーと権限

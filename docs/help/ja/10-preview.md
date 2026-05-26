@@ -1,7 +1,7 @@
 ---
 title: プレビュー機能
 slug: preview
-order: 70
+order: 100
 ---
 
 # プレビュー機能

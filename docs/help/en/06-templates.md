@@ -1,7 +1,7 @@
 ---
 title: Template editing
 slug: templates
-order: 40
+order: 60
 ---
 
 # Template editing
@@ -373,48 +373,10 @@ The CSS template can also use tags:
 | `{site_parts}` | URL prefix for template assets |
 | `{site_encoding}` | Character encoding |
 
-## Custom tags
-
-The **Custom Tags** tab in Design lets you register your own `{custom_xxx}` placeholders for use in templates. Values are inserted as raw HTML / text — they are **not escaped** when rendered.
-
-```html
-<!-- In a template -->
-<div class="analytics">{custom_google_analytics}</div>
-```
-
-Rules for registered tags:
-
-| Field | Rule |
-|---|---|
-| Tag name | `custom_` prefix followed by lowercase letters, digits, and underscores only (max 50 chars after the prefix) |
-| Value | HTML or plain text (max 64 KB) |
-| Limit | Up to 50 tags per weblog |
-
-Registered tags are injected automatically on **every page type** — entry lists, single entries, categories, archives, and profiles. Changes take effect immediately on the dynamic site; a static rebuild is required if you use `task build-site`.
-
-> **Security note:** values are emitted as raw HTML. Because only admin-level operators can edit them, the XSS surface is limited to trusted users.
-
-## Design settings
-
-The **Design** screen covers site-wide rendering knobs:
-
-- Switching the active template
-- Templates used for archive / category listings
-- Template used for the profile page
-- Number of entries per listing page
-- Sort order for entries and comments
-- Date format
-
-Date formats use the same SB3-style tokens such as `%Year%`, `%Mon%`, `%Day%`. See [Publishing settings and OG cards](settings-publishing) for details.
-
-## Import and export
-
-You can import an SB3-style `template.txt`. Older character encodings (Shift_JIS, EUC-JP, ISO-2022-JP) are auto-converted to UTF-8 during import.
-
-Export uses the same `template.txt` format — useful for backups or moving a template to another instance.
-
 ## Related pages
 
+This page covers the editing of one template set. The decisions that live above the template — which template is active, site-wide rendering options, custom tags, import/export, and OG card defaults — are gathered in [Blog design and OG cards](design).
+
+- [Blog design and OG cards](design)
 - [Preview mode](preview)
 - [Migrating from SB2 / SB3 and feature differences](sb3-migration)
-- [Publishing settings and OG cards](settings-publishing)

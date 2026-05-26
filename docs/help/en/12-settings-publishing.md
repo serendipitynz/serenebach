@@ -1,12 +1,14 @@
 ---
-title: Publishing settings and OG cards
+title: Publishing and screen settings
 slug: settings-publishing
-order: 80
+order: 120
 ---
 
-# Publishing settings and OG cards
+# Publishing and screen settings
 
 The **Settings** screen is where you change the blog name, description, URL, in-admin appearance, and AI configuration. The visible tabs depend on your role.
+
+OG card defaults, template switching, and other design-related options are gathered on the [Blog design and OG cards](design) page.
 
 ## Screen settings
 
@@ -28,10 +30,11 @@ Basic settings cover blog-wide values that affect the public site. Available to 
 | Base URL | Used to build absolute URLs in feeds and OG cards |
 | Language | Drives the public-page language and reader-facing messages |
 | llms.txt | Whether to expose the AI-agent-friendly text endpoint |
+| sitemap.xml / robots.txt | Whether to expose `sitemap.xml` and `robots.txt` for search engines |
 
 For a public blog, set the base URL. Without it, feed and social-share URLs may not resolve correctly.
 
-The OG card defaults (background image and text colour) live under **Design > OG Card**. See [OG cards](#og-cards) below.
+See [Static rebuild and publishing](rebuild-publishing) for the details of `sitemap.xml` / `robots.txt`.
 
 ## llms.txt
 
@@ -42,45 +45,16 @@ When enabled, llms.txt publishes a Markdown view of the public entries that AI a
 
 Leave it disabled if you don't want this. Both URLs return 404 in that case.
 
-## OG cards
-
-OG cards are the images social platforms show when someone shares an entry URL. Serene Bach generates a 1200 x 630 image per entry.
-
-The blog-wide defaults (background image and text colour) are edited under **Design > OG Card** in the left sidebar. Per-entry overrides are set on the entry editor.
-
-The background is resolved in this order:
-
-1. Entry-level OG background (set in the entry editor)
-2. Blog-wide OG background (Design > OG Card)
-3. The bundled default
-
-Backgrounds are picked from the image library. Off-aspect images are centre-cropped.
-
-The text colour applies to both the entry title and the blog title. When unset, the standard two-tone defaults apply. Tick "Hide text" if your background image already includes its own typography.
-
 ## AI settings
 
 The AI Settings tab covers the in-admin AI writing assist plus MCP access tokens.
 
 The writing assist requires `SB_AI_SECRET` on the server. Each user can then register a provider and API key for themselves.
 
-Admin users can also issue and revoke MCP access tokens from this screen.
-
-## Design settings
-
-The **Design** screen carries cross-template rendering knobs:
-
-- Templates used for archive / category / tag listings
-- Template used for the profile page
-- Number of entries per listing page
-- Sort order for entries
-- Sort order for comments
-- Date format
-
-Date formats use SB3-style tokens such as `%Year%`, `%Mon%`, `%Day%`, `%Week%`, `%Hour%`, `%Min%`. Example: `%Year%-%Mon%-%Day% (%Week%)`
+Admin users can also issue and revoke MCP access tokens from this screen. See [AI integration and MCP](mcp) for details.
 
 ## Related pages
 
-- [Template editing](templates)
+- [Blog design and OG cards](design)
 - [AI integration and MCP](mcp)
-- [Image uploads](images)
+- [Library](images)
