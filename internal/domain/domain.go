@@ -88,6 +88,12 @@ type Weblog struct {
 	// be writable. Errors are logged and surfaced as a flash; the save
 	// itself never rolls back on a failed rebuild.
 	AutoRebuildOnPublish bool
+	// SitemapEnabled controls whether /sitemap.xml is served and
+	// generated during static rebuild. On by default.
+	SitemapEnabled bool
+	// RobotsEnabled controls whether /robots.txt is served and
+	// generated during static rebuild. On by default.
+	RobotsEnabled bool
 	// ArchiveTemplateID pins a specific template for archive (year/month/
 	// category) pages. 0 means "use the active template". ProfileTemplateID
 	// plays the same role for the profile view.

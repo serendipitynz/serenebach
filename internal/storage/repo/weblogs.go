@@ -18,18 +18,20 @@ func (s *Store) WeblogByID(ctx context.Context, id int64) (*domain.Weblog, error
 		       archive_template_id, profile_template_id,
 		       date_format_entry, time_format_entry, date_format_comment,
 		       date_format_list, date_format_archive,
-		       entries_per_page, entry_sort_order, comment_sort_order
+		       entries_per_page, entry_sort_order, comment_sort_order,
+		       sitemap_enabled, robots_enabled
 		FROM weblogs WHERE id = ?`, id)
 	w := &domain.Weblog{}
 	var mode string
-	var llmsEnabled, autoRebuild int
+	var llmsEnabled, autoRebuild, sitemapEnabled, robotsEnabled int
 	if err := row.Scan(&w.ID, &w.Title, &w.Description, &w.BaseURL, &w.Lang, &mode, &w.SpamWords, &w.IPBlacklist, &llmsEnabled,
 		&autoRebuild,
 		&w.OGBGImagePath, &w.OGTextColor,
 		&w.ArchiveTemplateID, &w.ProfileTemplateID,
 		&w.DateFormatEntry, &w.TimeFormatEntry, &w.DateFormatComment,
 		&w.DateFormatList, &w.DateFormatArchive,
-		&w.EntriesPerPage, &w.EntrySortOrder, &w.CommentSortOrder); err != nil {
+		&w.EntriesPerPage, &w.EntrySortOrder, &w.CommentSortOrder,
+		&sitemapEnabled, &robotsEnabled); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -41,6 +43,8 @@ func (s *Store) WeblogByID(ctx context.Context, id int64) (*domain.Weblog, error
 	}
 	w.LLMSEnabled = llmsEnabled != 0
 	w.AutoRebuildOnPublish = autoRebuild != 0
+	w.SitemapEnabled = sitemapEnabled != 0
+	w.RobotsEnabled = robotsEnabled != 0
 	return w, nil
 }
 
@@ -115,17 +119,27 @@ func (s *Store) UpdateWeblog(ctx context.Context, w domain.Weblog) error {
 	if w.AutoRebuildOnPublish {
 		autoRebuild = 1
 	}
+	sitemap := 0
+	if w.SitemapEnabled {
+		sitemap = 1
+	}
+	robots := 0
+	if w.RobotsEnabled {
+		robots = 1
+	}
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE weblogs SET
 			title = ?, description = ?, base_url = ?, lang = ?,
 			comment_mode = ?, spam_words = ?, ip_blacklist = ?, llms_enabled = ?,
 			auto_rebuild_on_publish = ?,
-			og_bg_image_path = ?, og_text_color = ?
+			og_bg_image_path = ?, og_text_color = ?,
+			sitemap_enabled = ?, robots_enabled = ?
 		WHERE id = ?`,
 		w.Title, w.Description, w.BaseURL, w.Lang,
 		string(w.CommentMode), w.SpamWords, w.IPBlacklist, llms,
 		autoRebuild,
 		w.OGBGImagePath, w.OGTextColor,
+		sitemap, robots,
 		w.ID)
 	if err != nil {
 		return fmt.Errorf("repo: UpdateWeblog: %w", err)
