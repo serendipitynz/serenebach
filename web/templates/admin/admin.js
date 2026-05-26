@@ -2411,4 +2411,3 @@ if (languageSelect) {
       }).then(restore);
     });
   }
-}
