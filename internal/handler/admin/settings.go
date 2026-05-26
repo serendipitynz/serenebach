@@ -273,6 +273,8 @@ func parseSettingsForm(r *http.Request, base domain.Weblog) (domain.Weblog, stri
 	}
 	base.BaseURL = baseURL
 
+	base.SitemapEnabled = postFormValue(r, "sitemap_enabled") == "1"
+	base.RobotsEnabled = postFormValue(r, "robots_enabled") == "1"
 	base.LLMSEnabled = postFormValue(r, "llms_enabled") == "1"
 	base.AutoRebuildOnPublish = postFormValue(r, "auto_rebuild_on_publish") == "1"
 	// OG background / text-colour are edited on /admin/templates/og.

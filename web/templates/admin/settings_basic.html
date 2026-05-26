@@ -40,6 +40,28 @@
         </div>
       </div>
       <div class="form-row">
+        <div class="label">{{T "settings.blog.sitemap"}}</div>
+        <div class="radio-row">
+          <label class="inline-field"><input type="radio" name="sitemap_enabled" value="1"{{if .Weblog.SitemapEnabled}} checked{{end}}> {{T "settings.blog.sitemapPublic"}}</label>
+          <label class="inline-field"><input type="radio" name="sitemap_enabled" value="0"{{if not .Weblog.SitemapEnabled}} checked{{end}}> {{T "settings.blog.sitemapPrivate"}}</label>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="label"></div>
+        <p class="hint">{{THTML "settings.blog.sitemapHint"}}</p>
+      </div>
+      <div class="form-row">
+        <div class="label">{{T "settings.blog.robots"}}</div>
+        <div class="radio-row">
+          <label class="inline-field"><input type="radio" name="robots_enabled" value="1"{{if .Weblog.RobotsEnabled}} checked{{end}}> {{T "settings.blog.robotsPublic"}}</label>
+          <label class="inline-field"><input type="radio" name="robots_enabled" value="0"{{if not .Weblog.RobotsEnabled}} checked{{end}}> {{T "settings.blog.robotsPrivate"}}</label>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="label"></div>
+        <p class="hint">{{THTML "settings.blog.robotsHint"}}</p>
+      </div>
+      <div class="form-row">
         <div class="label">{{T "settings.blog.llms"}}</div>
         <div class="radio-row">
           <label class="inline-field"><input type="radio" name="llms_enabled" value="1"{{if .Weblog.LLMSEnabled}} checked{{end}}> {{T "settings.blog.llmsPublic"}}</label>
