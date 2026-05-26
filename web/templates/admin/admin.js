@@ -933,6 +933,84 @@
     });
   }
 
+  // uploadBatch runs `files` through uploadFile sequentially, then makes
+  // an auto-alt generation pass for any upload that asked for one. The
+  // caller owns its own progress sink and completion action so the same
+  // flow serves both the /admin/images drop zone and the in-form image
+  // picker.
+  //   opts.endpoint    — upload URL (undefined → uploadFile default)
+  //   opts.setProgress — fn(text) writing to the caller's progress UI
+  //   opts.onDone      — fn() run once everything settles (alt or not)
+  function uploadBatch(files, token, opts) {
+    opts = opts || {};
+    var setProgress = opts.setProgress || function () {};
+    var onDone = opts.onDone || function () {};
+    var total = files.length;
+    var done = 0;
+    var errors = [];
+    var altPending = [];
+
+    setProgress(sbT('js.upload.uploading', 0, total));
+
+    var chain = Promise.resolve();
+    Array.prototype.slice.call(files).forEach(function (file) {
+      chain = chain.then(function () {
+        return uploadFile(file, token, opts.endpoint).then(function (result) {
+          done += 1;
+          if (!result.ok) {
+            errors.push((file.name || 'file') + ': ' + (result.body && result.body.error || ('HTTP ' + result.status)));
+          } else if (result.body && result.body.auto_alt_requested && result.body.id) {
+            altPending.push(result.body.id);
+          }
+          setProgress(sbT('js.upload.uploading', done, total));
+        });
+      });
+    });
+
+    return chain.then(function () {
+      if (errors.length) { alert(errors.join('\n')); }
+      if (altPending.length === 0) {
+        onDone();
+        return;
+      }
+      // Auto-alt run: surface the "generating..." state, then finish once
+      // every alt call has returned (success or failure).
+      setProgress(sbT('js.ai.altGenerating', altPending.length));
+      var altPromises = altPending.map(function (id) {
+        return fetch('/admin/images/' + id + '/alt', {
+          method: 'POST',
+          headers: { 'X-CSRF-Token': token, 'Accept': 'application/json' },
+          credentials: 'same-origin'
+        }).then(function (res) { return res.json().catch(function () { return { ok: false }; }); })
+          .catch(function () { return { ok: false }; });
+      });
+      return Promise.all(altPromises).then(function (results) {
+        var failed = results.filter(function (r) { return !r.ok; }).length;
+        showToast(failed > 0 ? sbT('js.ai.altFail', failed) : sbT('js.ai.altDone', results.length));
+        onDone();
+      });
+    });
+  }
+
+  // wireDragHover toggles `hoverClass` on `zone` while a drag is over it:
+  // added on dragenter/dragover, removed on dragleave/drop. preventDefault
+  // + stopPropagation on every event so the browser doesn't navigate to a
+  // dropped file. The caller wires its own `drop` handler for the payload.
+  function wireDragHover(zone, hoverClass) {
+    ['dragenter', 'dragover'].forEach(function (evt) {
+      zone.addEventListener(evt, function (e) {
+        e.preventDefault(); e.stopPropagation();
+        zone.classList.add(hoverClass);
+      });
+    });
+    ['dragleave', 'drop'].forEach(function (evt) {
+      zone.addEventListener(evt, function (e) {
+        e.preventDefault(); e.stopPropagation();
+        zone.classList.remove(hoverClass);
+      });
+    });
+  }
+
   // ---- drop zone on /admin/images --------------------------------------
   var dropForms = document.querySelectorAll('[data-upload]');
   dropForms.forEach(function (form) {
@@ -941,18 +1019,7 @@
     var progress = form.querySelector('.drop-zone-progress');
     if (!zone || !input) return;
 
-    ['dragenter', 'dragover'].forEach(function (evt) {
-      zone.addEventListener(evt, function (e) {
-        e.preventDefault(); e.stopPropagation();
-        zone.classList.add('drag-over');
-      });
-    });
-    ['dragleave', 'drop'].forEach(function (evt) {
-      zone.addEventListener(evt, function (e) {
-        e.preventDefault(); e.stopPropagation();
-        zone.classList.remove('drag-over');
-      });
-    });
+    wireDragHover(zone, 'drag-over');
     zone.addEventListener('drop', function (e) {
       var files = e.dataTransfer && e.dataTransfer.files;
       if (!files || !files.length) return;
@@ -966,58 +1033,12 @@
     function submitFiles(files) {
       var token = form.getAttribute('data-csrf') || '';
       var endpoint = form.getAttribute('action') || '/admin/images';
-      var total = files.length;
-      var done = 0;
-      var errors = [];
-      if (progress) { progress.hidden = false; progress.textContent = sbT('js.upload.uploading', 0, total); }
-
-      var chain = Promise.resolve();
-      // Collect ids whose upload response asked for auto-alt. We'll
-      // hit /admin/images/{id}/alt for each in parallel after the
-      // upload pass finishes, keeping the upload latency unchanged.
-      var altPending = [];
-      for (var i = 0; i < files.length; i++) {
-        (function (file) {
-          chain = chain.then(function () {
-            return uploadFile(file, token, endpoint).then(function (result) {
-              done += 1;
-              if (!result.ok) {
-                errors.push((file.name || 'file') + ': ' + (result.body && result.body.error || ('HTTP ' + result.status)));
-              } else if (result.body && result.body.auto_alt_requested && result.body.id) {
-                altPending.push(result.body.id);
-              }
-              if (progress) progress.textContent = sbT('js.upload.uploading', done, total);
-            });
-          });
-        })(files[i]);
-      }
-      chain.then(function () {
-        if (errors.length) { alert(errors.join('\n')); }
-        if (altPending.length === 0) {
-          window.location.reload();
-          return;
-        }
-        // Auto-alt run: surface the "generating..." state so the user
-        // knows the server is still working, then reload once every
-        // alt call has returned (success or failure).
-        if (progress) progress.textContent = sbT('js.ai.altGenerating', altPending.length);
-        var altPromises = altPending.map(function (id) {
-          return fetch('/admin/images/' + id + '/alt', {
-            method: 'POST',
-            headers: { 'X-CSRF-Token': token, 'Accept': 'application/json' },
-            credentials: 'same-origin'
-          }).then(function (res) { return res.json().catch(function () { return { ok: false }; }); })
-            .catch(function () { return { ok: false }; });
-        });
-        Promise.all(altPromises).then(function (results) {
-          var failed = results.filter(function (r) { return !r.ok; }).length;
-          if (failed > 0) {
-            showToast(sbT('js.ai.altFail', failed));
-          } else {
-            showToast(sbT('js.ai.altDone', results.length));
-          }
-          window.location.reload();
-        });
+      uploadBatch(files, token, {
+        endpoint: endpoint,
+        setProgress: function (text) {
+          if (progress) { progress.hidden = false; progress.textContent = text; }
+        },
+        onDone: function () { window.location.reload(); }
       });
     }
   });
@@ -1031,18 +1052,7 @@
     var placeholder = zone.querySelector('[data-drop-placeholder]');
     var defaultText = placeholder ? placeholder.textContent : '';
 
-    ['dragenter', 'dragover'].forEach(function (evt) {
-      zone.addEventListener(evt, function (e) {
-        e.preventDefault(); e.stopPropagation();
-        zone.classList.add('drag-over');
-      });
-    });
-    ['dragleave', 'drop'].forEach(function (evt) {
-      zone.addEventListener(evt, function (e) {
-        e.preventDefault(); e.stopPropagation();
-        zone.classList.remove('drag-over');
-      });
-    });
+    wireDragHover(zone, 'drag-over');
     zone.addEventListener('drop', function (e) {
       var files = e.dataTransfer && e.dataTransfer.files;
       if (!files || !files.length) return;
@@ -1476,56 +1486,11 @@
       if (!hasFiles(e.dataTransfer)) return;
       e.preventDefault();
 
-      var token = readCSRFToken();
-      var files = e.dataTransfer.files;
-      var total = files.length;
-      var done = 0;
-      var errors = [];
-      var altPending = [];
-
-      if (pickerBody) {
-        pickerBody.textContent = sbT('js.upload.uploading', 0, total);
-      }
-
-      var chain = Promise.resolve();
-      Array.prototype.slice.call(files).forEach(function (file) {
-        chain = chain.then(function () {
-          return uploadFile(file, token).then(function (result) {
-            done += 1;
-            if (!result.ok) {
-              errors.push((file.name || 'file') + ': ' + (result.body && result.body.error || ('HTTP ' + result.status)));
-            } else if (result.body && result.body.auto_alt_requested && result.body.id) {
-              altPending.push(result.body.id);
-            }
-            if (pickerBody) pickerBody.textContent = sbT('js.upload.uploading', done, total);
-          });
-        });
-      });
-
-      chain.then(function () {
-        if (errors.length) { alert(errors.join('\n')); }
-        if (altPending.length === 0) {
-          loadPickerImages();
-          return;
-        }
-        if (pickerBody) pickerBody.textContent = sbT('js.ai.altGenerating', altPending.length);
-        var altPromises = altPending.map(function (id) {
-          return fetch('/admin/images/' + id + '/alt', {
-            method: 'POST',
-            headers: { 'X-CSRF-Token': token, 'Accept': 'application/json' },
-            credentials: 'same-origin'
-          }).then(function (res) { return res.json().catch(function () { return { ok: false }; }); })
-            .catch(function () { return { ok: false }; });
-        });
-        Promise.all(altPromises).then(function (results) {
-          var failed = results.filter(function (r) { return !r.ok; }).length;
-          if (failed > 0) {
-            showToast(sbT('js.ai.altFail', failed));
-          } else {
-            showToast(sbT('js.ai.altDone', results.length));
-          }
-          loadPickerImages();
-        });
+      uploadBatch(e.dataTransfer.files, readCSRFToken(), {
+        setProgress: function (text) {
+          if (pickerBody) pickerBody.textContent = text;
+        },
+        onDone: loadPickerImages
       });
     });
   }
@@ -2293,6 +2258,22 @@
     return aiPopupInstance;
   }
 
+  // postCompose POSTs `payload` to /admin/ai/compose and resolves to the
+  // parsed JSON, falling back to {ok:false,error:'parse'} when the body
+  // isn't JSON. Callers chain their own .then to drive the popup / toast.
+  function postCompose(payload) {
+    return fetch('/admin/ai/compose', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-CSRF-Token': readCSRFToken(),
+      },
+      body: JSON.stringify(payload),
+      credentials: 'same-origin'
+    }).then(function (res) { return res.json().catch(function () { return { ok: false, error: 'parse' }; }); });
+  }
+
   // ---- Ace AI toolbar dispatcher --------------------------------------
   // Shared helper so the three toolbar buttons (rewrite / continue /
   // summarise) POST to /admin/ai/compose with the right context +
@@ -2332,16 +2313,7 @@
 
     var restore = setButtonLoading(btn);
 
-    fetch('/admin/ai/compose', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-CSRF-Token': readCSRFToken(),
-      },
-      body: JSON.stringify(req),
-      credentials: 'same-origin'
-    }).then(function (res) { return res.json().catch(function () { return { ok: false, error: 'parse' }; }); })
+    postCompose(req)
       .then(function (data) {
         if (!data || !data.ok) {
           var key = (data && data.error) || 'provider_error';
@@ -2410,21 +2382,12 @@
       var restore = setButtonLoading(btn);
       showToast(sbT('js.ai.thinking'));
 
-      fetch('/admin/ai/compose', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-CSRF-Token': readCSRFToken(),
-        },
-        body: JSON.stringify({
-          action: action,
-          text: textForPrompt,
-          format: form.querySelector('select[name="format"]') ? form.querySelector('select[name="format"]').value : 'html',
-          language: document.documentElement.lang || 'ja',
-        }),
-        credentials: 'same-origin'
-      }).then(function (res) { return res.json().catch(function () { return { ok: false, error: 'parse' }; }); })
+      postCompose({
+        action: action,
+        text: textForPrompt,
+        format: form.querySelector('select[name="format"]') ? form.querySelector('select[name="format"]').value : 'html',
+        language: document.documentElement.lang || 'ja',
+      })
         .then(function (data) {
           if (!data || !data.ok) {
             showToast(sbT('js.ai.err.' + (data && data.error || 'provider_error')));
