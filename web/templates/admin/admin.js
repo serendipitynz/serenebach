@@ -2,86 +2,53 @@
 // Keep vanilla and free of build steps so "drop the binary in" still
 // works end-to-end without a bundler.
 
-(function () {
-  'use strict';
+import { createI18n } from './modules/core/i18n.js';
+import { safeRead, safeWrite } from './modules/core/storage.js';
+import { showToast, initToastPromotion } from './modules/core/toast.js';
 
-  // ---- flash alert → toast promotion ---------------------------------
-  // Server-rendered flash messages (<p class="alert success|error">)
-  // get promoted to a bottom-center toast so the save-confirmation
-  // pattern matches the rest of the admin UI. Success alerts are
-  // ephemeral and get removed from the DOM after promotion; error
-  // alerts stay inline so form-validation text remains readable after
-  // the toast fades. .alert.warning (e.g. analytics disabled) is
-  // persistent info and deliberately left alone.
-  document.querySelectorAll('.alert.success').forEach(function (el) {
-    var msg = (el.textContent || '').trim();
-    if (msg) showToast(msg);
-    el.remove();
+const sbT = createI18n((typeof window !== 'undefined' && window.__sbI18n) || {});
+
+initToastPromotion();
+
+// ---- appearance / language prefs -----------------------------------
+// Reflect the stored appearance preference into the <select> and apply
+// any change immediately. The pre-init script in layout.html already
+// set data-theme before CSS painted; this keeps the two in sync.
+var appearanceSelect = document.querySelector('[data-appearance-select]');
+if (appearanceSelect) {
+  var stored = safeRead('sb_admin_appearance') || 'auto';
+  appearanceSelect.value = stored;
+  appearanceSelect.addEventListener('change', function () {
+    var v = appearanceSelect.value;
+    if (v !== 'light' && v !== 'dark' && v !== 'auto') return;
+    safeWrite('sb_admin_appearance', v);
+    document.documentElement.setAttribute('data-theme', v);
   });
-  document.querySelectorAll('.alert.error').forEach(function (el) {
-    var msg = (el.textContent || '').trim();
-    if (msg) showToast(msg, 'error');
+}
+var languageSelect = document.querySelector('[data-language-select]');
+if (languageSelect) {
+  // The server renders <option selected> via {{Locale}}, so the
+  // dropdown is already correct on first paint. No client-side
+  // state restoration is needed — and it would not work under
+  // Sakura's ENC_ cookie protection anyway (the value is encrypted
+  // opaque to JS).
+  languageSelect.addEventListener('change', function () {
+    var v = languageSelect.value;
+    if (v !== 'ja' && v !== 'en') return;
+    var body = new URLSearchParams({ lang: v, csrf_token: readCSRFToken() });
+    var endpoint = (window.__sbRoot || '') + '/admin/settings/language';
+    fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body,
+      credentials: 'same-origin',
+    }).then(function (res) {
+      if (res.ok) window.location.reload();
+    });
   });
+}
 
-  // ---- appearance / language prefs -----------------------------------
-  // Reflect the stored appearance preference into the <select> and apply
-  // any change immediately. The pre-init script in layout.html already
-  // set data-theme before CSS painted; this keeps the two in sync.
-  var appearanceSelect = document.querySelector('[data-appearance-select]');
-  if (appearanceSelect) {
-    var stored = safeRead('sb_admin_appearance') || 'auto';
-    appearanceSelect.value = stored;
-    appearanceSelect.addEventListener('change', function () {
-      var v = appearanceSelect.value;
-      if (v !== 'light' && v !== 'dark' && v !== 'auto') return;
-      safeWrite('sb_admin_appearance', v);
-      document.documentElement.setAttribute('data-theme', v);
-    });
-  }
-  var languageSelect = document.querySelector('[data-language-select]');
-  if (languageSelect) {
-    // The server renders <option selected> via {{Locale}}, so the
-    // dropdown is already correct on first paint. No client-side
-    // state restoration is needed — and it would not work under
-    // Sakura's ENC_ cookie protection anyway (the value is encrypted
-    // opaque to JS).
-    languageSelect.addEventListener('change', function () {
-      var v = languageSelect.value;
-      if (v !== 'ja' && v !== 'en') return;
-      var body = new URLSearchParams({ lang: v, csrf_token: readCSRFToken() });
-      var endpoint = (window.__sbRoot || '') + '/admin/settings/language';
-      fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body,
-        credentials: 'same-origin',
-      }).then(function (res) {
-        if (res.ok) window.location.reload();
-      });
-    });
-  }
-
-  function safeRead(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-  function safeWrite(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
-
-  // sbT looks up a key in the per-request i18n bundle layout.html
-  // dropped into window.__sbI18n. If the key is missing the literal
-  // key comes back so missing strings surface visibly. sbT supports
-  // printf-style %d / %s substitutions so the caller can pass
-  // additional args after the key.
-  function sbT(key) {
-    var bundle = (typeof window !== 'undefined' && window.__sbI18n) || {};
-    var tmpl = bundle[key] || key;
-    if (arguments.length <= 1) return tmpl;
-    var args = Array.prototype.slice.call(arguments, 1);
-    var i = 0;
-    return tmpl.replace(/%[ds]/g, function () {
-      var v = args[i++];
-      return v === undefined ? '' : String(v);
-    });
-  }
-
-  // ---- Ace code editor (lazy-loaded) ----------------------------------
+// ---- Ace code editor (lazy-loaded) ----------------------------------
   // Any <textarea data-code-editor="html|css|markdown|text"> on the
   // page gets upgraded to an Ace editor. Ace itself is only fetched
   // when at least one such textarea exists — most admin pages don't
@@ -2469,4 +2436,4 @@
       }).then(restore);
     });
   }
-})();
+
