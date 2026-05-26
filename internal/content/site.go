@@ -448,6 +448,16 @@ func (s Site) Apply(c *sbtemplate.Context) {
 	c.Tag("site_css", s.CSSURL())
 	c.Tag("site_rss", s.RSSURL())
 	c.Tag("site_atom", s.AtomURL())
+	if s.Weblog.SitemapEnabled {
+		c.Tag("sitemap_url", s.baseURL()+"sitemap.xml")
+	} else {
+		c.Tag("sitemap_url", "")
+	}
+	if s.Weblog.RobotsEnabled {
+		c.Tag("robots_url", s.baseURL()+"robots.txt")
+	} else {
+		c.Tag("robots_url", "")
+	}
 	c.Tag("site_parts", s.PartsURL())
 	// {site_mobile} has no backing feature (mobile mode was dropped
 	// during the rewrite). {site_rsd} points at the /rsd.xml route,

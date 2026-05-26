@@ -25,6 +25,7 @@ import (
 	"github.com/serendipitynz/serenebach/internal/domain"
 	"github.com/serendipitynz/serenebach/internal/feed"
 	"github.com/serendipitynz/serenebach/internal/llmstxt"
+	"github.com/serendipitynz/serenebach/internal/sitemap"
 	"github.com/serendipitynz/serenebach/internal/storage/repo"
 )
 
@@ -47,6 +48,8 @@ type Report struct {
 	RSSWritten           bool
 	AtomWritten          bool
 	LLMSWritten          bool // both llms.txt + llms-full.txt (0 or 2 files)
+	SitemapWritten       bool
+	RobotsWritten        bool
 	OutDir               string
 }
 
@@ -140,7 +143,7 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 	// Every render + write succeeded. Swap the staged tree into
 	// place; failures inside promoteStaging leave the previous
 	// snapshot intact thanks to the rename-via-backup pattern.
-	if err := promoteStaging(finalOut, staging, env.weblog.LLMSEnabled, pageRoots); err != nil {
+	if err := promoteStaging(finalOut, staging, env.weblog.LLMSEnabled, env.weblog, pageRoots); err != nil {
 		return nil, err
 	}
 
@@ -173,6 +176,10 @@ type buildData struct {
 	sidebar      content.SidebarData
 	customTags   []domain.CustomTag
 	templates    map[int64]*domain.Template
+	pages        []domain.Page
+	tags         []domain.Tag
+	catLastMods  map[int64]time.Time
+	tagLastMods  map[int64]time.Time
 }
 
 // prepareBuildEnv resolves opts defaults (WID, TZ, EntryListLimit) and
@@ -246,6 +253,22 @@ func loadBuildData(ctx context.Context, store *repo.Store, wid int64, tz *time.L
 	if err != nil {
 		return nil, fmt.Errorf("rebuild: load custom tags: %w", err)
 	}
+	pages, err := store.PublishedPages(ctx, wid)
+	if err != nil {
+		return nil, fmt.Errorf("rebuild: load pages: %w", err)
+	}
+	tags, err := store.AllTags(ctx, wid)
+	if err != nil {
+		return nil, fmt.Errorf("rebuild: load tags: %w", err)
+	}
+	catLastMods, err := store.SitemapCategoryLastMods(ctx, wid)
+	if err != nil {
+		return nil, fmt.Errorf("rebuild: load category lastmods: %w", err)
+	}
+	tagLastMods, err := store.SitemapTagLastMods(ctx, wid)
+	if err != nil {
+		return nil, fmt.Errorf("rebuild: load tag lastmods: %w", err)
+	}
 	return &buildData{
 		all:          all,
 		cats:         cats,
@@ -254,6 +277,10 @@ func loadBuildData(ctx context.Context, store *repo.Store, wid int64, tz *time.L
 		sidebar:      sidebar,
 		customTags:   customTags,
 		templates:    map[int64]*domain.Template{},
+		pages:        pages,
+		tags:         tags,
+		catLastMods:  catLastMods,
+		tagLastMods:  tagLastMods,
 	}, nil
 }
 
@@ -325,7 +352,62 @@ func writeStagedExtras(staging string, site content.Site, tmpl *domain.Template,
 			return err
 		}
 	}
+	if err := writeStagedSEO(staging, weblog, data, rep); err != nil {
+		return err
+	}
 	return nil
+}
+
+// writeStagedSEO emits sitemap.xml and robots.txt into staging when
+// the corresponding toggles are on and base_url is configured.
+func writeStagedSEO(staging string, weblog *domain.Weblog, data *buildData, rep *Report) error {
+	if weblog.SitemapEnabled && weblog.BaseURL != "" {
+		if err := writeStagedSitemap(staging, weblog, data); err != nil {
+			return err
+		}
+		rep.SitemapWritten = true
+	}
+	if weblog.RobotsEnabled && weblog.BaseURL != "" {
+		body := sitemap.RobotsTxt(weblog)
+		if err := writeFile(filepath.Join(staging, "robots.txt"), []byte(body)); err != nil {
+			return err
+		}
+		rep.RobotsWritten = true
+	}
+	return nil
+}
+
+func writeStagedSitemap(staging string, weblog *domain.Weblog, data *buildData) error {
+	visibleCats := make([]domain.Category, 0, len(data.cats))
+	for _, c := range data.cats {
+		if !c.Hidden {
+			visibleCats = append(visibleCats, c)
+		}
+	}
+	filteredEntries := make([]domain.Entry, 0, len(data.all))
+	for _, e := range data.all {
+		if e.CategoryID == domain.Uncategorized {
+			filteredEntries = append(filteredEntries, e)
+			continue
+		}
+		if cat, ok := data.cats[e.CategoryID]; ok && !cat.Hidden {
+			filteredEntries = append(filteredEntries, e)
+		}
+	}
+	in := sitemap.Input{
+		Weblog:           weblog,
+		Entries:          filteredEntries,
+		Categories:       visibleCats,
+		Tags:             data.tags,
+		Pages:            data.pages,
+		CategoryLastMods: data.catLastMods,
+		TagLastMods:      data.tagLastMods,
+	}
+	body, _, err := sitemap.BuildFromInput(in)
+	if err != nil {
+		return fmt.Errorf("rebuild: sitemap: %w", err)
+	}
+	return writeFile(filepath.Join(staging, "sitemap.xml"), body)
 }
 
 // writeAdditiveAssets emits the assets whose lifecycle sits outside the
@@ -999,7 +1081,7 @@ func writeLLMsTxt(outDir string, weblog domain.Weblog, all []domain.Entry, rep *
 // so each file flips in place. Finally, when the LLMS toggle is off
 // any leftover llms*.txt are removed so flipping the switch off
 // cleans up after itself.
-func promoteStaging(finalOut, staging string, llmsEnabled bool, pruneSet map[string]struct{}) error {
+func promoteStaging(finalOut, staging string, llmsEnabled bool, weblog *domain.Weblog, pruneSet map[string]struct{}) error {
 	// Load the previous build's page-root manifest so we can prune
 	// stale directories that were generated in an earlier run but no
 	// longer exist (deleted, unpublished, or renamed pages).
@@ -1029,7 +1111,10 @@ func promoteStaging(finalOut, staging string, llmsEnabled bool, pruneSet map[str
 		return err
 	}
 
-	return cleanupLLMs(finalOut, llmsEnabled)
+	if err := cleanupLLMs(finalOut, llmsEnabled); err != nil {
+		return err
+	}
+	return cleanupSEOFiles(finalOut, weblog.SitemapEnabled, weblog.RobotsEnabled, weblog.BaseURL)
 }
 
 // promoteManagedSubtree swaps the staged copy of a known subtree
@@ -1086,7 +1171,7 @@ func promoteManagedSubtree(staging, finalOut, sub string) error {
 // place without needing a backup step. Missing staged files are
 // expected (e.g. llms*.txt when the toggle is off) and skipped.
 func promoteTopLevelFiles(staging, finalOut string) error {
-	for _, name := range []string{"index.html", "style.css", "rss.xml", "atom.xml", "llms.txt", "llms-full.txt"} {
+	for _, name := range []string{"index.html", "style.css", "rss.xml", "atom.xml", "llms.txt", "llms-full.txt", "sitemap.xml", "robots.txt"} {
 		stagedPath := filepath.Join(staging, name)
 		finalPath := filepath.Join(finalOut, name)
 		if _, err := os.Stat(stagedPath); err != nil {
@@ -1131,6 +1216,23 @@ func cleanupLLMs(finalOut string, llmsEnabled bool) error {
 	for _, name := range []string{"llms.txt", "llms-full.txt"} {
 		if err := os.Remove(filepath.Join(finalOut, name)); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("rebuild: remove %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
+// cleanupSEOFiles removes sitemap.xml / robots.txt when the corresponding
+// toggle has been turned off or base_url is empty so the static snapshot
+// stays consistent with the dynamic route state.
+func cleanupSEOFiles(finalOut string, sitemapEnabled, robotsEnabled bool, baseURL string) error {
+	if !sitemapEnabled || baseURL == "" {
+		if err := os.Remove(filepath.Join(finalOut, "sitemap.xml")); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("rebuild: remove sitemap.xml: %w", err)
+		}
+	}
+	if !robotsEnabled || baseURL == "" {
+		if err := os.Remove(filepath.Join(finalOut, "robots.txt")); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("rebuild: remove robots.txt: %w", err)
 		}
 	}
 	return nil

@@ -128,3 +128,14 @@ The admin Settings page edits per-weblog content values (title, description, bas
 - The output file is created with `0o600` permissions.
 
 Changes take effect immediately for dynamic rendering. After editing content settings, run a static rebuild (`/admin/rebuild`) to regenerate the on-disk HTML with the new values.
+
+## SEO
+
+`/sitemap.xml` and `/robots.txt` are generated automatically from the current content. Both are toggled on by default and can be turned off in the admin **Settings > Site Settings** page.
+
+| Toggle | Default | Effect when off |
+|---|---|---|
+| Sitemap | On | `/sitemap.xml` returns 404 |
+| robots.txt | On | `/robots.txt` returns 404 |
+
+When either toggle is off, the static rebuild also omits the file (and removes a stale copy on the next build).
