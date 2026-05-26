@@ -35,7 +35,8 @@ Every route the running server exposes, split between the public surface and the
 |---|---|
 | `/admin/login` | Login form + POST target |
 | `/admin/static/admin.css` | Embedded admin stylesheet |
-| `/admin/static/admin.js` | Embedded admin script (drawer toggle, picker, AI compose) |
+| `/admin/static/admin.js` | Embedded admin script entry (ES module; drawer toggle, picker, AI compose) |
+| `/admin/static/modules/*` | Admin ES module graph (i18n, storage, toast, …) |
 | `/admin/` | Dashboard (counters + recent entries + quick links) |
 | `/admin/entries` | Entry list (all statuses) |
 | `/admin/entries/new` | New entry form (GET + POST) |

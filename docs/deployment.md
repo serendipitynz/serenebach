@@ -250,7 +250,7 @@ In CGI mode every request starts a new process. Admin assets (`admin.css`, `admi
    ./serenebach extract-assets --out=./admin-static
    ```
 
-   This writes `admin.css`, `admin.js`, logos, favicon, and the Ace editor bundle (`ace/*.js`) to disk.
+    This writes `admin.css`, `admin.js`, the ES module graph (`modules/*.js`), logos, favicon, and the Ace editor bundle (`ace/*.js`) to disk.
 
    Then add an `.htaccess` rule (or equivalent) so Apache serves extracted files directly without invoking the CGI handler, while falling back to the CGI handler for anything that wasn't extracted:
 

@@ -1,9 +1,12 @@
 package admin
 
 import (
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	admintpl "github.com/serendipitynz/serenebach/web/templates/admin"
 )
 
 // TestServeAssetReturns304OnMatchingETag verifies that admin static
@@ -76,6 +79,42 @@ func TestServeEmbeddedReturns304OnMatchingETag(t *testing.T) {
 
 	rec2 := httptest.NewRecorder()
 	req2 := httptest.NewRequest("GET", "/static/sb_logo_dark.svg", nil)
+	req2.Header.Set("If-None-Match", etag)
+	h(rec2, req2)
+	if rec2.Code != http.StatusNotModified {
+		t.Errorf("conditional GET: status = %d, want 304", rec2.Code)
+	}
+	if rec2.Body.Len() != 0 {
+		t.Errorf("304 response body should be empty, got %d bytes", rec2.Body.Len())
+	}
+}
+
+// TestServeModulesReturns200And304 verifies the module subtree handler
+// honours the same ETag / MIME contract as the top-level asset helpers.
+func TestServeModulesReturns200And304(t *testing.T) {
+	modulesSub, err := fs.Sub(admintpl.FS(), "modules")
+	if err != nil {
+		t.Skip("modules directory not embedded")
+	}
+	h := serveStaticSubtree(modulesSub, "/admin/static/modules/", "text/javascript; charset=utf-8")
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/admin/static/modules/core/i18n.js", nil)
+	h(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("first GET: status = %d", rec.Code)
+	}
+	ct := rec.Header().Get("Content-Type")
+	if ct != "text/javascript; charset=utf-8" {
+		t.Errorf("Content-Type = %q, want text/javascript; charset=utf-8", ct)
+	}
+	etag := rec.Header().Get("ETag")
+	if etag == "" {
+		t.Fatal("first GET: missing ETag")
+	}
+
+	rec2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest("GET", "/admin/static/modules/core/i18n.js", nil)
 	req2.Header.Set("If-None-Match", etag)
 	h(rec2, req2)
 	if rec2.Code != http.StatusNotModified {

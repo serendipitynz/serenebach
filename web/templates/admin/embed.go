@@ -15,7 +15,7 @@ import (
 // development so template edits are reflected without rebuilding.
 var DevRoot string
 
-//go:embed *.html *.css *.js assets i18n
+//go:embed *.html *.css *.js modules assets i18n
 var files embed.FS
 
 // I18nCatalogues returns the admin-side string catalogues as

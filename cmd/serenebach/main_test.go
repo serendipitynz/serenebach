@@ -21,6 +21,10 @@ func TestRunExtractAssetsWritesAllFiles(t *testing.T) {
 		"MANIFEST",
 		// Ace editor bundle (at least the core file).
 		"ace/ace.js",
+		// ES module graph.
+		"modules/core/i18n.js",
+		"modules/core/storage.js",
+		"modules/core/toast.js",
 	}
 	for _, name := range want {
 		full := filepath.Join(outDir, name)
