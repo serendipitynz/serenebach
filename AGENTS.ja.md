@@ -90,6 +90,7 @@ operator から見える変更 (env / CLI フラグ / Task ターゲット / URL
 
 - ユーザに明示的に頼まれない限り **commit / push しない**
 - `git rebase` 等の履歴書き換えも明示要求のみ
+- **PR レビューコメントへの対応で `--amend` + force push を使わない。** レビュー対応は毎回 **新しい通常コミット** として積み増す。理由: レビュワが指摘前後を diff で追えるようにする / PR の Conversation タブで「このコミットでこのコメントに対応した」という対応関係を残す / force-push 事故を避ける。`git commit --amend` は **ユーザが明示的に「混ぜて」「amend で」と指示したときだけ** 使う。`git push --force` / `git push --force-with-lease` も **明示承認なしには絶対に走らせない**。
 - 大きな変更の前は意図を要約して合意してから動く
 
 ### 検証

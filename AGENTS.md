@@ -90,6 +90,7 @@ Any change visible to operators (env vars / CLI flags / Task targets / URL route
 
 - Do not commit or push unless the user explicitly asks.
 - Do not rewrite history (`git rebase` etc.) unless explicitly asked.
+- **Do not amend or force-push to respond to PR review comments.** Add a new normal commit per round of review feedback so reviewers can diff before/after, and so the PR Conversation tab keeps the "this commit addresses that comment" linkage. Use `git commit --amend` only when the user explicitly asks ("混ぜて" / "amend で"). Never run `git push --force` or `git push --force-with-lease` without explicit approval.
 - Before a large change, summarize the intent and get agreement first.
 
 ### Verification
