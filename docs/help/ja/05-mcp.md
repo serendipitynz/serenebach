@@ -1,7 +1,7 @@
 ---
 title: AI 連携と MCP
 slug: mcp
-order: 50
+order: 130
 ---
 
 # AI 連携と MCP
@@ -81,5 +81,5 @@ MCP とは別に、管理画面内の AI 執筆補助も用意されています
 ## 関連ページ
 
 - [ユーザーと権限](users-roles)
-- [公開設定と OG カード](settings-publishing)
-- [画像アップロード](images)
+- [公開設定と画面設定](settings-publishing)
+- [ライブラリ](images)

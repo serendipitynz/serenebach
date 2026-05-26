@@ -71,4 +71,4 @@ Saved entries appear immediately on the public site. Click **Public site** at th
 
 - [Writing and managing entries](entries)
 - [Template editing](templates)
-- [Publishing settings and OG cards](settings-publishing)
+- [Publishing and screen settings](settings-publishing)

@@ -1,7 +1,7 @@
 ---
 title: コメントとスパム対策
 slug: comments-spam
-order: 90
+order: 80
 ---
 
 # コメントとスパム対策
@@ -92,4 +92,4 @@ SB_TURNSTILE_SECRET=0x4AAAAA...
 ## 関連ページ
 
 - [テンプレート編集](templates)
-- [公開設定と OG カード](settings-publishing)
+- [公開設定と画面設定](settings-publishing)

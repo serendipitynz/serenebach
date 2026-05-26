@@ -1,7 +1,7 @@
 ---
 title: カテゴリーとタグ
 slug: categories-tags
-order: 30
+order: 40
 ---
 
 # カテゴリーとタグ

@@ -1,7 +1,7 @@
 ---
 title: Static rebuild and publishing
 slug: rebuild-publishing
-order: 120
+order: 110
 ---
 
 # Static rebuild and publishing

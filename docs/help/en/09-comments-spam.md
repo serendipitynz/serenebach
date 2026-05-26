@@ -1,7 +1,7 @@
 ---
 title: Comments and spam controls
 slug: comments-spam
-order: 90
+order: 80
 ---
 
 # Comments and spam controls
@@ -92,4 +92,4 @@ If your template emits the matching tags, the buttons appear on the public page.
 ## Related pages
 
 - [Template editing](templates)
-- [Publishing settings and OG cards](settings-publishing)
+- [Publishing and screen settings](settings-publishing)

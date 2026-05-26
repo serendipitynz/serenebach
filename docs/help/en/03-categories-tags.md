@@ -1,7 +1,7 @@
 ---
 title: Categories and tags
 slug: categories-tags
-order: 30
+order: 40
 ---
 
 # Categories and tags

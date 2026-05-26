@@ -1,7 +1,7 @@
 ---
 title: 静的再構築と配信
 slug: rebuild-publishing
-order: 120
+order: 110
 ---
 
 # 静的再構築と配信

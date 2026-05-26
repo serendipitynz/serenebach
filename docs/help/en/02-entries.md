@@ -98,5 +98,5 @@ The **Entries** list supports title search and status filtering. Click a title t
 ## Related pages
 
 - [Categories and tags](categories-tags)
-- [Image uploads](images)
+- [Library](images)
 - [Preview mode](preview)
