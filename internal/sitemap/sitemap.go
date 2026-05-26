@@ -121,7 +121,7 @@ func assembleURLs(base string, in Input) []urlEntry {
 
 	// Categories (non-hidden)
 	for _, c := range in.Categories {
-		loc := base + "/category/" + c.Slug + "/"
+		loc := base + categoryPermalink(c)
 		if _, ok := seen[loc]; ok {
 			continue
 		}
@@ -251,6 +251,13 @@ func permalink(e domain.Entry) string {
 		return "/entry/" + e.Slug + "/"
 	}
 	return fmt.Sprintf("/entry/%d/", e.ID)
+}
+
+func categoryPermalink(c domain.Category) string {
+	if c.Slug != "" {
+		return "/category/" + c.Slug + "/"
+	}
+	return fmt.Sprintf("/category/%d/", c.ID)
 }
 
 func entryLastModStr(e domain.Entry) string {

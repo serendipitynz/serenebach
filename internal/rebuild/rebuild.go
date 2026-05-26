@@ -143,7 +143,7 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 	// Every render + write succeeded. Swap the staged tree into
 	// place; failures inside promoteStaging leave the previous
 	// snapshot intact thanks to the rename-via-backup pattern.
-	if err := promoteStaging(finalOut, staging, env.weblog.LLMSEnabled, env.weblog.SitemapEnabled, env.weblog.RobotsEnabled, pageRoots); err != nil {
+	if err := promoteStaging(finalOut, staging, env.weblog.LLMSEnabled, env.weblog, pageRoots); err != nil {
 		return nil, err
 	}
 
@@ -1081,7 +1081,7 @@ func writeLLMsTxt(outDir string, weblog domain.Weblog, all []domain.Entry, rep *
 // so each file flips in place. Finally, when the LLMS toggle is off
 // any leftover llms*.txt are removed so flipping the switch off
 // cleans up after itself.
-func promoteStaging(finalOut, staging string, llmsEnabled, sitemapEnabled, robotsEnabled bool, pruneSet map[string]struct{}) error {
+func promoteStaging(finalOut, staging string, llmsEnabled bool, weblog *domain.Weblog, pruneSet map[string]struct{}) error {
 	// Load the previous build's page-root manifest so we can prune
 	// stale directories that were generated in an earlier run but no
 	// longer exist (deleted, unpublished, or renamed pages).
@@ -1114,7 +1114,7 @@ func promoteStaging(finalOut, staging string, llmsEnabled, sitemapEnabled, robot
 	if err := cleanupLLMs(finalOut, llmsEnabled); err != nil {
 		return err
 	}
-	return cleanupSEOFiles(finalOut, sitemapEnabled, robotsEnabled)
+	return cleanupSEOFiles(finalOut, weblog.SitemapEnabled, weblog.RobotsEnabled, weblog.BaseURL)
 }
 
 // promoteManagedSubtree swaps the staged copy of a known subtree
@@ -1222,15 +1222,15 @@ func cleanupLLMs(finalOut string, llmsEnabled bool) error {
 }
 
 // cleanupSEOFiles removes sitemap.xml / robots.txt when the corresponding
-// toggle has been turned off so the static snapshot stays consistent
-// with the dynamic route state.
-func cleanupSEOFiles(finalOut string, sitemapEnabled, robotsEnabled bool) error {
-	if !sitemapEnabled {
+// toggle has been turned off or base_url is empty so the static snapshot
+// stays consistent with the dynamic route state.
+func cleanupSEOFiles(finalOut string, sitemapEnabled, robotsEnabled bool, baseURL string) error {
+	if !sitemapEnabled || baseURL == "" {
 		if err := os.Remove(filepath.Join(finalOut, "sitemap.xml")); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("rebuild: remove sitemap.xml: %w", err)
 		}
 	}
-	if !robotsEnabled {
+	if !robotsEnabled || baseURL == "" {
 		if err := os.Remove(filepath.Join(finalOut, "robots.txt")); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("rebuild: remove robots.txt: %w", err)
 		}
