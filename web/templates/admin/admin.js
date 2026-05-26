@@ -992,6 +992,25 @@
     });
   }
 
+  // wireDragHover toggles `hoverClass` on `zone` while a drag is over it:
+  // added on dragenter/dragover, removed on dragleave/drop. preventDefault
+  // + stopPropagation on every event so the browser doesn't navigate to a
+  // dropped file. The caller wires its own `drop` handler for the payload.
+  function wireDragHover(zone, hoverClass) {
+    ['dragenter', 'dragover'].forEach(function (evt) {
+      zone.addEventListener(evt, function (e) {
+        e.preventDefault(); e.stopPropagation();
+        zone.classList.add(hoverClass);
+      });
+    });
+    ['dragleave', 'drop'].forEach(function (evt) {
+      zone.addEventListener(evt, function (e) {
+        e.preventDefault(); e.stopPropagation();
+        zone.classList.remove(hoverClass);
+      });
+    });
+  }
+
   // ---- drop zone on /admin/images --------------------------------------
   var dropForms = document.querySelectorAll('[data-upload]');
   dropForms.forEach(function (form) {
@@ -1000,18 +1019,7 @@
     var progress = form.querySelector('.drop-zone-progress');
     if (!zone || !input) return;
 
-    ['dragenter', 'dragover'].forEach(function (evt) {
-      zone.addEventListener(evt, function (e) {
-        e.preventDefault(); e.stopPropagation();
-        zone.classList.add('drag-over');
-      });
-    });
-    ['dragleave', 'drop'].forEach(function (evt) {
-      zone.addEventListener(evt, function (e) {
-        e.preventDefault(); e.stopPropagation();
-        zone.classList.remove('drag-over');
-      });
-    });
+    wireDragHover(zone, 'drag-over');
     zone.addEventListener('drop', function (e) {
       var files = e.dataTransfer && e.dataTransfer.files;
       if (!files || !files.length) return;
@@ -1044,18 +1052,7 @@
     var placeholder = zone.querySelector('[data-drop-placeholder]');
     var defaultText = placeholder ? placeholder.textContent : '';
 
-    ['dragenter', 'dragover'].forEach(function (evt) {
-      zone.addEventListener(evt, function (e) {
-        e.preventDefault(); e.stopPropagation();
-        zone.classList.add('drag-over');
-      });
-    });
-    ['dragleave', 'drop'].forEach(function (evt) {
-      zone.addEventListener(evt, function (e) {
-        e.preventDefault(); e.stopPropagation();
-        zone.classList.remove('drag-over');
-      });
-    });
+    wireDragHover(zone, 'drag-over');
     zone.addEventListener('drop', function (e) {
       var files = e.dataTransfer && e.dataTransfer.files;
       if (!files || !files.length) return;
