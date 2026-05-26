@@ -2258,6 +2258,22 @@
     return aiPopupInstance;
   }
 
+  // postCompose POSTs `payload` to /admin/ai/compose and resolves to the
+  // parsed JSON, falling back to {ok:false,error:'parse'} when the body
+  // isn't JSON. Callers chain their own .then to drive the popup / toast.
+  function postCompose(payload) {
+    return fetch('/admin/ai/compose', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-CSRF-Token': readCSRFToken(),
+      },
+      body: JSON.stringify(payload),
+      credentials: 'same-origin'
+    }).then(function (res) { return res.json().catch(function () { return { ok: false, error: 'parse' }; }); });
+  }
+
   // ---- Ace AI toolbar dispatcher --------------------------------------
   // Shared helper so the three toolbar buttons (rewrite / continue /
   // summarise) POST to /admin/ai/compose with the right context +
@@ -2297,16 +2313,7 @@
 
     var restore = setButtonLoading(btn);
 
-    fetch('/admin/ai/compose', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-CSRF-Token': readCSRFToken(),
-      },
-      body: JSON.stringify(req),
-      credentials: 'same-origin'
-    }).then(function (res) { return res.json().catch(function () { return { ok: false, error: 'parse' }; }); })
+    postCompose(req)
       .then(function (data) {
         if (!data || !data.ok) {
           var key = (data && data.error) || 'provider_error';
@@ -2375,21 +2382,12 @@
       var restore = setButtonLoading(btn);
       showToast(sbT('js.ai.thinking'));
 
-      fetch('/admin/ai/compose', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-CSRF-Token': readCSRFToken(),
-        },
-        body: JSON.stringify({
-          action: action,
-          text: textForPrompt,
-          format: form.querySelector('select[name="format"]') ? form.querySelector('select[name="format"]').value : 'html',
-          language: document.documentElement.lang || 'ja',
-        }),
-        credentials: 'same-origin'
-      }).then(function (res) { return res.json().catch(function () { return { ok: false, error: 'parse' }; }); })
+      postCompose({
+        action: action,
+        text: textForPrompt,
+        format: form.querySelector('select[name="format"]') ? form.querySelector('select[name="format"]').value : 'html',
+        language: document.documentElement.lang || 'ja',
+      })
         .then(function (data) {
           if (!data || !data.ok) {
             showToast(sbT('js.ai.err.' + (data && data.error || 'provider_error')));
