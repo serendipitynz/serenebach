@@ -299,7 +299,7 @@ func runExtractAssets(args []string) {
 	// template editor's lazy-loaded mode/theme files are available
 	// when Apache serves /admin/static/ace/* directly.
 	aceRoot := "assets/ace"
-	entries, err := fs.ReadDir(admintpl.FS(), aceRoot)
+	aceEntries, err := fs.ReadDir(admintpl.FS(), aceRoot)
 	if err != nil {
 		log.Fatalf("extract-assets: readdir %s: %v", aceRoot, err)
 	}
@@ -333,7 +333,13 @@ func runExtractAssets(args []string) {
 			fmt.Fprintf(os.Stderr, "extract-assets: wrote %s (%d bytes)\n", full, len(body))
 		}
 	}
-	walk(aceRoot, entries)
+	walk(aceRoot, aceEntries)
+
+	// Recursively extract modules/ so Apache can serve the ES module
+	// graph directly without invoking the CGI handler.
+	if err := extractDir(admintpl.FS(), "modules", filepath.Join(*out, "modules")); err != nil {
+		log.Fatalf("extract-assets: modules: %v", err)
+	}
 
 	// Write a MANIFEST so operators can verify version alignment after
 	// a binary upgrade.
@@ -341,6 +347,49 @@ func runExtractAssets(args []string) {
 		version.Full(), time.Now().UTC().Format(time.RFC3339))
 	_ = os.WriteFile(filepath.Join(*out, "MANIFEST"), []byte(manifest), 0o644)
 	fmt.Fprintln(os.Stderr, "extract-assets: ok")
+}
+
+// extractDir recursively copies every file under dir in fsys into outDir,
+// preserving the relative directory structure.
+func extractDir(fsys fs.FS, dir, outDir string) error {
+	entries, err := fs.ReadDir(fsys, dir)
+	if err != nil {
+		return err
+	}
+	var walk func(string, []fs.DirEntry) error
+	walk = func(current string, ents []fs.DirEntry) error {
+		for _, e := range ents {
+			pathInFS := current + "/" + e.Name()
+			rel := strings.TrimPrefix(pathInFS, dir+"/")
+			full := filepath.Join(outDir, rel)
+			if e.IsDir() {
+				if err := os.MkdirAll(full, 0o755); err != nil {
+					return err
+				}
+				sub, err := fs.ReadDir(fsys, pathInFS)
+				if err != nil {
+					return err
+				}
+				if err := walk(pathInFS, sub); err != nil {
+					return err
+				}
+				continue
+			}
+			if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+				return err
+			}
+			body, err := fs.ReadFile(fsys, pathInFS)
+			if err != nil {
+				return err
+			}
+			if err := os.WriteFile(full, body, 0o644); err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "extract-assets: wrote %s (%d bytes)\n", full, len(body))
+		}
+		return nil
+	}
+	return walk(dir, entries)
 }
 
 func runBuild(a *app.App, subArgs []string) {

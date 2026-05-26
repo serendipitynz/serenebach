@@ -119,7 +119,18 @@ func (h *Handler) MountPublic(r chi.Router) {
 	r.Get("/login", h.loginForm)
 	r.Post("/login", h.loginSubmit)
 	r.Get("/static/admin.css", serveAsset("admin.css", "text/css; charset=utf-8"))
-	r.Get("/static/admin.js", serveAsset("admin.js", "application/javascript; charset=utf-8"))
+	r.Get("/static/admin.js", serveAsset("admin.js", "text/javascript; charset=utf-8"))
+
+	// Admin JS modules are served as a subtree so the browser module
+	// loader can resolve relative imports. ETag / 304 behaviour matches
+	// the top-level asset helpers so CGI deployments still benefit
+	// from conditional requests.
+	modulesSub, err := fs.Sub(admintpl.FS(), "modules")
+	if err == nil {
+		modulesHandler := serveStaticSubtree(modulesSub, "/admin/static/modules/", "text/javascript; charset=utf-8")
+		r.Get("/static/modules/*", modulesHandler)
+		r.Head("/static/modules/*", modulesHandler)
+	}
 	// Logos and favicon live under assets/. Keep serving them by
 	// explicit route so the embedded FS stays private (no directory
 	// listings, no accidental enumeration of templates/css).
@@ -190,6 +201,36 @@ func serveAsset(name, contentType string) http.HandlerFunc {
 	}
 	etag := assetETag(body)
 	return func(w http.ResponseWriter, r *http.Request) {
+		if match := r.Header.Get("If-None-Match"); match != "" && match == etag {
+			w.Header().Set("ETag", etag)
+			w.Header().Set("Cache-Control", "public, max-age=300")
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Cache-Control", "public, max-age=300")
+		w.Header().Set("ETag", etag)
+		_, _ = w.Write(body)
+	}
+}
+
+// serveStaticSubtree serves files out of an fs.FS (e.g. a sub-tree of the
+// embedded admin assets) with the same ETag / 304 contract as serveAsset.
+// Unknown paths return 404; directory listings are denied.
+func serveStaticSubtree(sub fs.FS, stripPrefix, contentType string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, stripPrefix)
+		path = strings.TrimPrefix(path, "/")
+		if path == "" || strings.Contains(path, "..") {
+			http.NotFound(w, r)
+			return
+		}
+		body, err := fs.ReadFile(sub, path)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		etag := assetETag(body)
 		if match := r.Header.Get("If-None-Match"); match != "" && match == etag {
 			w.Header().Set("ETag", etag)
 			w.Header().Set("Cache-Control", "public, max-age=300")
