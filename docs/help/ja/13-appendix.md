@@ -10,9 +10,52 @@ order: 200
 
 ## バックアップ
 
-Serene Bach の主なデータは SQLite データベースと画像ディレクトリ、テンプレートディレクトリに保存されます。
+Serene Bach のデータ（SQLite データベース、アップロードファイル、テンプレートアセット）はすべて 1 つの ZIP アーカイブにまとめて書き出せます。
 
-最低限、次の 3 つをバックアップしてください。
+### `backup` サブコマンド
+
+```bash
+./serenebach backup --out ./backup-2026-05-23.zip
+```
+
+主なオプション:
+
+| フラグ | 既定値 | 内容 |
+|---|---|---|
+| `--out <path>` | `backup-YYYY-MM-DD-HHMMSS.zip` | 出力先パス（`-` で stdout） |
+| `--include-analytics` | off | Analytics DB / MCP audit DB を同梱（別ファイル設定時のみ） |
+| `--include-public` | off | 静的書き出し成果物も同梱 |
+| `--exclude <names>` | (なし) | `images` / `templates` を除外 |
+| `--quiet` | off | 進捗を表示しない |
+
+ZIP の中身:
+
+```
+backup-2026-05-23-093045.zip
+├── manifest.json
+├── db/
+│   ├── serenebach.db        ← VACUUM INTO した整合スナップショット
+│   ├── analytics.db         ← --include-analytics かつ別ファイル時のみ
+│   └── mcp_audit.db         ← 同上
+├── img/                     ← アップロードファイル
+├── templates/               ← テンプレートアセット
+└── public/                  ← --include-public 時のみ
+```
+
+ZIP ファイルは `0o600` 権限で作成されます。CGI 環境で実行する場合は `--out` の明示が必要です。
+
+### 復元
+
+restore サブコマンドはまだありません。手動で次のように復元します。
+
+1. ZIP を展開
+2. `db/serenebach.db` を所定の場所に配置
+3. 必要に応じて `img/` / `templates/` / `public/` も配置
+4. `./serenebach migrate` を実行
+
+### 個別にバックアップする
+
+`backup` サブコマンドを使わずに個別に保存する場合は、最低限次の 3 つをバックアップしてください。
 
 - SQLite データベース
 - `SB_IMAGE_DIR` の内容

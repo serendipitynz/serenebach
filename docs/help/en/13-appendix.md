@@ -10,9 +10,52 @@ Operational notes you'll consult periodically.
 
 ## Backups
 
-The bulk of Serene Bach's state lives in three places: the SQLite database, the image directory, and the template asset directory.
+All Serene Bach data (the SQLite database, uploaded files, template assets) can be exported into a single ZIP archive.
 
-At minimum, back up these three:
+### The `backup` subcommand
+
+```bash
+./serenebach backup --out ./backup-2026-05-23.zip
+```
+
+Main options:
+
+| Flag | Default | Description |
+|---|---|---|
+| `--out <path>` | `backup-YYYY-MM-DD-HHMMSS.zip` | Output path (`-` for stdout) |
+| `--include-analytics` | off | Include analytics / MCP audit DBs (only when stored separately) |
+| `--include-public` | off | Include static rebuild output |
+| `--exclude <names>` | (none) | Omit `images` and/or `templates` |
+| `--quiet` | off | Suppress progress output |
+
+Archive contents:
+
+```
+backup-2026-05-23-093045.zip
+├── manifest.json
+├── db/
+│   ├── serenebach.db        ← Consistent snapshot via VACUUM INTO
+│   ├── analytics.db         ← Only with --include-analytics + separate file
+│   └── mcp_audit.db         ← Same as above
+├── img/                     ← Uploaded files
+├── templates/               ← Template assets
+└── public/                  ← Only with --include-public
+```
+
+The ZIP file is created with `0o600` permissions. When running under CGI, `--out` must be given explicitly.
+
+### Restoring
+
+There is no `restore` subcommand yet. Restore manually:
+
+1. Unzip the archive
+2. Place `db/serenebach.db` at the desired location
+3. Copy `img/`, `templates/`, and `public/` as needed
+4. Run `./serenebach migrate`
+
+### Backing up directly
+
+If you prefer not to use the `backup` subcommand, at minimum back up these three:
 
 - The SQLite database
 - The contents of `SB_IMAGE_DIR`
