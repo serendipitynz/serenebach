@@ -106,6 +106,12 @@ func assembleURLs(base string, in Input) []urlEntry {
 
 	// Entries (published, hidden-category already excluded by caller)
 	for _, e := range in.Entries {
+		if e.NoIndex {
+			// noindex entries stay published on home / list but must
+			// not advertise their URL to crawlers. Skipping here (not
+			// in in.Entries) keeps the top-page lastmod calc intact.
+			continue
+		}
 		loc := base + permalink(e)
 		if _, ok := seen[loc]; ok {
 			continue
