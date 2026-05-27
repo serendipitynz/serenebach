@@ -51,19 +51,46 @@ func (v EntryView) applySEO(c *sbtemplate.Context) {
 	}
 }
 
-// entryExcerpt computes the {entry_excerpt} value shared by the entry
-// and list renderers, mirroring SB3's $entry->sum: the stored summary
-// when set, else a plain-text clip of the body, else the title (a Go
-// enhancement so the tag is never blank — SB3 would emit empty here,
-// but Body is optional while Title is required).
-func entryExcerpt(e domain.Entry) string {
-	if e.Summary != "" {
-		return e.Summary
+// applySEO (flat pages) mirrors EntryView.applySEO so pages share the
+// exact same {entry_excerpt} tag and entry_canonical / entry_noindex
+// blocks. Pages have no SB3 `sum` heritage, so the excerpt falls back to
+// a body clip then the title.
+func (v PageView) applySEO(c *sbtemplate.Context) {
+	c.Tag("entry_excerpt", seoExcerpt(v.Page.Summary, v.Page.Body, v.Page.Format, v.Page.Title))
+
+	if v.Page.CanonicalURL != "" {
+		c.Tag("entry_canonical_url", v.Page.CanonicalURL)
+		c.Block("entry_canonical", 1)
+	} else {
+		c.Block("entry_canonical", 0)
 	}
-	if s := excerptPlain(e.Body, e.Format); s != "" {
+
+	if v.Page.NoIndex {
+		c.Block("entry_noindex", 1)
+	} else {
+		c.Block("entry_noindex", 0)
+	}
+}
+
+// entryExcerpt computes the {entry_excerpt} value shared by the entry
+// and list renderers, mirroring SB3's $entry->sum.
+func entryExcerpt(e domain.Entry) string {
+	return seoExcerpt(e.Summary, e.Body, e.Format, e.Title)
+}
+
+// seoExcerpt is the {entry_excerpt} fallback chain shared by entries and
+// flat pages: the stored summary when set, else a plain-text clip of the
+// body, else the title (a Go enhancement so the tag is never blank —
+// SB3 would emit empty here, but Body is optional while Title is
+// required).
+func seoExcerpt(summary, body, format, title string) string {
+	if summary != "" {
+		return summary
+	}
+	if s := excerptPlain(body, format); s != "" {
 		return s
 	}
-	return e.Title
+	return title
 }
 
 // excerptPlain renders the body, strips tags, and clips to summaryLength

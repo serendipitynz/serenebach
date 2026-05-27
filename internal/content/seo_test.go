@@ -168,6 +168,87 @@ func TestEntryViewSEOMetaAbsentWhenUnset(t *testing.T) {
 	}
 }
 
+// pageSEOTemplate exercises the entry-only SEO blocks on a flat page:
+// canonical / noindex live at head level (outside sequel, so they render
+// for pages), and {entry_excerpt} sits in the entry block.
+const pageSEOTemplate = `<!doctype html>
+<html>
+<head>
+<!-- BEGIN entry_canonical -->
+<link rel="canonical" href="{entry_canonical_url}">
+<!-- END entry_canonical -->
+<!-- BEGIN entry_noindex -->
+<meta name="robots" content="noindex,follow">
+<!-- END entry_noindex -->
+</head>
+<!-- BEGIN entry -->
+<article><h1>{entry_title}</h1><p class="ex">{entry_excerpt}</p></article>
+<!-- END entry -->
+</html>
+`
+
+func TestPageViewSEOMetaPresent(t *testing.T) {
+	t.Parallel()
+
+	site := NewSite(domain.Weblog{ID: 1, BaseURL: "https://example.com", Lang: "ja"})
+	v := PageView{
+		Site:     site,
+		Template: &domain.Template{MainBody: pageSEOTemplate},
+		Page: domain.Page{
+			ID: 1, Title: "About", Body: "<p>page body</p>", Slug: "/about",
+			Summary:      "page summary",
+			CanonicalURL: "https://example.com/?a=1&b=2",
+			NoIndex:      true,
+			Status:       domain.PagePublished,
+		},
+	}
+	out, err := v.Render()
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	for _, want := range []string{
+		`<p class="ex">page summary</p>`,
+		`<meta name="robots" content="noindex,follow">`,
+		`<link rel="canonical" href="https://example.com/?a=1&amp;b=2">`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q\nfull output:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "&amp;amp;") {
+		t.Errorf("canonical URL was double-escaped:\n%s", out)
+	}
+}
+
+func TestPageViewSEOMetaAbsentWhenUnset(t *testing.T) {
+	t.Parallel()
+
+	site := NewSite(domain.Weblog{ID: 1, BaseURL: "https://example.com", Lang: "ja"})
+	v := PageView{
+		Site:     site,
+		Template: &domain.Template{MainBody: pageSEOTemplate},
+		Page: domain.Page{
+			ID: 1, Title: "About", Body: "<p>page body</p>", Slug: "/about",
+			// no Summary / CanonicalURL, NoIndex false
+			Status: domain.PagePublished,
+		},
+	}
+	out, err := v.Render()
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if strings.Contains(out, `rel="canonical"`) {
+		t.Errorf("canonical link emitted with no CanonicalURL:\n%s", out)
+	}
+	if strings.Contains(out, "noindex,follow") {
+		t.Errorf("robots noindex emitted with NoIndex=false:\n%s", out)
+	}
+	// excerpt falls back to the body clip (pages have no SB3 sum).
+	if !strings.Contains(out, `<p class="ex">page body</p>`) {
+		t.Errorf("excerpt should fall back to body clip:\n%s", out)
+	}
+}
+
 func TestListViewEmitsExcerptButNotEntryMeta(t *testing.T) {
 	t.Parallel()
 
