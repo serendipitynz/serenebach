@@ -1864,6 +1864,29 @@ table.sortable tbody tr.drop-below td {
   max-height: 80vh;
   object-fit: contain;
 }
+/* Media preview variant — audio/video players are centred in the modal
+   body. Documents have no thumbnail to enlarge, so the file-text icon
+   is shown in their place. */
+.modal.modal-media .modal-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-sunken);
+  min-height: 8rem;
+}
+.modal.modal-media .modal-body video {
+  display: block;
+  max-width: 100%;
+  max-height: 80vh;
+}
+.modal.modal-media .modal-body audio {
+  width: min(28rem, 100%);
+}
+.modal.modal-media .modal-body .modal-doc-icon {
+  width: 6rem;
+  height: 6rem;
+  color: var(--text-muted);
+}
 
 /* Plain two-column definition list used in content modals (comment
    details, template info) so labels and values align cleanly. */
