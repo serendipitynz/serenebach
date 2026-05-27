@@ -15,22 +15,57 @@ export function initImageLibrary() {
   initRenameModal();
 }
 
+// lucide file-text — documents have no thumbnail to enlarge, so the
+// preview modal shows this icon instead of a (broken) <img>.
+var fileTextSVG = '<svg class="icon-upload modal-doc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>';
+
 function initImagePreview() {
   document.querySelectorAll('[data-image-url]').forEach(function (host) {
     var url = host.getAttribute('data-image-url');
     if (!url) return;
+    var kind = host.getAttribute('data-kind') || 'image';
     var trigger = host.querySelector('figure') || host.querySelector('.image-row-icon') || host;
-    trigger.style.cursor = 'zoom-in';
+    trigger.style.cursor = (kind === 'image') ? 'zoom-in' : 'pointer';
     trigger.addEventListener('click', function (e) {
       if (e.target.closest('form, a, button')) return;
       e.preventDefault();
-      var alt = host.getAttribute('data-image-alt') || '';
-      var img = document.createElement('img');
-      img.src = url;
-      img.alt = alt;
-      openModal({ title: alt || sbT('js.modal.image'), variant: 'image', bodyNode: img });
+      var title = host.getAttribute('data-image-alt') || '';
+      openModal(buildPreview(kind, url, title));
     });
   });
+}
+
+// Build the openModal() options for a single library item. Audio and
+// video kinds get a playable media element; documents get the file-text
+// icon; everything else falls back to the enlarged image.
+function buildPreview(kind, url, title) {
+  var heading = title || sbT('js.modal.image');
+  switch (kind) {
+    case 'audio': {
+      var audio = document.createElement('audio');
+      audio.controls = true;
+      audio.src = url;
+      return { title: heading, variant: 'media', bodyNode: audio };
+    }
+    case 'movie': {
+      var video = document.createElement('video');
+      video.controls = true;
+      video.src = url;
+      return { title: heading, variant: 'media', bodyNode: video };
+    }
+    case 'document': {
+      var wrap = document.createElement('div');
+      wrap.className = 'modal-doc-preview';
+      wrap.innerHTML = fileTextSVG;
+      return { title: heading, variant: 'media', bodyNode: wrap };
+    }
+    default: {
+      var img = document.createElement('img');
+      img.src = url;
+      img.alt = title;
+      return { title: heading, variant: 'image', bodyNode: img };
+    }
+  }
 }
 
 function initViewTogglePersistence() {
