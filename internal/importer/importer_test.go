@@ -32,7 +32,7 @@ func buildSB3Fixture(t *testing.T) string {
 		`CREATE TABLE sb_weblog (weblog_id INTEGER PRIMARY KEY, weblog_title TEXT, weblog_text TEXT)`,
 		`CREATE TABLE sb_category (category_id INTEGER PRIMARY KEY, category_wid INTEGER, category_name TEXT, category_main INTEGER, category_order INTEGER, category_dir TEXT)`,
 		`CREATE TABLE sb_template (template_id INTEGER PRIMARY KEY, template_wid INTEGER, template_name TEXT, template_main TEXT, template_entry TEXT, template_css TEXT, template_info TEXT)`,
-		`CREATE TABLE sb_entry (entry_id INTEGER PRIMARY KEY, entry_wid INTEGER, entry_subj TEXT, entry_cat INTEGER, entry_date INTEGER, entry_auth INTEGER, entry_stat INTEGER, entry_body TEXT, entry_more TEXT, entry_form TEXT, entry_mod INTEGER, entry_file TEXT, entry_key TEXT)`,
+		`CREATE TABLE sb_entry (entry_id INTEGER PRIMARY KEY, entry_wid INTEGER, entry_subj TEXT, entry_cat INTEGER, entry_date INTEGER, entry_auth INTEGER, entry_stat INTEGER, entry_body TEXT, entry_more TEXT, entry_form TEXT, entry_mod INTEGER, entry_file TEXT, entry_key TEXT, entry_sum TEXT)`,
 	}
 	for _, s := range ddl {
 		if _, err := db.Exec(s); err != nil {
@@ -51,9 +51,11 @@ func buildSB3Fixture(t *testing.T) string {
 		`INSERT INTO sb_template VALUES (11, 0, 'legacy', '<html>' || X'0a' || '<!-- BEGIN trackback_area -->' || X'0a' || 'x' || X'0a' || '<!-- END trackback_area -->' || X'0a' || '{amazon_link}' || X'0a' || '</html>', '', '', 'info')`,
 		// entry 100 has both a custom save name and keywords; entry 102
 		// has neither so we cover the empty-string path through legacy_*.
-		`INSERT INTO sb_entry VALUES (100, 0, 'Published One', 1, 1700000000, 1, 1, '<p>one</p>', '', '', 1700000100, 'pub-one', 'go,sb')`,
-		`INSERT INTO sb_entry VALUES (101, 0, 'Draft Skipped', 2, 1700001000, 1, 0, '<p>draft</p>', '', '', 0, '', '')`,
-		`INSERT INTO sb_entry VALUES (102, 0, 'Published Two', 2, 1700002000, 1, 1, '<p>two</p>', '<p>more</p>', 'html', 1700002100, '', '')`,
+		// entry 100's summary is [entitized] (SB stores sum that way) so
+		// the import exercises the html.UnescapeString round-trip.
+		`INSERT INTO sb_entry VALUES (100, 0, 'Published One', 1, 1700000000, 1, 1, '<p>one</p>', '', '', 1700000100, 'pub-one', 'go,sb', 'Tom &amp; Jerry')`,
+		`INSERT INTO sb_entry VALUES (101, 0, 'Draft Skipped', 2, 1700001000, 1, 0, '<p>draft</p>', '', '', 0, '', '', '')`,
+		`INSERT INTO sb_entry VALUES (102, 0, 'Published Two', 2, 1700002000, 1, 1, '<p>two</p>', '<p>more</p>', 'html', 1700002100, '', '', '')`,
 	}
 	for _, s := range seed {
 		if _, err := db.Exec(s); err != nil {
@@ -104,6 +106,31 @@ func TestImportCopiesFilteredContent(t *testing.T) {
 	t.Run("entries carry legacy_* fields", func(t *testing.T) { assertEntriesLegacyFields(t, a.DB) })
 	t.Run("categories carry legacy_* fields", func(t *testing.T) { assertCategoriesLegacyFields(t, a.DB) })
 	t.Run("weblog legacy config defaults", func(t *testing.T) { assertWeblogLegacyDefaults(t, a.DB) })
+	t.Run("entry summary restored and unescaped", func(t *testing.T) { assertEntrySummaryImported(t, a.DB) })
+}
+
+// assertEntrySummaryImported checks that SB3 entry_sum is restored into
+// the summary column with its [entitized] HTML entities decoded back to
+// raw text (so the render layer's c.Tag escape runs exactly once), and
+// that an empty source summary stays empty.
+func assertEntrySummaryImported(t *testing.T, db *sql.DB) {
+	t.Helper()
+	cases := []struct {
+		title string
+		want  string
+	}{
+		{"Published One", "Tom & Jerry"}, // 'Tom &amp; Jerry' → unescaped
+		{"Published Two", ""},            // no source summary
+	}
+	for _, c := range cases {
+		var got string
+		if err := db.QueryRow(`SELECT summary FROM entries WHERE title = ?`, c.title).Scan(&got); err != nil {
+			t.Fatal(err)
+		}
+		if got != c.want {
+			t.Errorf("%s summary = %q, want %q", c.title, got, c.want)
+		}
+	}
 }
 
 func assertReportCounts(t *testing.T, report *importer.Report) {

@@ -53,10 +53,11 @@ func buildSB2Fixture(t *testing.T) string {
 		sb2Row("2", "0", "Sub-tech", "child of tech", "", "1", "0", "0", "tech/sub/", "0", "", "0", ""),
 	)
 
-	// entry/100.cgi — published, in category 1
+	// entry/100.cgi — published, in category 1. Carries an [entitized]
+	// summary so the import exercises the sum → summary unescape path.
 	mustMkdir(t, filepath.Join(dir, "entry"))
 	mustWrite(t, filepath.Join(dir, "entry", "100.cgi"),
-		sb2Entry("100", "Published Post", "1", "1700000000", "1", "Hello world body.", "", ""),
+		sb2EntryWithSum("100", "Published Post", "1", "1700000000", "1", "Hello world body.", "", "", "Tom &amp; Jerry"),
 	)
 	// entry/101.cgi — draft (stat=0), should be skipped under
 	// OnlyPublished and counted in SkippedEntries.
@@ -113,6 +114,13 @@ func sb2Row(fields ...string) string {
 // Data/Entry.pm. Fields the importer does not look at are zero-padded
 // so the row keeps the right shape.
 func sb2Entry(id, subj, cat, date, stat, body, more, file string) string {
+	return sb2EntryWithSum(id, subj, cat, date, stat, body, more, file, "")
+}
+
+// sb2EntryWithSum is sb2Entry plus the `sum` (summary) field at column
+// 19 — SB stores it [entitized]. Used to exercise the summary import +
+// unescape path.
+func sb2EntryWithSum(id, subj, cat, date, stat, body, more, file, sum string) string {
 	return sb2Row(
 		id,      // 0  id
 		"0",     // 1  wid
@@ -133,7 +141,7 @@ func sb2Entry(id, subj, cat, date, stat, body, more, file string) string {
 		"",      // 16 ping
 		body,    // 17 body
 		more,    // 18 more
-		"",      // 19 sum
+		sum,     // 19 sum
 		"",      // 20 key
 		"",      // 21 ext
 		"",      // 22 tmp
@@ -196,6 +204,21 @@ func TestImportSB2BasicRoundTrip(t *testing.T) {
 	sb2BasicAssertBasePathFallback(t, a.DB)
 	sb2BasicAssertCategoryParentRemap(t, a.DB)
 	sb2BasicAssertCommentsOnPublishedOnly(t, a.DB)
+	sb2BasicAssertSummaryUnescaped(t, a.DB)
+}
+
+// sb2BasicAssertSummaryUnescaped verifies SB2 `sum` (column 19) lands in
+// the summary column with HTML entities decoded — entry 100's source
+// summary is 'Tom &amp; Jerry', which must persist as raw 'Tom & Jerry'.
+func sb2BasicAssertSummaryUnescaped(t *testing.T, db *sql.DB) {
+	t.Helper()
+	var summary string
+	if err := db.QueryRow(`SELECT summary FROM entries WHERE wid = 1 AND legacy_id = 100`).Scan(&summary); err != nil {
+		t.Fatal(err)
+	}
+	if summary != "Tom & Jerry" {
+		t.Errorf("entry 100 summary = %q, want %q", summary, "Tom & Jerry")
+	}
 }
 
 func sb2BasicAssertReportCounts(t *testing.T, report *importer.Report) {
