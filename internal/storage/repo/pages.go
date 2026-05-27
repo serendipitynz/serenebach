@@ -13,11 +13,11 @@ import (
 
 // pageColumns is the canonical column list for the pages table. Order
 // must match the Scan argument order in scanPage / scanPages.
-const pageColumns = `id, wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at`
+const pageColumns = `id, wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, summary, canonical_url, noindex, created_at, updated_at`
 
 // pageColumnsP is pageColumns qualified with the `p.` alias so the
 // admin list query can join templates without ambiguity.
-const pageColumnsP = `p.id, p.wid, p.author_id, p.title, p.body, p.format, p.slug, p.template_id, p.sort_order, p.status, p.og_bg_image_path, p.created_at, p.updated_at`
+const pageColumnsP = `p.id, p.wid, p.author_id, p.title, p.body, p.format, p.slug, p.template_id, p.sort_order, p.status, p.og_bg_image_path, p.summary, p.canonical_url, p.noindex, p.created_at, p.updated_at`
 
 // PageBySlug returns one page by its slug (including the leading "/").
 func (s *Store) PageBySlug(ctx context.Context, wid int64, slug string) (*domain.Page, error) {
@@ -214,9 +214,9 @@ func (s *Store) PublishedPages(ctx context.Context, wid int64) ([]domain.Page, e
 func (s *Store) CreatePage(ctx context.Context, p domain.Page) (int64, error) {
 	now := time.Now().Unix()
 	res, err := s.db.ExecContext(ctx, `
-		INSERT INTO pages (wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.WID, p.AuthorID, p.Title, p.Body, p.Format, p.Slug, p.TemplateID, p.SortOrder, p.Status, p.OGBGImagePath, now, now)
+		INSERT INTO pages (wid, author_id, title, body, format, slug, template_id, sort_order, status, og_bg_image_path, summary, canonical_url, noindex, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.WID, p.AuthorID, p.Title, p.Body, p.Format, p.Slug, p.TemplateID, p.SortOrder, p.Status, p.OGBGImagePath, p.Summary, p.CanonicalURL, p.NoIndex, now, now)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return 0, ErrSlugInUse
@@ -235,10 +235,12 @@ func (s *Store) UpdatePage(ctx context.Context, p domain.Page) error {
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE pages SET
 			title = ?, body = ?, format = ?, slug = ?, template_id = ?,
-			sort_order = ?, status = ?, og_bg_image_path = ?, updated_at = ?
+			sort_order = ?, status = ?, og_bg_image_path = ?,
+			summary = ?, canonical_url = ?, noindex = ?, updated_at = ?
 		WHERE wid = ? AND id = ?`,
 		p.Title, p.Body, p.Format, p.Slug, p.TemplateID,
-		p.SortOrder, p.Status, p.OGBGImagePath, time.Now().Unix(), p.WID, p.ID)
+		p.SortOrder, p.Status, p.OGBGImagePath,
+		p.Summary, p.CanonicalURL, p.NoIndex, time.Now().Unix(), p.WID, p.ID)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return ErrSlugInUse
@@ -268,7 +270,7 @@ func (s *Store) DeletePage(ctx context.Context, wid, id int64) error {
 func scanPage(row *sql.Row) (*domain.Page, error) {
 	var p domain.Page
 	var createdAt, updatedAt int64
-	if err := row.Scan(&p.ID, &p.WID, &p.AuthorID, &p.Title, &p.Body, &p.Format, &p.Slug, &p.TemplateID, &p.SortOrder, &p.Status, &p.OGBGImagePath, &createdAt, &updatedAt); err != nil {
+	if err := row.Scan(&p.ID, &p.WID, &p.AuthorID, &p.Title, &p.Body, &p.Format, &p.Slug, &p.TemplateID, &p.SortOrder, &p.Status, &p.OGBGImagePath, &p.Summary, &p.CanonicalURL, &p.NoIndex, &createdAt, &updatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -284,7 +286,7 @@ func scanPages(rows *sql.Rows) ([]domain.Page, error) {
 	for rows.Next() {
 		var p domain.Page
 		var createdAt, updatedAt int64
-		if err := rows.Scan(&p.ID, &p.WID, &p.AuthorID, &p.Title, &p.Body, &p.Format, &p.Slug, &p.TemplateID, &p.SortOrder, &p.Status, &p.OGBGImagePath, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.WID, &p.AuthorID, &p.Title, &p.Body, &p.Format, &p.Slug, &p.TemplateID, &p.SortOrder, &p.Status, &p.OGBGImagePath, &p.Summary, &p.CanonicalURL, &p.NoIndex, &createdAt, &updatedAt); err != nil {
 			return nil, fmt.Errorf("repo: scan page: %w", err)
 		}
 		p.CreatedAt = time.Unix(createdAt, 0)

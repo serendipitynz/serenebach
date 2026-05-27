@@ -605,8 +605,16 @@ type Page struct {
 	SortOrder     int
 	Status        PageStatus
 	OGBGImagePath string // per-page OG background override; empty = inherit weblog default
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	// Summary / CanonicalURL / NoIndex mirror the entry SEO meta fields
+	// (see Entry). Summary feeds {entry_excerpt} (body clip → title
+	// fallback; pages have no SB3 `sum` heritage). CanonicalURL emits
+	// <link rel="canonical"> only when set; NoIndex emits a robots
+	// noindex meta and drops the page from sitemap.xml.
+	Summary      string
+	CanonicalURL string
+	NoIndex      bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 // Message is a visitor-submitted comment attached to one Entry. Name is
