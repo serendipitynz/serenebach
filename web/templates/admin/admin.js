@@ -25,6 +25,40 @@ initLinkKindToggle();
 initDateFormatPreview();
 initDropToInput();
 
+// ---- drop zone on /admin/images --------------------------------------
+// Any form tagged [data-upload] gets a drag-drop zone wired to
+// uploadBatch so files are uploaded via AJAX with progress.
+var dropForms = document.querySelectorAll('[data-upload]');
+dropForms.forEach(function (form) {
+  var zone = form.querySelector('[data-drop-zone]');
+  var input = form.querySelector('[data-drop-input]');
+  var progress = form.querySelector('.drop-zone-progress');
+  if (!zone || !input) return;
+
+  wireDragHover(zone, 'drag-over');
+  zone.addEventListener('drop', function (e) {
+    var files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || !files.length) return;
+    submitFiles(files);
+  });
+  input.addEventListener('change', function () {
+    if (!input.files || !input.files.length) return;
+    submitFiles(input.files);
+  });
+
+  function submitFiles(files) {
+    var token = form.getAttribute('data-csrf') || '';
+    var endpoint = form.getAttribute('action') || '/admin/images';
+    uploadBatch(files, token, {
+      endpoint: endpoint,
+      setProgress: function (text) {
+        if (progress) { progress.hidden = false; progress.textContent = text; }
+      },
+      onDone: function () { window.location.reload(); }
+    });
+  }
+});
+
 // ---- Ace code editor (lazy-loaded) ----------------------------------
 // Any <textarea data-code-editor="html|css|markdown|text"> on the
 // page gets upgraded to an Ace editor. Ace itself is only fetched
