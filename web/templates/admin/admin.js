@@ -766,7 +766,7 @@ if (entryForm && entryStatusSelect) {
 //     sibling forms don't interfere.
 //   - resize the entry-form 追記 editor when <details> opens (Ace
 //     computes layout as 0×0 while its container is display:none).
-ceReady.then(function (loaded) {
+aceReady.then(function (loaded) {
   if (!loaded) return;
   document.querySelectorAll('select[data-code-editor-format]').forEach(function (sel) {
     sel.addEventListener('change', function () {
