@@ -76,16 +76,6 @@
     <label>{{T "entries.form.slug"}}
       <input type="text" name="slug" value="{{.Entry.Slug}}" placeholder="{{T `entries.form.slugOptional`}}" pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="100">
     </label>
-    <label>{{T "entries.form.keywords"}}
-      {{if aiEnabled .User}}
-      <span class="input-with-btn">
-        <input type="text" name="keywords" value="{{.Entry.Keywords}}" placeholder="{{T `entries.form.keywordsOptional`}}" maxlength="200">
-        <button type="button" class="btn-icon" data-ai-suggest="keywords" title="{{T `js.ai.suggestKeywords`}}" aria-label="{{T `js.ai.suggestKeywords`}}">✨</button>
-      </span>
-      {{else}}
-      <input type="text" name="keywords" value="{{.Entry.Keywords}}" placeholder="{{T `entries.form.keywordsOptional`}}" maxlength="200">
-      {{end}}
-    </label>
     <label>{{T "entries.form.tags"}}
       {{if aiEnabled .User}}
       <span class="input-with-btn">
@@ -97,6 +87,33 @@
       {{end}}
     </label>
   </div>
+
+  <details class="entry-form-meta" {{if or .Entry.Summary .Entry.CanonicalURL .Entry.Keywords .Entry.NoIndex}}open{{end}}>
+    <summary>{{T "entries.form.metaGroup"}}</summary>
+    <div class="entry-form-meta-fields">
+      <label>{{T "entries.form.summary"}}
+        <textarea name="summary" rows="3" maxlength="200" placeholder="{{T `entries.form.summaryOptional`}}">{{.Entry.Summary}}</textarea>
+      </label>
+      <label>{{T "entries.form.keywords"}}
+        {{if aiEnabled .User}}
+        <span class="input-with-btn">
+          <input type="text" name="keywords" value="{{.Entry.Keywords}}" placeholder="{{T `entries.form.keywordsOptional`}}" maxlength="200">
+          <button type="button" class="btn-icon" data-ai-suggest="keywords" title="{{T `js.ai.suggestKeywords`}}" aria-label="{{T `js.ai.suggestKeywords`}}">✨</button>
+        </span>
+        {{else}}
+        <input type="text" name="keywords" value="{{.Entry.Keywords}}" placeholder="{{T `entries.form.keywordsOptional`}}" maxlength="200">
+        {{end}}
+      </label>
+      <label>{{T "entries.form.canonicalUrl"}}
+        <input type="url" name="canonical_url" value="{{.Entry.CanonicalURL}}" placeholder="{{T `entries.form.canonicalUrlOptional`}}" maxlength="2000">
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" name="noindex" value="1"{{if .Entry.NoIndex}} checked{{end}}>
+        <span>{{T "entries.form.noindex"}}</span>
+      </label>
+      <p class="hint">{{T "entries.form.noindexHint"}}</p>
+    </div>
+  </details>
 
 
   <div class="entry-form-flags">

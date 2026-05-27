@@ -79,6 +79,56 @@ func TestBuildFromInput_mixedEntries(t *testing.T) {
 	}
 }
 
+func TestBuildFromInput_skipsNoIndexEntries(t *testing.T) {
+	older := time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC)
+	newer := time.Date(2026, 5, 20, 0, 0, 0, 0, time.UTC)
+	in := Input{
+		Weblog: &domain.Weblog{BaseURL: "https://blog.example.com"},
+		Entries: []domain.Entry{
+			{ID: 1, Slug: "visible", PostedAt: older, UpdatedAt: older},
+			// noindex entry is also the most recently updated — it must
+			// drop out of the <url> list but still drive the top-page
+			// lastmod (it stays published on home / list, just unindexed).
+			{ID: 2, Slug: "hidden-from-index", NoIndex: true, PostedAt: newer, UpdatedAt: newer},
+		},
+	}
+	body, _, err := BuildFromInput(in)
+	if err != nil {
+		t.Fatalf("BuildFromInput: %v", err)
+	}
+	var us urlSet
+	if err := xml.Unmarshal(body, &us); err != nil {
+		t.Fatalf("xml unmarshal: %v", err)
+	}
+
+	var topLastMod string
+	for _, u := range us.URLs {
+		if u.Loc == "https://blog.example.com/entry/hidden-from-index/" {
+			t.Error("noindex entry should not appear in the urlset")
+		}
+		if u.Loc == "https://blog.example.com/" {
+			topLastMod = u.LastMod
+		}
+	}
+	if !containsLoc(us.URLs, "https://blog.example.com/entry/visible/") {
+		t.Error("indexed entry should still appear")
+	}
+	// noindex ≠ unpublished: the top-page lastmod must still reflect the
+	// newer (noindex) entry's date.
+	if topLastMod != "2026-05-20" {
+		t.Errorf("top-page lastmod = %q, want 2026-05-20 (noindex entry kept in lastmod calc)", topLastMod)
+	}
+}
+
+func containsLoc(urls []urlEntry, loc string) bool {
+	for _, u := range urls {
+		if u.Loc == loc {
+			return true
+		}
+	}
+	return false
+}
+
 func TestBuildFromInput_doesNotLeakExcluded(t *testing.T) {
 	now := time.Date(2026, 5, 20, 0, 0, 0, 0, time.UTC)
 	in := Input{

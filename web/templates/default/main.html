@@ -8,9 +8,16 @@
 <link rel="alternate" type="application/rss+xml" title="RSS" href="{site_rss}">
 <link rel="alternate" type="application/atom+xml" href="{site_atom}">
 <title>{site_title}</title>
+<!-- BEGIN entry_canonical -->
+<link rel="canonical" href="{entry_canonical_url}">
+<!-- END entry_canonical -->
+<!-- BEGIN entry_noindex -->
+<meta name="robots" content="noindex,follow">
+<!-- END entry_noindex -->
 <!-- BEGIN sequel -->
+<meta name="description" content="{entry_excerpt}">
 <meta property="og:title" content="{site_title}">
-<meta property="og:description" content="{blog_description}">
+<meta property="og:description" content="{entry_excerpt}">
 <meta property="og:image" content="{entry_og_image}">
 <meta property="og:type" content="article">
 <meta name="twitter:card" content="summary_large_image">

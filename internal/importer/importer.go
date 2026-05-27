@@ -11,6 +11,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"html"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -586,7 +587,8 @@ func importEntries(ctx context.Context, src *sql.DB, tx *sql.Tx, opts Options, c
 			COALESCE(entry_stat, 0),
 			COALESCE(entry_mod, 0),
 			COALESCE(entry_file, ''),
-			COALESCE(entry_key, '')
+			COALESCE(entry_key, ''),
+			COALESCE(entry_sum, '')
 		FROM sb_entry
 		ORDER BY entry_date`)
 	if err != nil {
@@ -595,8 +597,8 @@ func importEntries(ctx context.Context, src *sql.DB, tx *sql.Tx, opts Options, c
 	defer rows.Close()
 
 	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO entries (wid, author_id, category_id, title, body, more, format, status, posted_at, legacy_id, legacy_file, keywords, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+		INSERT INTO entries (wid, author_id, category_id, title, body, more, format, status, posted_at, legacy_id, legacy_file, keywords, summary, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return fmt.Errorf("importer: prepare entry insert: %w", err)
 	}
@@ -604,10 +606,10 @@ func importEntries(ctx context.Context, src *sql.DB, tx *sql.Tx, opts Options, c
 
 	for rows.Next() {
 		var sb3ID, postedAt, modAt int64
-		var title, body, more, format, file, keywords string
+		var title, body, more, format, file, keywords, summary string
 		var status int
 		var catRaw sql.NullString
-		if err := rows.Scan(&sb3ID, &title, &catRaw, &postedAt, &body, &more, &format, &status, &modAt, &file, &keywords); err != nil {
+		if err := rows.Scan(&sb3ID, &title, &catRaw, &postedAt, &body, &more, &format, &status, &modAt, &file, &keywords, &summary); err != nil {
 			return fmt.Errorf("importer: scan entry: %w", err)
 		}
 		if opts.OnlyPublished && status != 1 {
@@ -627,6 +629,9 @@ func importEntries(ctx context.Context, src *sql.DB, tx *sql.Tx, opts Options, c
 			opts.TargetWID, opts.AuthorID, newCat,
 			title, body, more, format, status,
 			postedAt, sb3ID, file, keywords,
+			// SB3 `sum` is [entitized] like SB2's; unescape so the domain
+			// holds raw text and c.Tag re-escapes exactly once at render.
+			html.UnescapeString(summary),
 			createdAt, updatedAt); err != nil {
 			return fmt.Errorf("importer: insert entry %d: %w", sb3ID, err)
 		}

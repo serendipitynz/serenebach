@@ -16,12 +16,12 @@ import (
 // be threaded through the corresponding Scan call sites, not every
 // query string in this file. Order must match the Scan argument
 // order in scanEntryOrNotFound / scanEntries and the inline Scans.
-const entryColumns = `id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned, accept_comments`
+const entryColumns = `id, wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, updated_at, likes_count, stamps_count, comments_count, og_bg_image_path, pinned, accept_comments, summary, canonical_url, noindex`
 
 // entryColumnsE is entryColumns qualified with the `e.` alias for
 // queries that join other tables (notably the admin list, which joins
 // categories to allow sort-by-category-name).
-const entryColumnsE = `e.id, e.wid, e.author_id, e.category_id, e.title, e.slug, e.keywords, e.body, e.more, e.format, e.status, e.posted_at, e.updated_at, e.likes_count, e.stamps_count, e.comments_count, e.og_bg_image_path, e.pinned, e.accept_comments`
+const entryColumnsE = `e.id, e.wid, e.author_id, e.category_id, e.title, e.slug, e.keywords, e.body, e.more, e.format, e.status, e.posted_at, e.updated_at, e.likes_count, e.stamps_count, e.comments_count, e.og_bg_image_path, e.pinned, e.accept_comments, e.summary, e.canonical_url, e.noindex`
 
 // EntryByID returns one entry by id and weblog id. ErrNotFound when missing.
 // The caller decides how to treat the entry's status (e.g. 410 vs 200) —
@@ -32,7 +32,7 @@ func (s *Store) EntryByID(ctx context.Context, wid, id int64) (*domain.Entry, er
 		FROM entries WHERE wid = ? AND id = ?`, wid, id)
 	e := &domain.Entry{}
 	var postedAt, updatedAt int64
-	if err := row.Scan(&e.ID, &e.WID, &e.AuthorID, &e.CategoryID, &e.Title, &e.Slug, &e.Keywords, &e.Body, &e.More, &e.Format, &e.Status, &postedAt, &updatedAt, &e.LikesCount, &e.StampsCount, &e.CommentsCount, &e.OGBGImagePath, &e.Pinned, &e.AcceptComments); err != nil {
+	if err := row.Scan(&e.ID, &e.WID, &e.AuthorID, &e.CategoryID, &e.Title, &e.Slug, &e.Keywords, &e.Body, &e.More, &e.Format, &e.Status, &postedAt, &updatedAt, &e.LikesCount, &e.StampsCount, &e.CommentsCount, &e.OGBGImagePath, &e.Pinned, &e.AcceptComments, &e.Summary, &e.CanonicalURL, &e.NoIndex); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -92,7 +92,7 @@ func (s *Store) NextPublishedEntry(ctx context.Context, wid int64, anchor domain
 func scanEntryOrNotFound(row *sql.Row) (*domain.Entry, error) {
 	e := &domain.Entry{}
 	var postedAt, updatedAt int64
-	if err := row.Scan(&e.ID, &e.WID, &e.AuthorID, &e.CategoryID, &e.Title, &e.Slug, &e.Keywords, &e.Body, &e.More, &e.Format, &e.Status, &postedAt, &updatedAt, &e.LikesCount, &e.StampsCount, &e.CommentsCount, &e.OGBGImagePath, &e.Pinned, &e.AcceptComments); err != nil {
+	if err := row.Scan(&e.ID, &e.WID, &e.AuthorID, &e.CategoryID, &e.Title, &e.Slug, &e.Keywords, &e.Body, &e.More, &e.Format, &e.Status, &postedAt, &updatedAt, &e.LikesCount, &e.StampsCount, &e.CommentsCount, &e.OGBGImagePath, &e.Pinned, &e.AcceptComments, &e.Summary, &e.CanonicalURL, &e.NoIndex); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -312,10 +312,10 @@ func appendEntriesFilters(b *strings.Builder, args *[]any, q ListEntriesQuery) {
 func (s *Store) CreateEntry(ctx context.Context, e domain.Entry) (int64, error) {
 	now := time.Now().Unix()
 	res, err := s.db.ExecContext(ctx, `
-		INSERT INTO entries (wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, created_at, updated_at, og_bg_image_path, pinned, accept_comments)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO entries (wid, author_id, category_id, title, slug, keywords, body, more, format, status, posted_at, created_at, updated_at, og_bg_image_path, pinned, accept_comments, summary, canonical_url, noindex)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		e.WID, e.AuthorID, e.CategoryID, e.Title, e.Slug, e.Keywords, e.Body, e.More, e.Format, e.Status,
-		e.PostedAt.Unix(), now, now, e.OGBGImagePath, e.Pinned, e.AcceptComments)
+		e.PostedAt.Unix(), now, now, e.OGBGImagePath, e.Pinned, e.AcceptComments, e.Summary, e.CanonicalURL, e.NoIndex)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return 0, ErrSlugInUse
@@ -336,10 +336,12 @@ func (s *Store) UpdateEntry(ctx context.Context, e domain.Entry) error {
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE entries SET
 			category_id = ?, title = ?, slug = ?, keywords = ?, body = ?, more = ?,
-			format = ?, status = ?, posted_at = ?, updated_at = ?, og_bg_image_path = ?, pinned = ?, accept_comments = ?
+			format = ?, status = ?, posted_at = ?, updated_at = ?, og_bg_image_path = ?, pinned = ?, accept_comments = ?,
+			summary = ?, canonical_url = ?, noindex = ?
 		WHERE wid = ? AND id = ?`,
 		e.CategoryID, e.Title, e.Slug, e.Keywords, e.Body, e.More, e.Format, e.Status,
 		e.PostedAt.Unix(), time.Now().Unix(), e.OGBGImagePath, e.Pinned, e.AcceptComments,
+		e.Summary, e.CanonicalURL, e.NoIndex,
 		e.WID, e.ID)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -371,7 +373,7 @@ func (s *Store) EntryBySlug(ctx context.Context, wid int64, slug string) (*domai
 		FROM entries WHERE wid = ? AND slug = ? AND slug != ''`, wid, slug)
 	e := &domain.Entry{}
 	var postedAt, updatedAt int64
-	if err := row.Scan(&e.ID, &e.WID, &e.AuthorID, &e.CategoryID, &e.Title, &e.Slug, &e.Keywords, &e.Body, &e.More, &e.Format, &e.Status, &postedAt, &updatedAt, &e.LikesCount, &e.StampsCount, &e.CommentsCount, &e.OGBGImagePath, &e.Pinned, &e.AcceptComments); err != nil {
+	if err := row.Scan(&e.ID, &e.WID, &e.AuthorID, &e.CategoryID, &e.Title, &e.Slug, &e.Keywords, &e.Body, &e.More, &e.Format, &e.Status, &postedAt, &updatedAt, &e.LikesCount, &e.StampsCount, &e.CommentsCount, &e.OGBGImagePath, &e.Pinned, &e.AcceptComments, &e.Summary, &e.CanonicalURL, &e.NoIndex); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -491,7 +493,7 @@ func scanEntries(rows *sql.Rows) ([]domain.Entry, error) {
 	for rows.Next() {
 		var e domain.Entry
 		var postedAt, updatedAt int64
-		if err := rows.Scan(&e.ID, &e.WID, &e.AuthorID, &e.CategoryID, &e.Title, &e.Slug, &e.Keywords, &e.Body, &e.More, &e.Format, &e.Status, &postedAt, &updatedAt, &e.LikesCount, &e.StampsCount, &e.CommentsCount, &e.OGBGImagePath, &e.Pinned, &e.AcceptComments); err != nil {
+		if err := rows.Scan(&e.ID, &e.WID, &e.AuthorID, &e.CategoryID, &e.Title, &e.Slug, &e.Keywords, &e.Body, &e.More, &e.Format, &e.Status, &postedAt, &updatedAt, &e.LikesCount, &e.StampsCount, &e.CommentsCount, &e.OGBGImagePath, &e.Pinned, &e.AcceptComments, &e.Summary, &e.CanonicalURL, &e.NoIndex); err != nil {
 			return nil, fmt.Errorf("repo: scan entry: %w", err)
 		}
 		e.PostedAt = time.Unix(postedAt, 0)

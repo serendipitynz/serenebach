@@ -4,6 +4,7 @@ package domain
 
 import (
 	"database/sql"
+	"net/url"
 	"regexp"
 	"time"
 )
@@ -21,6 +22,23 @@ func IsValidSlug(s string) bool {
 		return false
 	}
 	return slugPattern.MatchString(s)
+}
+
+// IsValidCanonicalURL reports whether s is an acceptable canonical URL
+// for an entry. Only absolute http(s) URLs with a host are allowed —
+// a canonical link must resolve the same from anywhere, so relative
+// paths and non-web schemes (javascript:, data:, …) are rejected.
+// Empty is reported as invalid; callers treat "no canonical" as a
+// distinct state and skip this check for that case.
+func IsValidCanonicalURL(s string) bool {
+	u, err := url.Parse(s)
+	if err != nil {
+		return false
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return false
+	}
+	return u.Host != ""
 }
 
 // CommentMode is a per-weblog policy controlling whether the public comment
@@ -413,6 +431,21 @@ type Entry struct {
 	// this entry. Kept in sync by comment CUD operations so template
 	// rendering never needs a COUNT(*) per entry on list pages.
 	CommentsCount int64
+	// Summary maps to SB3's entry `sum` field and feeds the SB3-compatible
+	// {entry_excerpt} tag (plus <meta name="description"> / og:description).
+	// When empty, the render layer clips a plain-text excerpt of Body (SB3
+	// SUMMARY_LENGTH=200, tags stripped), and falls back to Title when Body
+	// is also empty so the tag is never blank (Title is required, Body is
+	// not — a small Go enhancement over SB3, which would emit empty here).
+	Summary string
+	// CanonicalURL, when set, marks the canonical location of a
+	// cross-posted / syndicated entry. Empty = the entry's own permalink
+	// is canonical (emit nothing; an empty <link rel="canonical"> is
+	// actively harmful).
+	CanonicalURL string
+	// NoIndex requests <meta name="robots" content="noindex,follow"> for
+	// this entry. Default false = normal indexing (emit nothing).
+	NoIndex bool
 }
 
 // StampKind is the short identifier for one reaction. Fixed set so URLs

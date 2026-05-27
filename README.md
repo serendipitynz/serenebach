@@ -24,6 +24,7 @@ A self-hostable Go weblog engine — a lighter path between WordPress and Hugo. 
 - Outbound webhooks (entry / comment / image events) for Slack / Discord / Zapier / n8n
 - Upload and manage audio, documents, and movies alongside images in the library, with insertion into HTML or Markdown entries
 - Auto-generated `sitemap.xml` and `robots.txt` for search-engine discoverability (toggle on/off in site settings)
+- Per-entry SEO metadata: summary (`{entry_excerpt}`, SB3 `sum`-compatible, drives `<meta name="description">` / OG), canonical URL, and a per-entry `noindex` toggle that also drops the entry from `sitemap.xml`
 
 ## Quick start
 

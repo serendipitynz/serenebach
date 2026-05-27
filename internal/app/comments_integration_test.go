@@ -123,8 +123,11 @@ func TestCommentClosedModeRejects(t *testing.T) {
 	}
 
 	// And the public entry must not render the comment form either.
+	// Match the comment <textarea> specifically: the head now carries a
+	// <meta name="description"> (entry excerpt), so a bare name="description"
+	// substring would false-positive on that meta tag.
 	entryBody := httpGet(t, a.Handler(), "/entry/1/")
-	if strings.Contains(entryBody, `name="description"`) {
+	if strings.Contains(entryBody, `<textarea name="description"`) {
 		t.Errorf("comment form should not render in closed mode")
 	}
 }

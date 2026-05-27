@@ -20,6 +20,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"html"
 	"os"
 	"path/filepath"
 	"sort"
@@ -557,8 +558,8 @@ func importSB2Entries(ctx context.Context, tx *sql.Tx, entries []sb2Entry, catMa
 	idMap := make(map[int64]int64, len(entries))
 	now := time.Now().Unix()
 	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO entries (wid, author_id, category_id, title, body, more, format, status, posted_at, legacy_id, legacy_file, keywords, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+		INSERT INTO entries (wid, author_id, category_id, title, body, more, format, status, posted_at, legacy_id, legacy_file, keywords, summary, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return nil, fmt.Errorf("importer: prepare entries: %w", err)
 	}
@@ -614,6 +615,13 @@ func importSB2Entries(ctx context.Context, tx *sql.Tx, entries []sb2Entry, catMa
 			e.ID,
 			e.File,
 			e.Key,
+			// SB stores `sum` [entitized] (&amp; / &quot; …). The domain
+			// keeps raw text and re-escapes at render (c.Tag), so unescape
+			// here to avoid double-encoding (`Tom &amp; Jerry` →
+			// `Tom &amp;amp; Jerry`). Charset decode already happened in
+			// readSB2Records; unescape is the next stage. Unlike `keywords`
+			// (e.Key, inserted raw above), summary is unescaped on purpose.
+			html.UnescapeString(e.Sum),
 			now, now,
 		)
 		if err != nil {

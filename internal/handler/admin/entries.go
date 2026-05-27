@@ -407,6 +407,16 @@ func (h *Handler) parseEntryForm(r *http.Request, base domain.Entry) (domain.Ent
 
 	base.Keywords = normaliseEntryKeywords(r.PostFormValue("keywords"))
 
+	// SEO meta. Summary feeds the SB3 {entry_excerpt} tag; canonical_url
+	// and noindex are Go-native. Mirror the Slug / Keywords / Pinned
+	// patterns above.
+	base.Summary = strings.TrimSpace(r.PostFormValue("summary"))
+	base.CanonicalURL = strings.TrimSpace(r.PostFormValue("canonical_url"))
+	if base.CanonicalURL != "" && !domain.IsValidCanonicalURL(base.CanonicalURL) {
+		return base, tr(r, "entries.form.error.canonicalInvalid")
+	}
+	base.NoIndex = r.PostFormValue("noindex") == "1" // checkbox: present = noindex
+
 	if fmtRaw := postFormValue(r, "format"); fmtRaw != "" {
 		base.Format = string(format.Normalize(fmtRaw))
 	}

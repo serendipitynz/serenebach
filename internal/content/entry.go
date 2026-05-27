@@ -166,6 +166,7 @@ func (v EntryView) applyEntryBody(c *sbtemplate.Context) {
 	c.TagHTML("entry_tags", renderTagsFragment(v.Site, v.Tags))
 	c.Tag("csrf_token", v.CSRFToken)
 	v.applyPinned(c)
+	v.applySEO(c)
 }
 
 // applyOG emits the OG image URL + literal 1200×630 dimensions so
