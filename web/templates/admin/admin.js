@@ -5,6 +5,9 @@
 import { createI18n } from './modules/core/i18n.js';
 import { safeRead, safeWrite } from './modules/core/storage.js';
 import { showToast, initToastPromotion } from './modules/core/toast.js';
+import { readCSRFToken, csrfTokenFrom } from './modules/core/csrf.js';
+import { openModal, closeModal } from './modules/core/modal.js';
+import { setButtonLoading } from './modules/core/loading.js';
 
 const sbT = createI18n((typeof window !== 'undefined' && window.__sbI18n) || {});
 
@@ -450,61 +453,6 @@ if (window.matchMedia) {
   else if (mql.addListener) mql.addListener(listener);
 }
 
-// ---- modal -----------------------------------------------------------
-// Single host element shared across every page. Callers pass the body
-// HTML or a DOM node + optional title / footer buttons. Close actions
-// work via the X button, backdrop click, or ESC key — all three funnel
-// through closeModal() so state stays consistent.
-var modalHost = document.querySelector('[data-modal-host]');
-var modalTitle = modalHost && modalHost.querySelector('[data-modal-title]');
-var modalBody = modalHost && modalHost.querySelector('[data-modal-body]');
-var modalFoot = modalHost && modalHost.querySelector('[data-modal-foot]');
-var modalDialog = modalHost && modalHost.querySelector('.modal');
-var modalLastFocus = null;
-
-function openModal(opts) {
-  if (!modalHost) return;
-  modalLastFocus = document.activeElement;
-  modalTitle.textContent = opts.title || '';
-  modalBody.innerHTML = '';
-  if (opts.bodyNode) modalBody.appendChild(opts.bodyNode);
-  else if (typeof opts.bodyHTML === 'string') modalBody.innerHTML = opts.bodyHTML;
-  else if (typeof opts.bodyText === 'string') modalBody.textContent = opts.bodyText;
-  modalDialog.className = 'modal' + (opts.variant ? ' modal-' + opts.variant : '');
-  modalFoot.innerHTML = '';
-  if (opts.footerNode) {
-    modalFoot.appendChild(opts.footerNode);
-    modalFoot.hidden = false;
-  } else {
-    modalFoot.hidden = true;
-  }
-  modalHost.hidden = false;
-  // Focus the dialog so keyboard users land inside the modal; ESC
-  // captured by the document-level listener.
-  setTimeout(function () { try { modalDialog.focus(); } catch (e) {} }, 0);
-}
-function closeModal() {
-  if (!modalHost) return;
-  modalHost.hidden = true;
-  modalBody.innerHTML = '';
-  modalFoot.innerHTML = '';
-  if (modalLastFocus && modalLastFocus.focus) {
-    try { modalLastFocus.focus(); } catch (e) {}
-  }
-}
-if (modalHost) {
-  modalHost.addEventListener('click', function (e) {
-    if (e.target === modalHost) closeModal();
-  });
-  var closeBtn = modalHost.querySelector('[data-modal-close]');
-  if (closeBtn) closeBtn.addEventListener('click', closeModal);
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && !modalHost.hidden) closeModal();
-  });
-}
-// Expose for other code in this file (image click, comment modal, etc).
-window.__sbAdminModal = { open: openModal, close: closeModal };
-
 // ---- comment detail modal ------------------------------------------
 // Author / body cells on the moderation list carry the full comment
 // payload via data-* attributes. Click → modal with author metadata +
@@ -868,12 +816,7 @@ if (burger) {
   });
 }
 
-// ---- helpers ----------------------------------------------------------
-function csrfTokenFrom(el) {
-  return (el.closest('[data-csrf]') || document.querySelector('[data-csrf]') ||
-    document.querySelector('[data-upload]') || document.body).getAttribute('data-csrf') || '';
-}
-
+// ---- upload helpers ---------------------------------------------------
 function uploadFile(file, csrfToken, endpoint) {
   // endpoint defaults to the image upload endpoint so the editor's
   // drop-onto-textarea paths (which pass no endpoint) keep working.
@@ -2006,36 +1949,6 @@ function dateFormatTokens(d, lang) {
     Min: pad2(mi),
     Sec: pad2(se),
     Zone: tz
-  };
-}
-
-// readCSRFToken locates a csrf_token hidden input anywhere on the
-// page and returns its value. The admin layout renders one per
-// rendered form so every page reaches the fetch paths with a
-// populated token without relying on a dedicated attribute.
-function readCSRFToken() {
-  var el = document.querySelector('input[name="csrf_token"]');
-  return el && el.value ? el.value : '';
-}
-
-// Swap a button into a "loading" state with a spinning indicator
-// while a network request is in flight. The previous textContent is
-// captured up-front and restored by the matching restore() call so
-// even nested-i18n labels survive the round trip. Returns a restore
-// closure the caller invokes on settle (success OR failure).
-function setButtonLoading(btn) {
-  if (!btn) return function () {};
-  var originalLabel = btn.textContent;
-  btn.disabled = true;
-  btn.setAttribute('aria-busy', 'true');
-  var spinner = document.createElement('span');
-  spinner.className = 'sb-spinner';
-  spinner.setAttribute('aria-hidden', 'true');
-  btn.replaceChildren(spinner);
-  return function restore() {
-    btn.disabled = false;
-    btn.removeAttribute('aria-busy');
-    btn.textContent = originalLabel;
   };
 }
 
