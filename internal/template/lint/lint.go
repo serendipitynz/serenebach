@@ -62,7 +62,6 @@ var unsupportedTags = map[string]string{
 	"comment_iconform":      "comment icons aren't supported in the Go port",
 	"related_category":      "secondary categories aren't modelled in the Go port",
 	"related_category_disp": "secondary categories aren't modelled in the Go port",
-	"entry_excerpt":         "entry summary/excerpt field isn't modelled yet",
 	"calendar":              "calendar sidebar widget isn't implemented yet",
 	"calendar2":             "calendar sidebar widget isn't implemented yet",
 	"calendar_horizontal":   "calendar sidebar widget isn't implemented yet",

@@ -156,6 +156,12 @@ func (v ListView) applyEntry(c *sbtemplate.Context, i int, e domain.Entry) {
 	c.Tag("entry_stamp_url", v.Site.EntryPermalink(e)+"stamp")
 	c.Tag("entry_keywords", e.Keywords)
 	c.Tag("entry_keyword", e.Keywords)
+	// {entry_excerpt} is set on both list and entry pages (SB3's
+	// _body_text seeds it in either mode). The canonical / noindex
+	// blocks stay entry-only — they are head metadata that only makes
+	// sense on a single permalink, so they are left unset here and
+	// 0-stripe by default (count 0) on list pages.
+	c.Tag("entry_excerpt", entryExcerpt(e))
 	c.Tag("permalink", v.Site.EntryPermalink(e))
 	c.TagHTML("entry_tags", renderTagsFragment(v.Site, v.Tags[e.ID]))
 	// {entry_pinned} yields "pinned" or "" per iteration — usable as a
