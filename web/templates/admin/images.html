@@ -133,24 +133,5 @@
   </div>
 </div>
 
-<!-- rename modal -->
-<div class="modal-backdrop" id="rename-modal" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rename-title">
-    <div class="modal-head">
-      <h3 id="rename-title">{{T "images.edit"}}</h3>
-      <button type="button" class="btn-icon" data-modal-close aria-label="Close">&times;</button>
-    </div>
-    <form id="rename-form" method="post" action="">
-      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-      <div class="modal-body">
-        <label for="rename-filename">Filename</label>
-        <input type="text" id="rename-filename" name="filename" required maxlength="255">
-      </div>
-      <div class="modal-foot form-actions">
-        <button type="submit" class="primary">{{T "action.save"}}</button>
-        <button type="button" class="secondary" data-modal-close>{{T "action.cancel"}}</button>
-      </div>
-    </form>
-  </div>
-</div>
+
 {{end}}
