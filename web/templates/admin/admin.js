@@ -8,48 +8,56 @@ import { showToast, initToastPromotion } from './modules/core/toast.js';
 import { readCSRFToken, csrfTokenFrom } from './modules/core/csrf.js';
 import { openModal, closeModal } from './modules/core/modal.js';
 import { setButtonLoading } from './modules/core/loading.js';
+import { initAppearanceLanguage } from './modules/features/appearance-language.js';
+import { initNavigation } from './modules/features/navigation.js';
+import { initSortableLists } from './modules/features/sortable-list.js';
+import { initLinkKindToggle } from './modules/features/link-form.js';
+import { initDateFormatPreview } from './modules/features/date-format-preview.js';
+import { initDropToInput, wireDragHover } from './modules/features/drop-to-input.js';
 
 const sbT = createI18n((typeof window !== 'undefined' && window.__sbI18n) || {});
 
 initToastPromotion();
+initAppearanceLanguage();
+initNavigation();
+initSortableLists(sbT);
+initLinkKindToggle();
+initDateFormatPreview();
+initDropToInput();
 
-// ---- appearance / language prefs -----------------------------------
-// Reflect the stored appearance preference into the <select> and apply
-// any change immediately. The pre-init script in layout.html already
-// set data-theme before CSS painted; this keeps the two in sync.
-var appearanceSelect = document.querySelector('[data-appearance-select]');
-if (appearanceSelect) {
-var stored = safeRead('sb_admin_appearance') || 'auto';
-appearanceSelect.value = stored;
-appearanceSelect.addEventListener('change', function () {
-  var v = appearanceSelect.value;
-  if (v !== 'light' && v !== 'dark' && v !== 'auto') return;
-  safeWrite('sb_admin_appearance', v);
-  document.documentElement.setAttribute('data-theme', v);
-});
-}
-var languageSelect = document.querySelector('[data-language-select]');
-if (languageSelect) {
-// The server renders <option selected> via {{Locale}}, so the
-// dropdown is already correct on first paint. No client-side
-// state restoration is needed — and it would not work under
-// Sakura's ENC_ cookie protection anyway (the value is encrypted
-// opaque to JS).
-languageSelect.addEventListener('change', function () {
-  var v = languageSelect.value;
-  if (v !== 'ja' && v !== 'en') return;
-  var body = new URLSearchParams({ lang: v, csrf_token: readCSRFToken() });
-  var endpoint = (window.__sbRoot || '') + '/admin/settings/language';
-  fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body,
-    credentials: 'same-origin',
-  }).then(function (res) {
-    if (res.ok) window.location.reload();
+// ---- drop zone on /admin/images --------------------------------------
+// Any form tagged [data-upload] gets a drag-drop zone wired to
+// uploadBatch so files are uploaded via AJAX with progress.
+var dropForms = document.querySelectorAll('[data-upload]');
+dropForms.forEach(function (form) {
+  var zone = form.querySelector('[data-drop-zone]');
+  var input = form.querySelector('[data-drop-input]');
+  var progress = form.querySelector('.drop-zone-progress');
+  if (!zone || !input) return;
+
+  wireDragHover(zone, 'drag-over');
+  zone.addEventListener('drop', function (e) {
+    var files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || !files.length) return;
+    submitFiles(files);
   });
+  input.addEventListener('change', function () {
+    if (!input.files || !input.files.length) return;
+    submitFiles(input.files);
+  });
+
+  function submitFiles(files) {
+    var token = form.getAttribute('data-csrf') || '';
+    var endpoint = form.getAttribute('action') || '/admin/images';
+    uploadBatch(files, token, {
+      endpoint: endpoint,
+      setProgress: function (text) {
+        if (progress) { progress.hidden = false; progress.textContent = text; }
+      },
+      onDone: function () { window.location.reload(); }
+    });
+  }
 });
-}
 
 // ---- Ace code editor (lazy-loaded) ----------------------------------
 // Any <textarea data-code-editor="html|css|markdown|text"> on the
@@ -786,36 +794,6 @@ if (filterInput) {
   });
 }
 
-// ---- mobile drawer ----------------------------------------------------
-// Burger toggles the sidebar on phone-class viewports. Clicking a
-// sidebar link closes it automatically (the navigation answers the
-// "why did I open this?"), and tapping the backdrop or pressing
-// Escape gives a cancel path — both are touch-critical on mobile
-// where there's no easy way back to the burger button itself.
-var burger = document.querySelector('[data-toggle-nav]');
-if (burger) {
-  burger.addEventListener('click', function (e) {
-    e.stopPropagation();
-    document.body.classList.toggle('nav-open');
-  });
-  var links = document.querySelectorAll('.sidebar a');
-  for (var i = 0; i < links.length; i++) {
-    links[i].addEventListener('click', function () {
-      document.body.classList.remove('nav-open');
-    });
-  }
-  document.addEventListener('click', function (e) {
-    if (!document.body.classList.contains('nav-open')) return;
-    if (e.target.closest && e.target.closest('.sidebar')) return;
-    document.body.classList.remove('nav-open');
-  });
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && document.body.classList.contains('nav-open')) {
-      document.body.classList.remove('nav-open');
-    }
-  });
-}
-
 // ---- upload helpers ---------------------------------------------------
 function uploadFile(file, csrfToken, endpoint) {
   // endpoint defaults to the image upload endpoint so the editor's
@@ -901,91 +879,6 @@ function uploadBatch(files, token, opts) {
     });
   });
 }
-
-// wireDragHover toggles `hoverClass` on `zone` while a drag is over it:
-// added on dragenter/dragover, removed on dragleave/drop. preventDefault
-// + stopPropagation on every event so the browser doesn't navigate to a
-// dropped file. The caller wires its own `drop` handler for the payload.
-function wireDragHover(zone, hoverClass) {
-  ['dragenter', 'dragover'].forEach(function (evt) {
-    zone.addEventListener(evt, function (e) {
-      e.preventDefault(); e.stopPropagation();
-      zone.classList.add(hoverClass);
-    });
-  });
-  ['dragleave', 'drop'].forEach(function (evt) {
-    zone.addEventListener(evt, function (e) {
-      e.preventDefault(); e.stopPropagation();
-      zone.classList.remove(hoverClass);
-    });
-  });
-}
-
-// ---- drop zone on /admin/images --------------------------------------
-var dropForms = document.querySelectorAll('[data-upload]');
-dropForms.forEach(function (form) {
-  var zone = form.querySelector('[data-drop-zone]');
-  var input = form.querySelector('[data-drop-input]');
-  var progress = form.querySelector('.drop-zone-progress');
-  if (!zone || !input) return;
-
-  wireDragHover(zone, 'drag-over');
-  zone.addEventListener('drop', function (e) {
-    var files = e.dataTransfer && e.dataTransfer.files;
-    if (!files || !files.length) return;
-    submitFiles(files);
-  });
-  input.addEventListener('change', function () {
-    if (!input.files || !input.files.length) return;
-    submitFiles(input.files);
-  });
-
-  function submitFiles(files) {
-    var token = form.getAttribute('data-csrf') || '';
-    var endpoint = form.getAttribute('action') || '/admin/images';
-    uploadBatch(files, token, {
-      endpoint: endpoint,
-      setProgress: function (text) {
-        if (progress) { progress.hidden = false; progress.textContent = text; }
-      },
-      onDone: function () { window.location.reload(); }
-    });
-  }
-});
-
-// ---- drop-to-input (populate a file input without AJAX) -------------
-// Used by forms that still POST normally (e.g. template import) but
-// want a drop target on top of the bare <input type="file">.
-document.querySelectorAll('[data-drop-to-input]').forEach(function (zone) {
-  var input = zone.querySelector('[data-drop-input]');
-  if (!input) return;
-  var placeholder = zone.querySelector('[data-drop-placeholder]');
-  var defaultText = placeholder ? placeholder.textContent : '';
-
-  wireDragHover(zone, 'drag-over');
-  zone.addEventListener('drop', function (e) {
-    var files = e.dataTransfer && e.dataTransfer.files;
-    if (!files || !files.length) return;
-    try {
-      var dt = new DataTransfer();
-      dt.items.add(files[0]);
-      input.files = dt.files;
-    } catch (_) {
-      // DataTransfer constructor missing (very old browsers) — leave
-      // the input untouched so the click-to-pick fallback still works.
-      return;
-    }
-    updateLabel();
-  });
-  input.addEventListener('change', updateLabel);
-
-  function updateLabel() {
-    if (!placeholder) return;
-    placeholder.textContent = (input.files && input.files.length)
-      ? input.files[0].name
-      : defaultText;
-  }
-});
 
 // ---- copy-URL buttons (gallery) --------------------------------------
 // On success: flash a checkmark inside icon-style buttons (or swap
@@ -1647,21 +1540,6 @@ if (renameModal && renameForm && renameInput) {
   });
 }
 
-// ---- sortable admin lists (drag-and-drop reorder) -------------------
-// Generic: any table tagged data-<kind>-sortable posts [ids] back to the
-// matching /admin/<kind>/reorder endpoint on drop. Rows supply their id
-// via data-<kind>-id and the whole <tr> is draggable. Keeps the category
-// list and the template list (and anything later) on one code path.
-initSortableList('category');
-initSortableList('template');
-initSortableList('user');
-initSortableList('link');
-
-// ---- link form: show/hide URI / target / group / disp when the
-// 種類 selector flips. Only renders on the NEW form (existing rows
-// lock their kind and skip the radios entirely).
-initLinkKindToggle();
-
 // ---- unsaved-change warning on admin edit forms --------------------
 // Any form tagged [data-unsaved-warn] gets a browser beforeunload
 // warning if its contents diverge from the initial snapshot. Covers
@@ -1730,226 +1608,12 @@ function snapshot(form) {
   return pairs.join('&');
 }
 
-function initLinkKindToggle() {
-  var form = document.querySelector('[data-link-form]');
-  if (!form) return;
-  var fields = form.querySelector('[data-link-fields]');
-  if (!fields) return;
-  var radios = form.querySelectorAll('[data-link-kind]');
-  if (!radios.length) return;
-  function sync() {
-    var selected = form.querySelector('[data-link-kind]:checked');
-    var isGroup = selected && selected.value === 'group';
-    if (isGroup) fields.setAttribute('hidden', '');
-    else fields.removeAttribute('hidden');
-  }
-  for (var i = 0; i < radios.length; i++) {
-    radios[i].addEventListener('change', sync);
-  }
-  sync();
-}
-
-function initSortableList(kind) {
-  var table = document.querySelector('[data-' + kind + '-sortable]');
-  if (!table) return;
-  var tbody = table.querySelector('tbody');
-  var status = table.parentNode.querySelector('[data-reorder-status]');
-  var token = table.getAttribute('data-csrf') || '';
-  var idAttr = 'data-' + kind + '-id';
-  var endpoint = table.getAttribute('data-sort-endpoint') || '/admin/' + kind + 's/reorder';
-  if (!tbody) return;
-
-  var dragged = null;
-
-  tbody.addEventListener('dragstart', function (e) {
-    var row = closestRow(e.target);
-    if (!row) return;
-    dragged = row;
-    row.classList.add('dragging');
-    if (e.dataTransfer) {
-      e.dataTransfer.effectAllowed = 'move';
-      // Firefox needs some data set on the transfer to start a drag.
-      e.dataTransfer.setData('text/plain', row.getAttribute(idAttr) || '');
-    }
-  });
-
-  tbody.addEventListener('dragend', function () {
-    if (dragged) dragged.classList.remove('dragging');
-    clearDropMarkers();
-    dragged = null;
-  });
-
-  tbody.addEventListener('dragover', function (e) {
-    if (!dragged) return;
-    e.preventDefault();
-    var row = closestRow(e.target);
-    if (!row || row === dragged) return;
-    clearDropMarkers();
-    if (insertBefore(e, row)) {
-      row.classList.add('drop-above');
-    } else {
-      row.classList.add('drop-below');
-    }
-  });
-
-  tbody.addEventListener('drop', function (e) {
-    if (!dragged) return;
-    e.preventDefault();
-    var row = closestRow(e.target);
-    clearDropMarkers();
-    if (!row || row === dragged) return;
-    if (insertBefore(e, row)) {
-      tbody.insertBefore(dragged, row);
-    } else {
-      tbody.insertBefore(dragged, row.nextSibling);
-    }
-    persistOrder();
-  });
-
-  function closestRow(el) {
-    while (el && el !== tbody) {
-      if (el.tagName === 'TR' && el.hasAttribute(idAttr)) return el;
-      el = el.parentNode;
-    }
-    return null;
-  }
-
-  function insertBefore(e, row) {
-    var rect = row.getBoundingClientRect();
-    return (e.clientY - rect.top) < rect.height / 2;
-  }
-
-  function clearDropMarkers() {
-    tbody.querySelectorAll('.drop-above, .drop-below').forEach(function (r) {
-      r.classList.remove('drop-above');
-      r.classList.remove('drop-below');
-    });
-  }
-
-  function persistOrder() {
-    var ids = [];
-    tbody.querySelectorAll('tr[' + idAttr + ']').forEach(function (r) {
-      var raw = r.getAttribute(idAttr);
-      var n = parseInt(raw, 10);
-      if (!isNaN(n)) ids.push(n);
-    });
-    flashStatus(sbT('js.reorder.saving'), '');
-    fetch(endpoint, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': token,
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({ ids: ids })
-    }).then(function (res) {
-      if (res.ok) flashStatus(sbT('js.reorder.saved'), 'success');
-      else flashStatus(sbT('js.reorder.errorHTTP', res.status), 'error');
-    }).catch(function () {
-      flashStatus(sbT('js.reorder.errorGeneric'), 'error');
-    });
-  }
-
-  function flashStatus(msg, cls) {
-    if (!status) return;
-    status.hidden = false;
-    status.textContent = msg;
-    status.className = 'reorder-status' + (cls ? ' ' + cls : '');
-  }
-}
-
 function hasFiles(dt) {
   if (!dt.types) return false;
   for (var i = 0; i < dt.types.length; i++) {
     if (dt.types[i] === 'Files') return true;
   }
   return false;
-}
-
-// ---- date-format live preview ---------------------------------------
-// On the デザイン設定 > 設定 page each of the 5 pattern inputs gets a
-// sibling `<span data-date-format-preview>` that re-renders as the
-// author types. Mirrors the server-side dateformat.Expand logic so
-// the preview and the public site always agree; if this ever drifts,
-// the server render wins (this is just a typing aid).
-(function () {
-  var section = document.querySelector('[data-date-format-section]');
-  if (!section) return;
-  var lang = section.getAttribute('data-lang') || 'en';
-  section.querySelectorAll('[data-date-format-input]').forEach(function (input) {
-    var preview = input.parentNode.querySelector('[data-date-format-preview]');
-    if (!preview) return;
-    var update = function () {
-      var out = expandDateFormat(input.value, new Date(), lang);
-      preview.textContent = out;
-    };
-    input.addEventListener('input', update);
-  });
-})();
-
-function expandDateFormat(pattern, d, lang) {
-  if (!pattern) return '';
-  var tokens = dateFormatTokens(d, lang);
-  return pattern.replace(/%([A-Za-z0-9]+)%/g, function (match, name) {
-    return Object.prototype.hasOwnProperty.call(tokens, name) ? tokens[name] : match;
-  });
-}
-function dateFormatTokens(d, lang) {
-  var pad2 = function (n) { return (n < 10 ? '0' : '') + n; };
-  var y = d.getFullYear();
-  var mo = d.getMonth() + 1;
-  var day = d.getDate();
-  var h = d.getHours();
-  var mi = d.getMinutes();
-  var se = d.getSeconds();
-  var wk = d.getDay();
-  var tz = (function () {
-    var m = -d.getTimezoneOffset();
-    var sign = m >= 0 ? '+' : '-';
-    var abs = Math.abs(m);
-    return sign + pad2(Math.floor(abs / 60)) + pad2(abs % 60);
-  })();
-  var weekLongEN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  var weekShortEN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  var monthLongEN = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  var monthShortEN = ['', 'Jan.', 'Feb.', 'Mar.', 'Apr.', 'May.', 'Jun.', 'Jul.', 'Aug.', 'Sep.', 'Oct.', 'Nov.', 'Dec.'];
-  var weekLongJA = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'];
-  var weekShortJA = ['日', '月', '火', '水', '木', '金', '土'];
-  var dayOrd = (function () {
-    if (lang === 'ja') return day + '日';
-    var mod100 = day % 100;
-    if (mod100 >= 11 && mod100 <= 13) return day + 'th';
-    switch (day % 10) {
-      case 1: return day + 'st';
-      case 2: return day + 'nd';
-      case 3: return day + 'rd';
-    }
-    return day + 'th';
-  })();
-  var h11 = h % 12;
-  var h12 = h % 12 || 12;
-  return {
-    Year: String(y),
-    YearShort: pad2(y % 100),
-    Mon: pad2(mo),
-    MonNum: String(mo),
-    MonShort: lang === 'ja' ? (mo + '月') : monthShortEN[mo],
-    MonLong: lang === 'ja' ? (mo + '月') : monthLongEN[mo],
-    Day: pad2(day),
-    DayShort: String(day),
-    DayOrd: dayOrd,
-    Week: lang === 'ja' ? weekShortJA[wk] : weekShortEN[wk],
-    WeekLong: lang === 'ja' ? weekLongJA[wk] : weekLongEN[wk],
-    Hour: pad2(h),
-    Hour24: String(h),
-    Hour11: pad2(h11),
-    Hour12: pad2(h12),
-    HourAP: h < 12 ? 'AM' : 'PM',
-    Min: pad2(mi),
-    Sec: pad2(se),
-    Zone: tz
-  };
 }
 
 // ---- AI suggestion popup -------------------------------------------
