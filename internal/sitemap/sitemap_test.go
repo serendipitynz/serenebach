@@ -120,6 +120,31 @@ func TestBuildFromInput_skipsNoIndexEntries(t *testing.T) {
 	}
 }
 
+func TestBuildFromInput_skipsNoIndexPages(t *testing.T) {
+	now := time.Date(2026, 5, 20, 0, 0, 0, 0, time.UTC)
+	in := Input{
+		Weblog: &domain.Weblog{BaseURL: "https://blog.example.com"},
+		Pages: []domain.Page{
+			{Slug: "/about", CreatedAt: now, UpdatedAt: now},
+			{Slug: "/secret", NoIndex: true, CreatedAt: now, UpdatedAt: now},
+		},
+	}
+	body, _, err := BuildFromInput(in)
+	if err != nil {
+		t.Fatalf("BuildFromInput: %v", err)
+	}
+	var us urlSet
+	if err := xml.Unmarshal(body, &us); err != nil {
+		t.Fatalf("xml unmarshal: %v", err)
+	}
+	if containsLoc(us.URLs, "https://blog.example.com/secret/") {
+		t.Error("noindex page should not appear in the urlset")
+	}
+	if !containsLoc(us.URLs, "https://blog.example.com/about/") {
+		t.Error("indexed page should still appear")
+	}
+}
+
 func containsLoc(urls []urlEntry, loc string) bool {
 	for _, u := range urls {
 		if u.Loc == loc {

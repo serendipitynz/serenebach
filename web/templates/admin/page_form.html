@@ -60,6 +60,23 @@
     </label>
   </div>
 
+  <details class="entry-form-meta" {{if or .Page.Summary .Page.CanonicalURL .Page.NoIndex}}open{{end}}>
+    <summary>{{T "entries.form.metaGroup"}}</summary>
+    <div class="entry-form-meta-fields">
+      <label>{{T "entries.form.summary"}}
+        <textarea name="summary" rows="3" maxlength="200" placeholder="{{T `entries.form.summaryOptional`}}">{{.Page.Summary}}</textarea>
+      </label>
+      <label>{{T "entries.form.canonicalUrl"}}
+        <input type="url" name="canonical_url" value="{{.Page.CanonicalURL}}" placeholder="{{T `entries.form.canonicalUrlOptional`}}" maxlength="2000">
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" name="noindex" value="1"{{if .Page.NoIndex}} checked{{end}}>
+        <span>{{T "entries.form.noindex"}}</span>
+      </label>
+      <p class="hint">{{T "entries.form.noindexHint"}}</p>
+    </div>
+  </details>
+
   <div class="form-row" data-og-bg-field>
     <div class="label">{{T "entries.form.ogBg"}}</div>
     <div>

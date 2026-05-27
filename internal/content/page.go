@@ -72,6 +72,7 @@ func (v PageView) Render() (string, error) {
 	c.Tag("entry_og_image_height", "630")
 	c.Tag("entry_keywords", "")
 	c.Tag("entry_keyword", "")
+	v.applySEO(c)
 	c.Tag("permalink", v.Site.TopURL()+v.Page.Slug[1:])
 	c.Tag("entry_tags", "")
 	c.Tag("csrf_token", "")

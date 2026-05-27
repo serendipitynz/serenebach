@@ -71,8 +71,9 @@ Anything inside `{...}` is replaced at render time with the actual value.
 | Entry | `pinned_entry` | **Single-entry pages only:** count = 1 for pinned entries, 0 otherwise. Always 0 on list pages (home, category, etc.) — use the `{entry_pinned}` tag for per-entry conditional styling on list pages instead. |
 | Entry | `option` | Shown only on single-entry pages. |
 | Entry | `sequel` | Shown only on single-entry pages. Contains prev/next entry navigation. |
-| Entry | `entry_canonical` | **Single-entry pages only**: expands (count 1) only when a canonical URL is set in the entry editor. Use it to emit `<link rel="canonical">` in `<head>`; reference `{entry_canonical_url}` inside it. |
-| Entry | `entry_noindex` | **Single-entry pages only**: expands (count 1) only for entries marked "Hide from search engines" in the editor. Use it to emit `<meta name="robots" content="noindex,follow">`. |
+| Entry | `entry_canonical` | **Single-entry and flat pages only**: expands (count 1) only when a canonical URL is set in the editor. Use it to emit `<link rel="canonical">` in `<head>`; reference `{entry_canonical_url}` inside it. |
+| Entry | `entry_noindex` | **Single-entry and flat pages only**: expands (count 1) only for entries/pages marked "Hide from search engines" in the editor. Use it to emit `<meta name="robots" content="noindex,follow">`. |
+| Entry | `single_meta` | **Single-entry and flat pages only**: groups the `<head>` metadata (meta description / OG tags, referencing `{entry_excerpt}` etc.) that only makes sense on a single-content view. Not expanded on list pages, where `{entry_excerpt}` would resolve to the first entry's excerpt. |
 | Comments | `comment_area` | Shown on single-entry pages when comments are accepted. Contains the comment form. |
 | Comments | `comment` | Individual approved comments. Repeats per comment. |
 | Pagination | `page` | Page navigation. Shown when total pages > 1. |
@@ -180,7 +181,7 @@ Usable inside and outside the `page` block.
 | `{entry_stamp_url}` | Stamp POST URL |
 | `{entry_keywords}` | Keywords (comma-separated) |
 | `{entry_keyword}` | SB3 spelling alias for `{entry_keywords}` |
-| `{entry_excerpt}` | Entry summary for meta description / OG. Uses the "Summary" field from the entry editor when set, otherwise a 200-char clip of the body (tags stripped), otherwise the title. Expanded on both list and single-entry pages. SB3 `sum`-compatible |
+| `{entry_excerpt}` | Entry summary for meta description / OG. Uses the "Summary" field from the editor when set, otherwise a 200-char clip of the body (tags stripped), otherwise the title. Expanded on list, single-entry, and flat pages. SB3 `sum`-compatible |
 | `{entry_tags}` | Tag list HTML fragment |
 | `{entry_pinned}` | `"pinned"` for pinned entries, `""` (empty) otherwise. Can be injected directly as a CSS class (e.g. `class="entry {entry_pinned}"`). Works correctly per-entry on both list and single-entry pages. |
 | `{permalink}` | SB3 short alias for `{entry_permalink}` |

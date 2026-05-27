@@ -303,6 +303,14 @@ func parsePageForm(r *http.Request, base domain.Page) (domain.Page, string) {
 	// the weblog-level field; empty = inherit the site default.
 	base.OGBGImagePath = postFormValue(r, "og_bg_image_path")
 
+	// SEO meta — mirrors the entry form (summary / canonical_url / noindex).
+	base.Summary = strings.TrimSpace(r.PostFormValue("summary"))
+	base.CanonicalURL = strings.TrimSpace(r.PostFormValue("canonical_url"))
+	if base.CanonicalURL != "" && !domain.IsValidCanonicalURL(base.CanonicalURL) {
+		return base, tr(r, "entries.form.error.canonicalInvalid")
+	}
+	base.NoIndex = r.PostFormValue("noindex") == "1" // checkbox: present = noindex
+
 	status, errMsg := parsePageStatus(r, r.PostFormValue("status"))
 	if errMsg != "" {
 		return base, errMsg
