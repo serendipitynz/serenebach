@@ -34,6 +34,13 @@ var tagStripRe = regexp.MustCompile(`<[^>]*>`)
 func (v EntryView) applySEO(c *sbtemplate.Context) {
 	c.Tag("entry_excerpt", entryExcerpt(v.Entry))
 
+	// single_meta gates the per-item head metadata (description / OG) so
+	// it renders on single-content views (entry permalink + flat page)
+	// but not on list pages, where {entry_excerpt} would resolve to the
+	// first entry's excerpt. The sequel block stays entry-only (prev/next
+	// nav); see PageView.applySEO for the flat-page side.
+	c.Block("single_meta", 1)
+
 	// canonical: c.Tag runs html.EscapeString on the value, so pass the
 	// raw URL — pre-escaping would double-encode `?a=1&b=2` into
 	// `&amp;amp;` and break the link.
@@ -57,6 +64,10 @@ func (v EntryView) applySEO(c *sbtemplate.Context) {
 // a body clip then the title.
 func (v PageView) applySEO(c *sbtemplate.Context) {
 	c.Tag("entry_excerpt", seoExcerpt(v.Page.Summary, v.Page.Body, v.Page.Format, v.Page.Title))
+
+	// A flat page is a single-content view, so the head metadata block
+	// renders here too (the entry-only sequel block stays 0 for pages).
+	c.Block("single_meta", 1)
 
 	if v.Page.CanonicalURL != "" {
 		c.Tag("entry_canonical_url", v.Page.CanonicalURL)

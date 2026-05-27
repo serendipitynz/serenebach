@@ -73,6 +73,7 @@ Anything inside `{...}` is replaced at render time with the actual value.
 | Entry | `sequel` | Shown only on single-entry pages. Contains prev/next entry navigation. |
 | Entry | `entry_canonical` | **Single-entry and flat pages only**: expands (count 1) only when a canonical URL is set in the editor. Use it to emit `<link rel="canonical">` in `<head>`; reference `{entry_canonical_url}` inside it. |
 | Entry | `entry_noindex` | **Single-entry and flat pages only**: expands (count 1) only for entries/pages marked "Hide from search engines" in the editor. Use it to emit `<meta name="robots" content="noindex,follow">`. |
+| Entry | `single_meta` | **Single-entry and flat pages only**: groups the `<head>` metadata (meta description / OG tags, referencing `{entry_excerpt}` etc.) that only makes sense on a single-content view. Not expanded on list pages, where `{entry_excerpt}` would resolve to the first entry's excerpt. |
 | Comments | `comment_area` | Shown on single-entry pages when comments are accepted. Contains the comment form. |
 | Comments | `comment` | Individual approved comments. Repeats per comment. |
 | Pagination | `page` | Page navigation. Shown when total pages > 1. |
