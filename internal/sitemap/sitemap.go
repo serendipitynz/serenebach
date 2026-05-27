@@ -157,6 +157,9 @@ func assembleURLs(base string, in Input) []urlEntry {
 
 	// Flat pages (published)
 	for _, p := range in.Pages {
+		if p.NoIndex {
+			continue // noindex pages stay published but unindexed (same as entries)
+		}
 		loc := base + p.Slug
 		if loc[len(loc)-1] != '/' {
 			loc += "/"
