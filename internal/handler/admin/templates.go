@@ -88,6 +88,11 @@ var tmplFuncs = template.FuncMap{
 	"iconExternal": func() template.HTML {
 		return template.HTML(`<svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M10 2h6v6m-1-5l-7 7M4 4v12h12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`)
 	},
+	// iconHelp is the lucide circle-question-mark, used by the hintTip
+	// partial as the (?) affordance that toggles a click-to-reveal hint.
+	"iconHelp": func() template.HTML {
+		return template.HTML(`<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>`)
+	},
 	"uploadIcon": func(kind string) template.HTML {
 		switch kind {
 		case "audio":
