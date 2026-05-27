@@ -1,7 +1,7 @@
 import { createI18n } from '../core/i18n.js';
 import { safeRead, safeWrite } from '../core/storage.js';
 import { showToast } from '../core/toast.js';
-import { openModal } from '../core/modal.js';
+import { openModal, closeModal } from '../core/modal.js';
 import { readCSRFToken } from '../core/csrf.js';
 
 const sbT = createI18n((typeof window !== 'undefined' && window.__sbI18n) || {});
