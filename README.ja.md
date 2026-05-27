@@ -24,6 +24,7 @@
 - Outbound Webhooks: 記事公開 / コメント受信 / 画像アップロード で Slack / Discord / Zapier / n8n に通知
 - 画像だけでなく音声・文書・動画もライブラリで管理・アップロード可能（Markdown/HTML 記事への挿入に対応）
 - `sitemap.xml` と `robots.txt` の自動生成（サイト設定で ON/OFF 切替可能）
+- 記事単位の SEO メタ情報: 要約（`{entry_excerpt}`、SB3 `sum` 互換。`<meta name="description">` / OG に反映）、canonical URL、記事ごとの `noindex` トグル（`sitemap.xml` からも除外）
 
 ## クイックスタート
 

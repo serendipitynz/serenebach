@@ -34,7 +34,10 @@ The "more" section holds a longer continuation that's revealed on the individual
 | Status | Draft / Published / Closed |
 | Posted at | The timestamp shown on the entry. Future dates are allowed |
 | Slug | A short URL component used in place of the numeric ID |
-| Keywords | Used for `<meta name="keywords">` in supported templates |
+| Keywords | Used for `<meta name="keywords">` in supported templates. Lives in the "Metadata & search engines" group |
+| Summary | The text used for `<meta name="description">` and the OG description (`{entry_excerpt}`). When empty it is auto-generated from the body (up to 200 chars), falling back to the title when the body is empty too |
+| Canonical URL | Point search engines at a different canonical location (e.g. when syndicated from elsewhere). Absolute `http(s)://` URLs only; nothing is emitted when empty |
+| Hide from search engines | When on, emits `<meta name="robots" content="noindex,follow">` for the entry and drops it from `sitemap.xml`. The entry itself stays published on the site |
 | OG card background | Override the social-share card background per entry. After saving, use the **Generate OG card** button to rebuild it manually |
 
 ## Entry status
