@@ -1601,6 +1601,38 @@ table.listing-sortable thead .sort-link.desc::after { content: " ▼"; }
   .entry-form-options { grid-template-columns: 1fr; }
 }
 
+/* Collapsible "metadata & search engines" group — same boxed <details>
+   treatment as entry-form-more, but its body stacks heterogeneous
+   fields (summary textarea, keywords, canonical URL, noindex toggle)
+   vertically rather than in the options grid. */
+.entry-form-meta {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  margin: 0.5rem 0;
+}
+.entry-form-meta > summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  padding: 0.25rem 0;
+  user-select: none;
+}
+.entry-form-meta[open] > summary { margin-bottom: 0.5rem; }
+.entry-form-meta-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.entry-form-meta-fields textarea,
+.entry-form-meta-fields input[type="text"],
+.entry-form-meta-fields input[type="url"] {
+  display: block;
+  width: 100%;
+}
+.entry-form-meta-fields .hint { margin: 0; }
+
 /* Row of inline boolean toggles (pinned, etc.). Designed to grow
    horizontally as more flag-style checkboxes are added. */
 .entry-form-flags {
