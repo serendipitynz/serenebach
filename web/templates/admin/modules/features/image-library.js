@@ -18,13 +18,13 @@ export function initImageLibrary() {
 function initImagePreview() {
   document.querySelectorAll('[data-image-url]').forEach(function (host) {
     var url = host.getAttribute('data-image-url');
-    var alt = host.getAttribute('data-image-alt') || '';
     if (!url) return;
     var trigger = host.querySelector('figure') || host.querySelector('.image-row-icon') || host;
     trigger.style.cursor = 'zoom-in';
     trigger.addEventListener('click', function (e) {
       if (e.target.closest('form, a, button')) return;
       e.preventDefault();
+      var alt = host.getAttribute('data-image-alt') || '';
       var img = document.createElement('img');
       img.src = url;
       img.alt = alt;
@@ -229,8 +229,9 @@ function initRenameModal() {
                 nameSpan.textContent = newName;
                 nameSpan.title = newName;
               }
-              var iconImg = row.querySelector('.image-row-icon');
-              if (iconImg) iconImg.alt = newName;
+              row.querySelectorAll('img').forEach(function (img) {
+                img.alt = newName;
+              });
             }
 
             closeModal();
