@@ -37,10 +37,9 @@
     </div>
 
     <div class="form-row">
-      <div class="label">{{T "links.form.target"}}</div>
+      <div class="label label-with-tip">{{T "links.form.target"}}{{template "hintTip" "links.form.targetHint"}}</div>
       <div>
         <input type="text" name="target" value="{{.Link.Target}}" placeholder="{{T `links.form.targetPlaceholder`}}">
-        <p class="hint">{{T "links.form.targetHint"}}</p>
       </div>
     </div>
 

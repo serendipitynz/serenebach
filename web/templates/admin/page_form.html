@@ -69,11 +69,13 @@
       <label>{{T "entries.form.canonicalUrl"}}
         <input type="url" name="canonical_url" value="{{.Page.CanonicalURL}}" placeholder="{{T `entries.form.canonicalUrlOptional`}}" maxlength="2000">
       </label>
-      <label class="checkbox-label">
-        <input type="checkbox" name="noindex" value="1"{{if .Page.NoIndex}} checked{{end}}>
-        <span>{{T "entries.form.noindex"}}</span>
-      </label>
-      <p class="hint">{{T "entries.form.noindexHint"}}</p>
+      <div class="label-with-tip">
+        <label class="checkbox-label">
+          <input type="checkbox" name="noindex" value="1"{{if .Page.NoIndex}} checked{{end}}>
+          <span>{{T "entries.form.noindex"}}</span>
+        </label>
+        {{template "hintTip" "entries.form.noindexHint"}}
+      </div>
     </div>
   </details>
 
@@ -101,7 +103,6 @@
         </button>
         <span class="og-card-status" data-og-card-status hidden></span>
       </div>
-      <p class="hint">{{T "entries.form.ogCardHint"}}</p>
       {{end}}
     </div>
   </div>

@@ -203,3 +203,17 @@ state-free — the empty string renders the arrow as disabled.
 </nav>
 {{end}}
 {{end}}
+
+{{/*
+Click-to-reveal help tooltip. Pass the i18n key of the hint text as the
+data argument (the dot). The (?) button toggles the hint body open; the
+modules/features/hint-tooltip.js handler closes it on outside-click or
+Escape. Used where an explanation is long and only occasionally needed,
+in place of an always-on <p class="hint"> caption.
+*/}}
+{{define "hintTip"}}
+<span class="hint-tip" data-hint-tip>{{/*
+  */}}<button type="button" class="hint-tip-btn" aria-label="{{T `common.showHint`}}" aria-expanded="false">{{iconHelp}}</button>{{/*
+  */}}<span class="hint-tip-body" role="tooltip" hidden>{{T .}}</span>{{/*
+*/}}</span>
+{{end}}

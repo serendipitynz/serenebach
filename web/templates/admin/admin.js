@@ -19,6 +19,7 @@ import { initImageLibrary } from './modules/features/image-library.js';
 import { initImagePicker } from './modules/features/image-picker.js';
 import { initAceEditors, setAIButtonCallback } from './modules/features/ace-editor.js';
 import { runAceAI, initAISuggestButtons, initAITestButton } from './modules/features/ai-assist.js';
+import { initHintTooltips } from './modules/features/hint-tooltip.js';
 
 const sbT = createI18n((typeof window !== 'undefined' && window.__sbI18n) || {});
 
@@ -31,6 +32,7 @@ initDateFormatPreview();
 initDropToInput();
 initUploadForms();
 initImageLibrary();
+initHintTooltips();
 
 const ace = initAceEditors();
 initImagePicker(ace.ready);
