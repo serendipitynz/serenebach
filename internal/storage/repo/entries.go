@@ -289,19 +289,33 @@ func buildEntriesCountSQL(wid int64, q ListEntriesQuery) (string, []any) {
 // appendEntriesFilters writes the WHERE-clause fragments shared between
 // list and count: owner restriction, search needle. The opening
 // `WHERE e.wid = ?` is the caller's responsibility.
+//
+// Search is split by token length: tokens >= trigramMinLen go through
+// the entries_fts MATCH path (sub-select to keep ORDER BY / SortDir on
+// the base table intact), while shorter tokens AND in a bounded LIKE
+// on the base columns. A non-empty Search whose tokens are all
+// meta-only ("***", "():") collapses to `AND 1=0` so admins don't get
+// a surprise full-list view instead of "0 results".
 func appendEntriesFilters(b *strings.Builder, args *[]any, q ListEntriesQuery) {
 	if q.OwnerID != nil {
 		b.WriteString(` AND e.author_id = ?`)
 		*args = append(*args, *q.OwnerID)
 	}
 	if q.Search != "" {
-		needle := "%" + escapeLike(q.Search) + "%"
-		b.WriteString(` AND (e.title LIKE ? ESCAPE '\'
-			OR e.body LIKE ? ESCAPE '\'
-			OR e.more LIKE ? ESCAPE '\'
-			OR e.keywords LIKE ? ESCAPE '\'
-			OR e.slug LIKE ? ESCAPE '\')`)
-		*args = append(*args, needle, needle, needle, needle, needle)
+		matched := false
+		if ftsQuery := ToFTSQuery(q.Search); ftsQuery != "" {
+			b.WriteString(` AND e.id IN (SELECT rowid FROM entries_fts WHERE entries_fts MATCH ?)`)
+			*args = append(*args, ftsQuery)
+			matched = true
+		}
+		for _, n := range LikeNeedles(q.Search) {
+			b.WriteString(` AND (e.title LIKE ? ESCAPE '\' OR e.body LIKE ? ESCAPE '\' OR e.more LIKE ? ESCAPE '\' OR e.keywords LIKE ? ESCAPE '\')`)
+			*args = append(*args, n, n, n, n)
+			matched = true
+		}
+		if !matched {
+			b.WriteString(` AND 1=0`)
+		}
 	}
 }
 
@@ -414,22 +428,48 @@ func (s *Store) AllPublishedEntries(ctx context.Context, wid int64) ([]domain.En
 }
 
 // SearchPublishedEntries returns published entries whose title, body,
-// or more field contains the needle (case-insensitive LIKE). Ordered
-// newest-first. Used by the MCP server's search_entries tool and, in
-// future, a site-search UI — no full-text index yet, plain LIKE is
-// fine for the typical single-author weblog scale.
+// more, or keywords contain the needle, newest-first. Used by the MCP
+// server's search_entries tool. Internally uses the trigram FTS index
+// for tokens >= trigramMinLen and a base-column LIKE for shorter
+// tokens (mirroring the public /search and admin entry list paths so
+// the three surfaces share one index). Hidden categories are NOT
+// excluded — the MCP scope is admin-authored and may legitimately
+// surface its own non-public categories; the public /search path
+// handles hidden-category exclusion separately.
 func (s *Store) SearchPublishedEntries(ctx context.Context, wid int64, query string, limit int) ([]domain.Entry, error) {
 	if query == "" || limit <= 0 {
 		return nil, nil
 	}
-	needle := "%" + strings.ReplaceAll(strings.ReplaceAll(query, `\`, `\\`), "%", `\%`) + "%"
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT `+entryColumns+`
-		FROM entries
-		WHERE wid = ? AND status = ?
-		  AND (title LIKE ? ESCAPE '\' OR body LIKE ? ESCAPE '\' OR more LIKE ? ESCAPE '\' OR keywords LIKE ? ESCAPE '\')
-		ORDER BY posted_at DESC
-		LIMIT ?`, wid, domain.EntryPublished, needle, needle, needle, needle, limit)
+	ftsQuery := ToFTSQuery(query)
+	likeNeedles := LikeNeedles(query)
+	if ftsQuery == "" && len(likeNeedles) == 0 {
+		return nil, nil
+	}
+
+	var b strings.Builder
+	args := []any{wid, domain.EntryPublished}
+	if ftsQuery != "" {
+		b.WriteString(`
+			SELECT ` + entryColumnsE + `
+			FROM entries_fts f
+			JOIN entries e ON e.id = f.rowid
+			WHERE f.entries_fts MATCH ? AND e.wid = ? AND e.status = ?`)
+		// MATCH placeholder comes first in the FROM/WHERE chain.
+		args = []any{ftsQuery, wid, domain.EntryPublished}
+	} else {
+		b.WriteString(`
+			SELECT ` + entryColumnsE + `
+			FROM entries e
+			WHERE e.wid = ? AND e.status = ?`)
+	}
+	for _, n := range likeNeedles {
+		b.WriteString(` AND (e.title LIKE ? ESCAPE '\' OR e.body LIKE ? ESCAPE '\' OR e.more LIKE ? ESCAPE '\' OR e.keywords LIKE ? ESCAPE '\')`)
+		args = append(args, n, n, n, n)
+	}
+	b.WriteString(` ORDER BY e.posted_at DESC LIMIT ?`)
+	args = append(args, limit)
+
+	rows, err := s.db.QueryContext(ctx, b.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("repo: SearchPublishedEntries: %w", err)
 	}
