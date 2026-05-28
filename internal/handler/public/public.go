@@ -64,8 +64,12 @@ func siteWithLabel(w domain.Weblog, lang string) content.Site {
 // fetches user-defined custom tags from the store so {custom_*}
 // placeholders resolve on the rendered page. Errors are logged and
 // swallowed so a broken custom-tag query doesn't 500 the public site.
+// Dynamic-handler builds always enable the search form — the /search
+// route is mounted, so the form has a working action. Static rebuild
+// goes through a separate constructor that respects the per-weblog
+// static_search_form_enabled toggle.
 func (h *Handler) buildSite(ctx context.Context, w domain.Weblog) content.Site {
-	s := siteWithLabel(w, w.Lang).WithTZ(h.tz())
+	s := siteWithLabel(w, w.Lang).WithTZ(h.tz()).WithSearchForm(true)
 	tags, err := h.Store.ListCustomTags(ctx, h.WID)
 	if err != nil {
 		log.Printf("public.buildSite: load custom tags: %v", err)
@@ -163,6 +167,7 @@ func (h *Handler) Mount(r chi.Router) {
 	// resolveCategoryKey disambiguates. Symmetric with the entry route.
 	r.Get("/category/{key}", h.category)
 	r.Get("/tag/{slug}", h.tag)
+	r.Get("/search", h.search)
 	r.Get("/archive/{year}", h.archiveYear)
 	r.Get("/archive/{year}/{month}", h.archiveMonth)
 	r.Get("/profile/{id}", h.profile)
