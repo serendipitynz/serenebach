@@ -115,7 +115,11 @@ func Build(ctx context.Context, store *repo.Store, opts Options) (*Report, error
 	if err != nil {
 		return nil, err
 	}
-	site := content.NewSite(*env.weblog).WithBasePath(opts.BasePath).WithCustomTags(data.customTags).WithTZ(opts.TZ)
+	site := content.NewSite(*env.weblog).
+		WithBasePath(opts.BasePath).
+		WithCustomTags(data.customTags).
+		WithTZ(opts.TZ).
+		WithSearchForm(env.weblog.StaticSearchFormEnabled)
 	finalOut := opts.OutDir
 	rep := &Report{OutDir: finalOut}
 

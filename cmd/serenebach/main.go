@@ -76,6 +76,7 @@ var subcommands = map[string]subcmdHandler{
 	"import":  runImportCmd,
 	"build":   runBuildCmd,
 	"mcp":     runMCP,
+	"reindex": runReindex,
 }
 
 func main() {
@@ -109,7 +110,7 @@ func main() {
 
 	handler, ok := subcommands[subcmd]
 	if !ok {
-		log.Fatalf("unknown subcommand: %q (want: serve | seed | migrate | import | build | extract-assets | backup)", subcmd)
+		log.Fatalf("unknown subcommand: %q (want: serve | seed | migrate | import | build | extract-assets | backup | reindex)", subcmd)
 	}
 
 	a, err := newApp(cfg)

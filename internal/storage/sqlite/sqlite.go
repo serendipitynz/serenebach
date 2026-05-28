@@ -30,5 +30,18 @@ func Open(path string) (*sql.DB, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("sqlite: ping %q: %w", path, err)
 	}
+	// FTS5 + trigram tokenizer are required by the entry full-text search
+	// migration (see migrations/0052_entry_fts.sql). modernc.org/sqlite
+	// ships with both enabled, but we assert that here before any
+	// migration runs so a hypothetical driver swap fails loudly with a
+	// clear message rather than corrupting the migrations table.
+	if _, err := db.Exec(`CREATE VIRTUAL TABLE _fts_probe USING fts5(content, tokenize='trigram')`); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("sqlite: FTS5 with the trigram tokenizer is required but not available in this driver build: %w", err)
+	}
+	if _, err := db.Exec(`DROP TABLE _fts_probe`); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("sqlite: drop FTS5 probe: %w", err)
+	}
 	return db, nil
 }

@@ -19,11 +19,12 @@ func (s *Store) WeblogByID(ctx context.Context, id int64) (*domain.Weblog, error
 		       date_format_entry, time_format_entry, date_format_comment,
 		       date_format_list, date_format_archive,
 		       entries_per_page, entry_sort_order, comment_sort_order,
-		       sitemap_enabled, robots_enabled
+		       sitemap_enabled, robots_enabled,
+		       static_search_form_enabled
 		FROM weblogs WHERE id = ?`, id)
 	w := &domain.Weblog{}
 	var mode string
-	var llmsEnabled, autoRebuild, sitemapEnabled, robotsEnabled int
+	var llmsEnabled, autoRebuild, sitemapEnabled, robotsEnabled, staticSearchForm int
 	if err := row.Scan(&w.ID, &w.Title, &w.Description, &w.BaseURL, &w.Lang, &mode, &w.SpamWords, &w.IPBlacklist, &llmsEnabled,
 		&autoRebuild,
 		&w.OGBGImagePath, &w.OGTextColor,
@@ -31,7 +32,8 @@ func (s *Store) WeblogByID(ctx context.Context, id int64) (*domain.Weblog, error
 		&w.DateFormatEntry, &w.TimeFormatEntry, &w.DateFormatComment,
 		&w.DateFormatList, &w.DateFormatArchive,
 		&w.EntriesPerPage, &w.EntrySortOrder, &w.CommentSortOrder,
-		&sitemapEnabled, &robotsEnabled); err != nil {
+		&sitemapEnabled, &robotsEnabled,
+		&staticSearchForm); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -45,6 +47,7 @@ func (s *Store) WeblogByID(ctx context.Context, id int64) (*domain.Weblog, error
 	w.AutoRebuildOnPublish = autoRebuild != 0
 	w.SitemapEnabled = sitemapEnabled != 0
 	w.RobotsEnabled = robotsEnabled != 0
+	w.StaticSearchFormEnabled = staticSearchForm != 0
 	return w, nil
 }
 

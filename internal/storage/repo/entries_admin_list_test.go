@@ -72,15 +72,18 @@ func TestListEntriesForAdmin_Search(t *testing.T) {
 	seedAdminListEntry(t, s, domain.Entry{Title: "hello world", Body: "alpha"}, 50)
 	bID := seedAdminListEntry(t, s, domain.Entry{Title: "goodbye", Body: "needle in body", Slug: "bye"}, 40)
 	cID := seedAdminListEntry(t, s, domain.Entry{Title: "needle in title", Body: "nothing"}, 30)
-	dID := seedAdminListEntry(t, s, domain.Entry{Title: "slug match", Slug: "my-needle"}, 20)
+	// Slug-only matches are no longer searchable after the move from
+	// the SB-era LIKE-on-five-columns query to the trigram FTS path
+	// (entries_fts indexes title/body/more/keywords, not slug). Keep
+	// the row in fixtures so the absence is documented.
+	_ = seedAdminListEntry(t, s, domain.Entry{Title: "slug match", Slug: "my-needle"}, 20)
 	_ = seedAdminListEntry(t, s, domain.Entry{Title: "miss"}, 10)
 
 	got, err := s.ListEntriesForAdmin(ctx, 1, ListEntriesQuery{Search: "needle"})
 	if err != nil {
 		t.Fatalf("ListEntriesForAdmin: %v", err)
 	}
-	// dID newest first because we ordered by posted DESC
-	wantIDs := []int64{dID, cID, bID}
+	wantIDs := []int64{cID, bID}
 	if len(got) != len(wantIDs) {
 		t.Fatalf("len: got %d, want %d", len(got), len(wantIDs))
 	}

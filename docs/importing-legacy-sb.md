@@ -71,7 +71,8 @@ Mounted by `Handler.MountLegacy` (GET + POST). The shim translates the query str
 | `mode=user&pid=N` | 301 | `/profile/N/` — id passthrough (user import is out of scope; see *Known limitations*) |
 | `mode=comment&eid=N` — POST | **307** | `/entry/N/comment` — method + body preserved so the canonical handler still owns CSRF / Turnstile / spam checks. `eid` is passthrough here, not a `legacy_id` lookup, because the URL only appears in imported templates and goes away once the template is replaced |
 | `mode=comment&eid=N` — GET | 301 | `/entry/N/#comment-form` |
-| `mode=search` | 404 | Intentional — surfaces the gap until a real `/search` lands |
+| `mode=search&search=<term>` (or `mode=search&q=<term>`) | 301 | `/search?q=<term>` — term is URL-encoded; an empty term still 301s to bare `/search` |
+| `?search=<term>` (no `mode`) | 301 | `/search?q=<term>` — SB3 native shape. `sb::App::Main` infers `srch` mode purely from the `search` query parameter (last-assignment-wins, so it overrides `?eid=` / `?cid=` / `?month=` when both are present) |
 | `mode=page` | 301 | `/` |
 | Unknown / empty `mode` | 301 | `/` (so a misconfigured imported template doesn't drop the reader off a cliff) |
 
@@ -137,7 +138,6 @@ All four columns are indexed (partial indexes excluding the empty / NULL sentine
 - **Monthly archive type is out of scope.** When `legacy_archive_type=Monthly`, the static-HTML branches are disabled. The legacy URL was `YYYYMM.html` with the per-entry anchor fragment living inside the page, and a 301 cannot recover that fragment.
 - **Static URL redirects need `configure.cgi` (or `init.cgi`).** Without those, `base_path` / `log_path` / `suffix` fall back to built-in defaults that almost certainly don't match a real deployment's static layout. Dynamic `/sb.cgi?…` redirects keep working regardless.
 - **`mode=user&pid=N` is id passthrough, not a lookup.** SB stored `crypt()` password hashes that are not bcrypt-compatible, so user accounts are intentionally not imported and there is no guarantee that an SB `user_id` equals a Go `user.id`. Imported templates that emit `{site_cgi}?mode=user&pid=N` still land on `/profile/N/`, which may or may not be the right person.
-- **`mode=search` returns 404.** A real `/search` route hasn't shipped yet; the 404 surfaces the gap rather than silently redirecting to an empty home page. When `/search` lands this branch becomes a 301 forwarder.
 - **Comment-form `eid` is passthrough.** `mode=comment&eid=N` 307-forwards to `/entry/N/comment` directly. This means the rare external POST landing on a post-import legacy URL targets the *new* numeric id, not the SB legacy id. Accepted collateral — these URLs only realistically appear in not-yet-replaced imported templates.
 
 ### Related compatibility (not redirects)

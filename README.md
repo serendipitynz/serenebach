@@ -25,6 +25,7 @@ A self-hostable Go weblog engine — a lighter path between WordPress and Hugo. 
 - Upload and manage audio, documents, and movies alongside images in the library, with insertion into HTML or Markdown entries
 - Auto-generated `sitemap.xml` and `robots.txt` for search-engine discoverability (toggle on/off in site settings)
 - Per-entry and per-page SEO metadata: summary (`{entry_excerpt}`, SB3 `sum`-compatible, drives `<meta name="description">` / OG), canonical URL, and a `noindex` toggle that also drops the entry/page from `sitemap.xml`
+- Full-text entry search at `/search?q=…` backed by a SQLite FTS5 trigram index — works for arbitrary-language substrings (including Japanese) and is shared with the admin entry list and MCP `search_entries`
 
 ## Quick start
 

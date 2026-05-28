@@ -11,9 +11,21 @@ package content
 import (
 	"html"
 	"strconv"
+	"strings"
 
 	"github.com/serendipitynz/serenebach/internal/template/sbtemplate"
 )
+
+// pageSeparator returns "?" when the BasePath has no query string yet
+// (the common case — /, /category/N/, /tag/foo/), or "&" when one is
+// already present (the /search?q=... path). Keeps applyPageBlock's
+// prev/next URLs valid for either shape.
+func pageSeparator(basePath string) string {
+	if strings.Contains(basePath, "?") {
+		return "&"
+	}
+	return "?"
+}
 
 // Pagination bundles the inputs applyPageBlock needs. Zero value
 // (TotalEntries == 0 or BasePath empty) is safe — the helper
@@ -71,11 +83,11 @@ func applyPageBlock(c *sbtemplate.Context, tmpl *sbtemplate.Template, pg Paginat
 	prevLink := ""
 	nextLink := ""
 	if pg.CurrentPage > 1 {
-		prevURL = pg.BasePath + "?page=" + strconv.Itoa(pg.CurrentPage-1)
+		prevURL = pg.BasePath + pageSeparator(pg.BasePath) + "page=" + strconv.Itoa(pg.CurrentPage-1)
 		prevLink = `<a href="` + html.EscapeString(prevURL) + `" rel="prev">&lt;&lt;</a>`
 	}
 	if pg.CurrentPage > 0 && pg.CurrentPage < pageCount {
-		nextURL = pg.BasePath + "?page=" + strconv.Itoa(pg.CurrentPage+1)
+		nextURL = pg.BasePath + pageSeparator(pg.BasePath) + "page=" + strconv.Itoa(pg.CurrentPage+1)
 		nextLink = `<a href="` + html.EscapeString(nextURL) + `" rel="next">&gt;&gt;</a>`
 	}
 	c.Tag("prev_page_url", prevURL)

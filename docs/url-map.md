@@ -15,12 +15,13 @@ Every route the running server exposes, split between the public surface and the
 | `/tag/{slug}/` | Entries carrying one tag (tags are author-assigned; see admin tag management) |
 | `/archive/{year}/` | Year archive |
 | `/archive/{year}/{month}/` | Month archive |
+| `/search?q=<query>&page=<n>` | Full-text entry search (FTS5 trigram). Pagination uses the same `?page=N` shape; out-of-range pages 404. Dynamic-only — static-only deployments do not expose this route. Hidden-category entries are excluded |
 | `/profile/{id}/` | Author profile page (SB3 `?pid=N` equivalent). Users with `list_visible=0` 404 |
 | `?page=N` | Pagination query (1-indexed) valid on home / category / tag / archive routes; out-of-range values 404 |
 | `/rss.xml` | RSS 2.0 feed of the latest 20 entries (served dynamically or from the static snapshot) |
 | `/atom.xml` | Atom 1.0 feed of the latest 20 entries |
 | `/rsd.xml` | RSD 1.0 discovery XML. The `{site_rsd}` tag points here for imported templates; the advertised XML-RPC API itself is not implemented |
-| `/sb.cgi?mode=…` | SB3 legacy shim. `mode=entry/category/archive/user` returns 301, `mode=comment` 307-forwards the POST body to `/entry/{id}/comment` |
+| `/sb.cgi?mode=…` | SB3 legacy shim. `mode=entry/category/archive/user/search` returns 301 (search forwards to `/search?q=…`, picking the term from either `search` or `q`), `mode=comment` 307-forwards the POST body to `/entry/{id}/comment`. The SB3-native `sb.cgi?search=<term>` shape (no `mode`) is also 301'd to `/search?q=<term>` |
 | `/sitemap.xml` | Sitemap protocol 0.9 URL set. 404 when disabled in site settings |
 | `/robots.txt` | Crawler directives + `Sitemap:` line. 404 when disabled in site settings |
 | `/llms.txt` | Markdown index for AI agents. 404 unless the weblog opts in via 基本設定 |
