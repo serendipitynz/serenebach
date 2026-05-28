@@ -105,6 +105,25 @@ var differsBlocks = map[string]string{
 	"selected_entry_list": "always 0 — recommended-posts flag isn't modelled yet",
 }
 
+// nativeTags / nativeBlocks document the names introduced by the Go
+// rewrite that have no SB3 counterpart. They are NOT flagged by the
+// linter (the engine treats unknown names as silently fine), but
+// listing them here keeps the inventory traceable: if a future SB3
+// compat audit ever pulls "every tag this engine emits", these are
+// the ones that should be flagged as engine extensions rather than
+// implementations of an SB3 contract.
+var nativeTags = map[string]string{
+	"search_query": "Serene Bach native — search-result page only",
+	"search_total": "Serene Bach native — search-result page only",
+	"search_url":   "Serene Bach native — /search action URL",
+}
+
+var nativeBlocks = map[string]string{
+	"search_form":    "Serene Bach native — embed search form (gated by static_search_form_enabled on static builds)",
+	"search_results": "Serene Bach native — search-result page only",
+	"search_empty":   "Serene Bach native — search-result page only",
+}
+
 // Analyze walks the parsed template and returns every tag / block
 // the Go port handles unusually. Unknown names (custom tags, rare
 // SB3 names we haven't inventoried) are silently ignored so themes
@@ -115,6 +134,9 @@ func Analyze(tmpl *sbtemplate.Template) []Finding {
 	}
 	var out []Finding
 	for _, tag := range tmpl.UsedTags() {
+		if _, native := nativeTags[tag]; native {
+			continue
+		}
 		if note, ok := unsupportedTags[tag]; ok {
 			out = append(out, Finding{Kind: KindTag, Name: tag, Severity: SevUnsupported, Note: note})
 			continue
@@ -131,6 +153,9 @@ func Analyze(tmpl *sbtemplate.Template) []Finding {
 		}
 	}
 	for _, block := range tmpl.UsedBlocks() {
+		if _, native := nativeBlocks[block]; native {
+			continue
+		}
 		if note, ok := unsupportedBlocks[block]; ok {
 			out = append(out, Finding{Kind: KindBlock, Name: block, Severity: SevUnsupported, Note: note})
 			continue
