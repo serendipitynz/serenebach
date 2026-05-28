@@ -85,6 +85,12 @@ func applySidebarBlocks(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Template
 	applyRecentCommentBlock(s, c, tmpl, data.RecentComments)
 	applyLatestEntryBlock(s, c, tmpl, data.LatestEntries)
 	applyLinkBlock(c, tmpl, data.Links)
+	// search_form is a Serene Bach native block — most authors will
+	// drop it into the sidebar but the gate has to fire on every view
+	// regardless of placement so static-only deployments don't show a
+	// dead form. Routing the call through applySidebarBlocks means
+	// every existing view (list / entry / page / profile) inherits it.
+	s.ApplySearchForm(c, tmpl)
 	// selected_entry (SB3's "recommended posts") relies on a flag
 	// we haven't modelled yet — strip to 0 so imported templates
 	// don't trip on the raw marker.

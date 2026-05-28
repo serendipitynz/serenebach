@@ -217,6 +217,31 @@ type Site struct {
 	// config.Config.TZ via WithTZ so the deployed binary renders
 	// the same archive dates regardless of the host TZ.
 	TZ *time.Location
+	// SearchFormEnabled controls whether the `search_form` block is
+	// rendered with count 1 (or stripped to 0) and whether {search_url}
+	// resolves to a real URL. The dynamic public handler always sets
+	// this to true; static rebuild reflects Weblog.StaticSearchFormEnabled.
+	// Apply only reads this — it never touches Weblog.StaticSearchFormEnabled
+	// directly, so the dynamic / static distinction stays at the call
+	// site rather than spreading into the renderer.
+	SearchFormEnabled bool
+	// SearchQuery is what {search_query} resolves to on the rendered
+	// page. Empty on every non-search page so imported templates can
+	// safely reference the tag in sidebar markup.
+	SearchQuery string
+	// SearchTotal is the total match count on the search results page,
+	// expanded by {search_total}. Empty string on every other page.
+	SearchTotal string
+}
+
+// SearchURL returns the URL the {search_url} tag expands to. Computed
+// from SearchFormEnabled + baseURL so chaining .WithBasePath(...) after
+// .WithSearchForm(...) still produces a correct sub-path URL.
+func (s Site) SearchURL() string {
+	if !s.SearchFormEnabled {
+		return ""
+	}
+	return s.baseURL() + "search"
 }
 
 func NewSite(w domain.Weblog) Site {
@@ -298,6 +323,26 @@ func (s Site) WithCustomTags(tags []domain.CustomTag) Site {
 // nil is accepted and resets to "use time.Local on resolve".
 func (s Site) WithTZ(loc *time.Location) Site {
 	s.TZ = loc
+	return s
+}
+
+// WithSearchForm returns a copy with the SearchFormEnabled toggle set.
+// {search_url} is computed by Site.SearchURL() at render time so a
+// later WithBasePath(...) call still produces the correct sub-path
+// URL. The dynamic public handler calls WithSearchForm(true)
+// unconditionally; static rebuild calls it only when the operator has
+// flipped Weblog.StaticSearchFormEnabled on.
+func (s Site) WithSearchForm(enabled bool) Site {
+	s.SearchFormEnabled = enabled
+	return s
+}
+
+// WithSearchContext returns a copy carrying the search-results page
+// data ({search_query} / {search_total}). Used only by the /search
+// renderer; other pages leave these fields empty.
+func (s Site) WithSearchContext(query string, total int) Site {
+	s.SearchQuery = query
+	s.SearchTotal = strconv.Itoa(total)
 	return s
 }
 
@@ -458,6 +503,11 @@ func (s Site) Apply(c *sbtemplate.Context) {
 	} else {
 		c.Tag("robots_url", "")
 	}
+	// Search-form tags. SearchURL is empty (and search_form block is
+	// 0-striped by the view layer) when SearchFormEnabled is false.
+	c.Tag("search_url", s.SearchURL())
+	c.Tag("search_query", s.SearchQuery)
+	c.Tag("search_total", s.SearchTotal)
 	c.Tag("site_parts", s.PartsURL())
 	// {site_mobile} has no backing feature (mobile mode was dropped
 	// during the rewrite). {site_rsd} points at the /rsd.xml route,
@@ -497,6 +547,23 @@ func (s Site) Apply(c *sbtemplate.Context) {
 	// tag so they can reference (or shadow) standard names if desired.
 	for _, ct := range s.CustomTags {
 		c.TagHTML(ct.Name, ct.Value)
+	}
+}
+
+// ApplySearchForm strips the `search_form` block to count 0 when the
+// site's SearchFormEnabled toggle is off, and otherwise marks the block
+// as count 1 so its body renders once. Callers from every view path
+// (list / entry / search / page / profile) invoke this so a template
+// that includes <!-- BEGIN search_form --> behaves consistently across
+// pages. Templates that don't reference the block are skipped.
+func (s Site) ApplySearchForm(c *sbtemplate.Context, tmpl *sbtemplate.Template) {
+	if !tmpl.HasBlock("search_form") {
+		return
+	}
+	if s.SearchFormEnabled {
+		c.Block("search_form", 1)
+	} else {
+		c.Block("search_form", 0)
 	}
 }
 
