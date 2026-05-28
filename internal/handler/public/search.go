@@ -125,4 +125,3 @@ func (h *Handler) search(w http.ResponseWriter, r *http.Request) {
 	}
 	writeHTML(w, body, "public.search")
 }
-

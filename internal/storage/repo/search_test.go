@@ -50,8 +50,8 @@ func TestLikeNeedles(t *testing.T) {
 		want []string
 	}{
 		{"", nil},
-		{"机器学习", nil},        // >=3 chars → MATCH path
-		{"machine", nil},      // >=3 chars → MATCH path
+		{"机器学习", nil},    // >=3 chars → MATCH path
+		{"machine", nil}, // >=3 chars → MATCH path
 		{"東京", []string{`%東京%`}},
 		// `_` and `%` escaped, `:` left literal.
 		{"a%", []string{`%a\%%`}},
@@ -82,12 +82,12 @@ func TestHasSearchTerms(t *testing.T) {
 	}{
 		{"", false},
 		{"   ", false},
-		{"foo", true}, // MATCH path
-		{"a", true},   // 1-char token still captured via LIKE
-		{"東京", true},  // LIKE path
-		{"foo bar", true},      // MATCH
-		{"foo 東京", true},       // MATCH AND LIKE
-		{"***", true},          // 3+ chars, treated as MATCH (will yield 0 rows)
+		{"foo", true},     // MATCH path
+		{"a", true},       // 1-char token still captured via LIKE
+		{"東京", true},      // LIKE path
+		{"foo bar", true}, // MATCH
+		{"foo 東京", true},  // MATCH AND LIKE
+		{"***", true},     // 3+ chars, treated as MATCH (will yield 0 rows)
 	}
 	for _, tc := range cases {
 		if got := HasSearchTerms(tc.in); got != tc.want {
