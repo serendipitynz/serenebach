@@ -65,6 +65,11 @@ func TestEntryList_DefaultRendersAllEntries(t *testing.T) {
 func TestEntryList_SearchNarrowsResults(t *testing.T) {
 	h, _ := newAdminTestHandler(t)
 	seedEntryListRow(t, h, "needle in title", "", 1, 30)
+	// Slug-only matches were searchable in the SB-era LIKE path but
+	// not in the trigram FTS path that replaced it (entries_fts
+	// indexes title/body/more/keywords; slug is intentionally
+	// out-of-scope per Phase 50 §2.2). Keep the row in fixtures so
+	// the absence stays documented.
 	seedEntryListRow(t, h, "unrelated", "my-needle", 1, 20)
 	seedEntryListRow(t, h, "miss", "", 1, 10)
 
@@ -79,11 +84,11 @@ func TestEntryList_SearchNarrowsResults(t *testing.T) {
 	if !strings.Contains(body, "needle in title") {
 		t.Error("title-match should appear in body")
 	}
-	if !strings.Contains(body, "my-needle") {
-		t.Error("slug-match should appear in body")
-	}
 	if strings.Contains(body, ">miss<") {
 		t.Error("non-matching entry should be filtered out")
+	}
+	if strings.Contains(body, ">unrelated<") {
+		t.Error("slug-only match should NOT appear (entries_fts has no slug column)")
 	}
 	// Clear link present when search is active.
 	if !strings.Contains(body, `class="list-search-clear"`) {
