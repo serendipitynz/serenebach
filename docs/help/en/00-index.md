@@ -27,6 +27,7 @@ This help focuses on the day-to-day admin operations — writing entries, dialli
 - [AI integration and MCP](mcp)
 - [Webhooks (outbound notifications)](webhooks)
 - [Migrating from SB2 / SB3 and feature differences](sb3-migration)
+- [Full-text search](search)
 - [Appendix](appendix)
 
 ## About this help

@@ -25,6 +25,7 @@
 - 画像だけでなく音声・文書・動画もライブラリで管理・アップロード可能（Markdown/HTML 記事への挿入に対応）
 - `sitemap.xml` と `robots.txt` の自動生成（サイト設定で ON/OFF 切替可能）
 - 記事・固定ページ単位の SEO メタ情報: 要約（`{entry_excerpt}`、SB3 `sum` 互換。`<meta name="description">` / OG に反映）、canonical URL、`noindex` トグル（`sitemap.xml` からも除外）
+- `/search?q=…` の全文検索（SQLite FTS5 + trigram トークナイザ）。任意言語の部分一致（日本語含む）に対応し、管理画面の記事一覧検索と MCP の `search_entries` ともインデックスを共有
 
 ## クイックスタート
 

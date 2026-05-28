@@ -15,6 +15,7 @@ Every route the running server exposes, split between the public surface and the
 | `/tag/{slug}/` | Entries carrying one tag (tags are author-assigned; see admin tag management) |
 | `/archive/{year}/` | Year archive |
 | `/archive/{year}/{month}/` | Month archive |
+| `/search?q=<query>&page=<n>` | Full-text entry search (FTS5 trigram). Pagination uses the same `?page=N` shape; out-of-range pages 404. Dynamic-only — static-only deployments do not expose this route. Hidden-category entries are excluded |
 | `/profile/{id}/` | Author profile page (SB3 `?pid=N` equivalent). Users with `list_visible=0` 404 |
 | `?page=N` | Pagination query (1-indexed) valid on home / category / tag / archive routes; out-of-range values 404 |
 | `/rss.xml` | RSS 2.0 feed of the latest 20 entries (served dynamically or from the static snapshot) |
