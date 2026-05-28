@@ -138,12 +138,22 @@ func TestLegacyCGIRedirectsPerMode(t *testing.T) {
 		{"/sb.cgi?mode=archive&cond=202604", 301, "/archive/2026/04/"},
 		{"/sb.cgi?mode=user&pid=1", 301, "/profile/1/"},
 		{"/sb.cgi?mode=comment&eid=5", 301, "/entry/5/#comment-form"},
-		{"/sb.cgi?mode=search&q=hi", 404, ""},
+		// Search: legacy `mode=search&q=…` and the SB3 native
+		// `?search=…` (no mode) both 301 to the modern /search route.
+		// Empty term still forwards so the visitor lands on /search
+		// guidance, not the home page.
+		{"/sb.cgi?mode=search&q=hi", 301, "/search?q=hi"},
+		{"/sb.cgi?mode=search&search=%E6%9D%B1%E4%BA%AC", 301, "/search?q=%E6%9D%B1%E4%BA%AC"},
+		{"/sb.cgi?mode=search", 301, "/search"},
+		{"/sb.cgi?search=hi", 301, "/search?q=hi"},
 		{"/sb.cgi?mode=", 301, "/"},
 		// Mode-less external permalinks (SB3 permalink() output).
 		{"/sb.cgi?eid=42", 301, "/entry/199/"},
 		{"/sb.cgi?cid=7", 301, "/category/88/"},
 		{"/sb.cgi?month=202604", 301, "/archive/2026/04/"},
+		// search wins over eid in modeless form (SB3 sequential mode
+		// assignment makes srch the last and therefore winning mode).
+		{"/sb.cgi?eid=42&search=foo", 301, "/search?q=foo"},
 	}
 	for _, tc := range cases {
 		w := httptest.NewRecorder()

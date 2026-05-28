@@ -21,7 +21,7 @@ Every route the running server exposes, split between the public surface and the
 | `/rss.xml` | RSS 2.0 feed of the latest 20 entries (served dynamically or from the static snapshot) |
 | `/atom.xml` | Atom 1.0 feed of the latest 20 entries |
 | `/rsd.xml` | RSD 1.0 discovery XML. The `{site_rsd}` tag points here for imported templates; the advertised XML-RPC API itself is not implemented |
-| `/sb.cgi?mode=…` | SB3 legacy shim. `mode=entry/category/archive/user` returns 301, `mode=comment` 307-forwards the POST body to `/entry/{id}/comment` |
+| `/sb.cgi?mode=…` | SB3 legacy shim. `mode=entry/category/archive/user/search` returns 301 (search forwards to `/search?q=…`, picking the term from either `search` or `q`), `mode=comment` 307-forwards the POST body to `/entry/{id}/comment`. The SB3-native `sb.cgi?search=<term>` shape (no `mode`) is also 301'd to `/search?q=<term>` |
 | `/sitemap.xml` | Sitemap protocol 0.9 URL set. 404 when disabled in site settings |
 | `/robots.txt` | Crawler directives + `Sitemap:` line. 404 when disabled in site settings |
 | `/llms.txt` | Markdown index for AI agents. 404 unless the weblog opts in via 基本設定 |

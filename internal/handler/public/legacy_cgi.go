@@ -38,7 +38,10 @@ import (
 //	                                                for the SB3 port)
 //	mode=comment&eid=N, POST → 307 /entry/N/comment (body preserved)
 //	mode=comment&eid=N, GET  → 301 /entry/N/#comment-form
-//	mode=search             → 404
+//	mode=search&search=<q>   → 301 /search?q=<q>  (term also accepted via q=<q>)
+//	?search=<q> (no mode)    → 301 /search?q=<q>  (SB3 native — sb::App::Main
+//	                                               infers srch mode purely
+//	                                               from the search param)
 //	(empty / unknown)       → 301 /
 //
 // 307 preserves the POST body + method so the existing commentSubmit
@@ -68,10 +71,7 @@ func (h *Handler) legacyCGI(w http.ResponseWriter, r *http.Request) {
 	case "comment":
 		serveLegacyCommentRedirect(w, r, q)
 	case "search":
-		// Search isn't implemented yet. 404 surfaces the gap rather
-		// than silently redirecting to an empty home — once a /search
-		// route lands this branch becomes a 301 forwarder.
-		http.NotFound(w, r)
+		serveLegacySearchRedirect(w, r, q)
 	case "page":
 		http.Redirect(w, r, root(r)+"/", http.StatusMovedPermanently)
 	default:
@@ -83,6 +83,14 @@ func (h *Handler) legacyCGI(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) serveLegacyModelessRedirect(w http.ResponseWriter, r *http.Request, q url.Values) {
+	// SB3's sb::App::Main upgrades the request to search mode whenever
+	// `search` is non-empty (last-assignment-wins, so it overrides eid /
+	// cid / month / day). Mirror that priority here so imported
+	// templates and old paginator links keep their query string.
+	if s := q.Get("search"); s != "" {
+		redirectLegacySearch(w, r, s)
+		return
+	}
 	if eid := q.Get("eid"); eid != "" {
 		h.redirectLegacyEntryID(w, r, eid)
 		return
@@ -96,6 +104,32 @@ func (h *Handler) serveLegacyModelessRedirect(w http.ResponseWriter, r *http.Req
 		return
 	}
 	http.Redirect(w, r, root(r)+"/", http.StatusMovedPermanently)
+}
+
+// serveLegacySearchRedirect handles `mode=search`. SB3 templates carry
+// the term in `search=<q>`, but the current `mode=search&q=<q>` form
+// is also accepted because existing tests / templates may produce it.
+// Empty term forwards to bare `/search`, where the public handler
+// renders the guidance page.
+func serveLegacySearchRedirect(w http.ResponseWriter, r *http.Request, q url.Values) {
+	term := q.Get("search")
+	if term == "" {
+		term = q.Get("q")
+	}
+	redirectLegacySearch(w, r, term)
+}
+
+// redirectLegacySearch 301s to the Go-native /search route. term is
+// url-encoded so spaces and Japanese pass through cleanly; an empty
+// term still forwards (to the bare /search) so the modern handler can
+// render its guidance page instead of dropping the visitor on the
+// home page with no explanation.
+func redirectLegacySearch(w http.ResponseWriter, r *http.Request, term string) {
+	dest := root(r) + "/search"
+	if term != "" {
+		dest += "?q=" + url.QueryEscape(term)
+	}
+	http.Redirect(w, r, dest, http.StatusMovedPermanently)
 }
 
 func (h *Handler) serveLegacyEntryRedirect(w http.ResponseWriter, r *http.Request, q url.Values) {
