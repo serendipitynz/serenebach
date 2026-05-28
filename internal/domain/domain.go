@@ -112,6 +112,14 @@ type Weblog struct {
 	// RobotsEnabled controls whether /robots.txt is served and
 	// generated during static rebuild. On by default.
 	RobotsEnabled bool
+	// StaticSearchFormEnabled gates whether the `search_form` block /
+	// `{search_url}` tag are emitted on statically-rebuilt pages.
+	// Off by default — without a dynamic backend the form would post
+	// to a non-existent /search route. Operators flip it on only when
+	// the static snapshot is served alongside a dynamic backend.
+	// Dynamic-only deployments ignore this column (the search form is
+	// always emitted from the dynamic path).
+	StaticSearchFormEnabled bool
 	// ArchiveTemplateID pins a specific template for archive (year/month/
 	// category) pages. 0 means "use the active template". ProfileTemplateID
 	// plays the same role for the profile view.
