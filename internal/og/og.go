@@ -26,6 +26,11 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
+// Noto Sans JP (Medium) is (c) 2014, 2015 Adobe Systems Incorporated and is
+// redistributed unmodified under the SIL Open Font License 1.1. The full
+// license text ships next to the font in assets/NotoSansJP-LICENSE.txt and
+// in every release archive.
+//
 //go:embed assets/NotoSansJP-Medium.otf
 var jpFontBytes []byte
 

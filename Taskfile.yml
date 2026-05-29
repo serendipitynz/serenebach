@@ -225,7 +225,7 @@ tasks:
           stage="dist/${name}"
           mkdir -p "$stage"
           cp "bin/serenebach-${target}" "${stage}/serenebach"
-          cp README.md README.ja.md LICENSE "$stage/"
+          cp README.md README.ja.md LICENSE internal/og/assets/NotoSansJP-LICENSE.txt "$stage/"
           tar -C dist -czf "dist/${name}.tar.gz" "$name"
           rm -rf "$stage"
         done
@@ -236,7 +236,7 @@ tasks:
           stage="dist/${name}"
           mkdir -p "$stage"
           cp "bin/serenebach-${target}.exe" "${stage}/serenebach.exe"
-          cp README.md README.ja.md LICENSE "$stage/"
+          cp README.md README.ja.md LICENSE internal/og/assets/NotoSansJP-LICENSE.txt "$stage/"
           (cd dist && zip -qr "${name}.zip" "$name")
           rm -rf "$stage"
         done

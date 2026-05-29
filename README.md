@@ -113,3 +113,7 @@ CI runs the same checks on every push and pull request:
 ## License
 
 [MIT](LICENSE). See the file for the full text.
+
+### Third-party assets
+
+The Open Graph card renderer embeds **Noto Sans JP** (Medium) — © 2014, 2015 Adobe Systems Incorporated, with Reserved Font Name "Source" — redistributed unmodified under the [SIL Open Font License 1.1](internal/og/assets/NotoSansJP-LICENSE.txt). Noto Sans JP is built from Adobe's Source Han Sans; "Noto" is a trademark of Google Inc. The license text ships next to the font and inside every release archive.

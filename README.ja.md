@@ -115,3 +115,7 @@ CI でも push / PR ごとに同じコマンドが走ります:
 ## ライセンス
 
 [MIT](LICENSE)
+
+### サードパーティ素材
+
+OG カード画像のレンダラは **Noto Sans JP**（Medium、© 2014, 2015 Adobe Systems Incorporated、Reserved Font Name "Source"）をバイナリに埋め込んでいます。フォントは無改変で [SIL Open Font License 1.1](internal/og/assets/NotoSansJP-LICENSE.txt) のもとで再配布されます。Noto Sans JP は Adobe の Source Han Sans を基にしており、"Noto" は Google Inc. の商標です。ライセンス全文はフォントの隣と各リリースアーカイブに同梱しています。
