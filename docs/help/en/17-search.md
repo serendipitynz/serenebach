@@ -1,7 +1,7 @@
 ---
 title: Full-text search
 slug: search
-order: 160
+order: 105
 ---
 
 # Full-text search

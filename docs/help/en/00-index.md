@@ -22,12 +22,12 @@ This help focuses on the day-to-day admin operations — writing entries, dialli
 - [Comments and spam controls](comments-spam)
 - [Users and roles](users-roles)
 - [Preview mode](preview)
+- [Full-text search](search)
 - [Static rebuild and publishing](rebuild-publishing)
 - [Publishing and screen settings](settings-publishing)
 - [AI integration and MCP](mcp)
 - [Webhooks (outbound notifications)](webhooks)
 - [Migrating from SB2 / SB3 and feature differences](sb3-migration)
-- [Full-text search](search)
 - [Appendix](appendix)
 
 ## About this help
