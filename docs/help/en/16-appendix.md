@@ -132,10 +132,11 @@ The footer of the admin UI shows the Serene Bach version. Include it in bug repo
 
 ## License
 
-The Go port of Serene Bach is published under the MIT licence. See `LICENSE` in the repository for details.
+The Go port of Serene Bach itself is published under the MIT licence. For details — including the licences of the bundled third-party assets (font, editor) and the Go libraries used — see [License and third-party notices](license).
 
 ## Related pages
 
+- [License and third-party notices](license)
 - [Getting started](getting-started)
 - [Migrating from SB2 / SB3 and feature differences](sb3-migration)
 - [Static rebuild and publishing](rebuild-publishing)

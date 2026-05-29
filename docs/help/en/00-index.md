@@ -29,6 +29,7 @@ This help focuses on the day-to-day admin operations — writing entries, dialli
 - [Webhooks (outbound notifications)](webhooks)
 - [Migrating from SB2 / SB3 and feature differences](sb3-migration)
 - [Appendix](appendix)
+- [License and third-party notices](license)
 
 ## About this help
 
