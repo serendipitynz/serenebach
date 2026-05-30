@@ -97,7 +97,6 @@ Not supported:
 - Trackback-related tags
 - Amazon-affiliate tags
 - Mobile-only output
-- Some "recommended" / "selected entry" style tags
 - Anything that depended on SB3 plugins
 
 After import, the editor flags unsupported or behaviourally different tags so you can adjust them before publishing.

@@ -85,7 +85,7 @@ Anything inside `{...}` is replaced at render time with the actual value.
 | Lists | `latest_entry` | Recent entries list. |
 | Lists | `link` | Blogroll / link list. |
 | Lists | `recent_comment` | Recent comments list. |
-| Lists | `selected_entry` | Selected/recommended entries list. **Always 0 in the Go port.** |
+| Lists | `selected_entry` | Lists the entries the current view is showing (search / archive / category results, or — on a permalink — the entry plus its next/prev neighbours) into `{selected_entry_list}`. Collapses to 0 when there is nothing to show. |
 | Flat pages | `dedicated_page` | Shown only on flat pages. Hidden on regular entry pages and listings. |
 
 ### Pinned entries (`{entry_pinned}` tag and `pinned_entry` block)
@@ -361,12 +361,6 @@ These tags and blocks are either not implemented or behave differently from SB3.
 | `{comment_icon}` | Icon image | Always empty |
 | `{profile_email}` | User email address | Always empty (kept private) |
 | `{sb_comment_js}` | SB3 comment script | Always empty |
-
-### Blocks with different semantics
-
-| Block | SB3 semantics | Go-port semantics |
-|---|---|---|
-| `selected_entry` | Shown when recommended-posts flag is set | Always 0 |
 
 ## CSS template
 
