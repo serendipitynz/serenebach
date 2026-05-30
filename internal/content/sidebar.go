@@ -2,7 +2,8 @@
 // every rendered page alongside the main entry/list area.
 //
 // Each block corresponds to a callback in SB3's sb::Content::List:
-// `archives`, `category`, `recent_comment`, `latest_entry`. The SB3
+// `archives`, `category`, `recent_comment`, `latest_entry`,
+// `selected_entry`. The SB3
 // convention is "a block with count 1 holding a
 // single pre-rendered `<ul>…</ul>` tag"; an empty list collapses the
 // block to count 0 so the markup strips away cleanly.
@@ -63,6 +64,12 @@ type SidebarData struct {
 	RecentComments []repo.RecentApprovedMessage
 	// LatestEntries: N most recent published entries.
 	LatestEntries []domain.Entry
+	// SelectedEntries: the entries currently in context for this view —
+	// the list page's own entries, or (on a permalink) the entry itself
+	// flanked by its next/prev neighbours. Mirrors SB3's
+	// sb::Content::List::_selected. Each view populates it from data it
+	// already holds; an empty slice collapses the block to count 0.
+	SelectedEntries []domain.Entry
 	// Links: the blogroll. Groups + their member links come through in
 	// sort_order; the renderer groups children under their parent.
 	Links []domain.Link
@@ -91,12 +98,7 @@ func applySidebarBlocks(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Template
 	// dead form. Routing the call through applySidebarBlocks means
 	// every existing view (list / entry / page / profile) inherits it.
 	s.ApplySearchForm(c, tmpl)
-	// selected_entry (SB3's "recommended posts") relies on a flag
-	// we haven't modelled yet — strip to 0 so imported templates
-	// don't trip on the raw marker.
-	if tmpl.HasBlock("selected_entry") {
-		c.Block("selected_entry", 0)
-	}
+	applySelectedEntryBlock(s, c, tmpl, data.SelectedEntries)
 }
 
 // applyArchivesBlock mirrors sb::Content::List::_archives. Emits
@@ -398,4 +400,40 @@ func applyLatestEntryBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Templ
 	c.Num(0)
 	c.TagHTML("latest_entry_list", b.String())
 	c.Block("latest_entry", 1)
+}
+
+// applySelectedEntryBlock mirrors sb::Content::List::_selected. Unlike
+// the other sidebar blocks it doesn't pull a dedicated query — it
+// re-lists the entries the current view is already showing (search /
+// archive / category results, or a permalink's entry flanked by its
+// next/prev neighbours). The caller threads those entries in via
+// SidebarData.SelectedEntries. The rendered shape matches
+// {latest_entry_list}: `<ul><li><a href="...">Title</a>Date</li>…`,
+// with Date following the SB3 `conf_dateinlist` (DateFormatList)
+// pattern.
+func applySelectedEntryBlock(s Site, c *sbtemplate.Context, tmpl *sbtemplate.Template, entries []domain.Entry) {
+	if !tmpl.HasBlock("selected_entry") {
+		return
+	}
+	if len(entries) == 0 {
+		c.Block("selected_entry", 0)
+		return
+	}
+	var b strings.Builder
+	b.WriteString("<ul>")
+	for _, e := range entries {
+		url := s.EntryPermalink(e)
+		date := s.FormatListDate(e.PostedAt)
+		b.WriteString(`<li><a href="`)
+		b.WriteString(html.EscapeString(url))
+		b.WriteString(`">`)
+		b.WriteString(html.EscapeString(e.Title))
+		b.WriteString(`</a>`)
+		b.WriteString(html.EscapeString(date))
+		b.WriteString(`</li>`)
+	}
+	b.WriteString("</ul>")
+	c.Num(0)
+	c.TagHTML("selected_entry_list", b.String())
+	c.Block("selected_entry", 1)
 }
