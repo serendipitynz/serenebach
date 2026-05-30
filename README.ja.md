@@ -115,3 +115,9 @@ CI でも push / PR ごとに同じコマンドが走ります:
 ## ライセンス
 
 [MIT](LICENSE)
+
+### サードパーティ素材
+
+OG カード画像のレンダラは **Noto Sans JP**（Medium、© 2014, 2015 Adobe Systems Incorporated、Reserved Font Name "Source"）をバイナリに埋め込んでいます。フォントは無改変で [SIL Open Font License 1.1](internal/og/assets/NotoSansJP-LICENSE.txt) のもとで再配布されます。Noto Sans JP は Adobe の Source Han Sans を基にしており、"Noto" は Google Inc. の商標です。ライセンス全文はフォントの隣と各リリースアーカイブに同梱しています。
+
+管理画面は **Ace** エディタ（`ajaxorg/ace`、© 2010 Ajax.org B.V.、[BSD 3-Clause](web/templates/admin/assets/ace/LICENSE)）をバイナリに同梱しています。Ace および **バイナリにコンパイルされる全 Go モジュール**（`go list -deps ./cmd/serenebach` に出る直接・間接依存すべて）の著作権表示とライセンス全文は [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) にまとめ、各リリースアーカイブに同梱しています。バイナリの依存が変わったらモジュールキャッシュから再生成してください。

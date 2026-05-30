@@ -132,10 +132,11 @@ CGI として動かしている場合は、Web サーバのエラーログを確
 
 ## ライセンス
 
-Go 版 Serene Bach は MIT ライセンスで公開されています。詳しくはリポジトリの `LICENSE` を参照してください。
+Go 版 Serene Bach 本体は MIT ライセンスで公開されています。同梱しているサードパーティ素材（フォント・エディター）や使用している Go ライブラリのライセンスを含む詳細は [ライセンスと third-party 表記](license) を参照してください。
 
 ## 関連ページ
 
+- [ライセンスと third-party 表記](license)
 - [はじめに](getting-started)
 - [SB2 / SB3 からの移行と機能差異](sb3-migration)
 - [静的再構築と配信](rebuild-publishing)

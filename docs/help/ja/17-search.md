@@ -1,7 +1,7 @@
 ---
 title: 全文検索
 slug: search
-order: 160
+order: 105
 ---
 
 # 全文検索
