@@ -37,7 +37,7 @@ BSD 3-Clause requires the copyright notice, conditions, and disclaimer to accomp
 
 ## Main Go libraries used in the build
 
-The direct dependencies from `go.mod`. Because they are statically linked into the binary, each one's copyright notice and full license text is collected in `THIRD-PARTY-NOTICES.txt`, shipped with the distribution.
+The table below is a highlight of the main libraries (the direct `go.mod` dependencies). The copyright notices and full license texts for these and **every module compiled into the binary, indirect dependencies included**, are collected in `THIRD-PARTY-NOTICES.txt`, shipped with the distribution. That file is generated from the modules in the `go list -deps ./cmd/serenebach` import graph.
 
 | Library | Purpose | License |
 |---|---|---|
@@ -50,7 +50,7 @@ The direct dependencies from `go.mod`. Because they are statically linked into t
 | `golang.org/x/text` | Character-encoding handling | BSD 3-Clause |
 | `gopkg.in/yaml.v3` | YAML parsing | MIT / Apache-2.0 |
 
-For the complete dependency list, including indirect dependencies, see `go.mod` / `go.sum`.
+For the full license texts of every module in the binary see `THIRD-PARTY-NOTICES.txt`; for dependency versions see `go.mod` / `go.sum`.
 
 ## Related pages
 

@@ -120,4 +120,4 @@ CI でも push / PR ごとに同じコマンドが走ります:
 
 OG カード画像のレンダラは **Noto Sans JP**（Medium、© 2014, 2015 Adobe Systems Incorporated、Reserved Font Name "Source"）をバイナリに埋め込んでいます。フォントは無改変で [SIL Open Font License 1.1](internal/og/assets/NotoSansJP-LICENSE.txt) のもとで再配布されます。Noto Sans JP は Adobe の Source Han Sans を基にしており、"Noto" は Google Inc. の商標です。ライセンス全文はフォントの隣と各リリースアーカイブに同梱しています。
 
-管理画面は **Ace** エディタ（`ajaxorg/ace`、© 2010 Ajax.org B.V.、[BSD 3-Clause](web/templates/admin/assets/ace/LICENSE)）をバイナリに同梱しています。Ace および直接 Go 依存（chi, goose, goldmark, modernc.org/sqlite, golang.org/x/{crypto,image,text}, yaml.v3）の著作権表示とライセンス全文は [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) にまとめ、各リリースアーカイブに同梱しています。`go.mod` の直接依存が変わったらモジュールキャッシュから更新してください。
+管理画面は **Ace** エディタ（`ajaxorg/ace`、© 2010 Ajax.org B.V.、[BSD 3-Clause](web/templates/admin/assets/ace/LICENSE)）をバイナリに同梱しています。Ace および **バイナリにコンパイルされる全 Go モジュール**（`go list -deps ./cmd/serenebach` に出る直接・間接依存すべて）の著作権表示とライセンス全文は [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) にまとめ、各リリースアーカイブに同梱しています。バイナリの依存が変わったらモジュールキャッシュから再生成してください。
