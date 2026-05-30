@@ -8,7 +8,7 @@ order: 210
 
 The Go port of Serene Bach itself is published under the **MIT License**. See `LICENSE` in the repository for the full text.
 
-This page summarises the third-party assets distributed inside the Serene Bach binary, along with the main Go libraries used to build it.
+This page summarises the third-party assets distributed inside the Serene Bach binary, along with the main Go libraries used to build it. The copyright notices and full license texts (conditions and disclaimers included) are collected in `THIRD-PARTY-NOTICES.txt`, bundled at the root of each release archive. Only the bundled font's OFL text ships separately, as `NotoSansJP-LICENSE.txt`.
 
 ## Bundled third-party assets
 
@@ -29,12 +29,15 @@ In line with OFL 1.1, the font's copyright notice and full licence text are ship
 
 The code editor used for templates and entry bodies (`ajaxorg/ace`).
 
-- License: BSD 3-Clause License
+- License: BSD 3-Clause License (`Copyright (c) 2010, Ajax.org B.V.`)
+- Full text: `web/templates/admin/assets/ace/LICENSE` (next to the asset, embedded in the binary) and `THIRD-PARTY-NOTICES.txt` in the distribution
 - Location: `web/templates/admin/assets/ace/` (embedded in the binary)
+
+BSD 3-Clause requires the copyright notice, conditions, and disclaimer to accompany binary distributions, so the full license text is shipped with the distribution as above.
 
 ## Main Go libraries used in the build
 
-The direct dependencies from `go.mod`. The full text of each licence is included with the respective module in the module cache fetched by `go mod download`.
+The direct dependencies from `go.mod`. Because they are statically linked into the binary, each one's copyright notice and full license text is collected in `THIRD-PARTY-NOTICES.txt`, shipped with the distribution.
 
 | Library | Purpose | License |
 |---|---|---|
