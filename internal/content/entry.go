@@ -95,6 +95,11 @@ func (v EntryView) Render() (string, error) {
 	v.applyComments(c, tmpl)
 
 	applyProfileBlock(v.Site, c, tmpl, v.ProfileUsers)
+	// {selected_entry_list} on a permalink lists the entry itself
+	// flanked by its neighbours. SB3 _selected unshifts the "next"
+	// (newer) entry and pushes the "prev" (older) one, yielding
+	// newest→oldest: [next, current, prev].
+	v.Sidebar.SelectedEntries = v.selectedEntries()
 	applySidebarBlocks(v.Site, c, tmpl, v.Sidebar)
 	stripUnusedEntryBlocks(c, tmpl)
 
@@ -268,6 +273,22 @@ func applyAdjacentEntryTags(c *sbtemplate.Context, side string, site Site, targe
 	}
 	c.Tag(side+"_permalink", site.EntryPermalink(*target))
 	c.Tag(side+"_title", target.Title)
+}
+
+// selectedEntries returns the entry plus its neighbours in SB3
+// _selected order: the newer ("next") entry first, the entry itself,
+// then the older ("prev") entry. Edge entries (nil neighbours) drop
+// out so the list never carries a phantom row.
+func (v EntryView) selectedEntries() []domain.Entry {
+	out := make([]domain.Entry, 0, 3)
+	if v.Next != nil {
+		out = append(out, *v.Next)
+	}
+	out = append(out, v.Entry)
+	if v.Prev != nil {
+		out = append(out, *v.Prev)
+	}
+	return out
 }
 
 // stripUnusedEntryBlocks zeros out the blocks that never fire on a

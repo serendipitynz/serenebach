@@ -94,6 +94,10 @@ func (v SearchView) Render() (string, error) {
 	}
 
 	applyProfileBlock(v.Site, c, tmpl, v.ProfileUsers)
+	// {selected_entry_list} on the search page lists the current hit
+	// set — SB3 _selected's headline use case. Guidance mode (no
+	// query) leaves Results empty, collapsing the block to 0.
+	v.Sidebar.SelectedEntries = v.Results
 	applySidebarBlocks(v.Site, c, tmpl, v.Sidebar)
 	applyPageBlock(c, tmpl, v.Pagination)
 

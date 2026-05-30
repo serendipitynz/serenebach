@@ -100,10 +100,7 @@ var unsupportedBlocks = map[string]string{
 	"mobile_trackback_area": "mobile mode was dropped in the Go port",
 }
 
-var differsBlocks = map[string]string{
-	"selected_entry":      "always 0 — recommended-posts flag isn't modelled yet",
-	"selected_entry_list": "always 0 — recommended-posts flag isn't modelled yet",
-}
+var differsBlocks = map[string]string{}
 
 // nativeTags / nativeBlocks document the names introduced by the Go
 // rewrite that have no SB3 counterpart. They are NOT flagged by the

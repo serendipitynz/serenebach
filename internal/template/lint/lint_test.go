@@ -65,15 +65,16 @@ func TestAnalyzeIgnoresUnknownTags(t *testing.T) {
 	}
 }
 
-func TestAnalyzeFlagsSelectedEntryBlockAsDiffers(t *testing.T) {
-	tmpl := parseOrFatal(t, "<!-- BEGIN selected_entry -->\nx\n<!-- END selected_entry -->\n")
+// selected_entry / {selected_entry_list} are now implemented (SB3
+// _selected parity), so the linter must NOT flag them anymore.
+func TestAnalyzeDoesNotFlagSelectedEntry(t *testing.T) {
+	tmpl := parseOrFatal(t, "<!-- BEGIN selected_entry -->\n{selected_entry_list}\n<!-- END selected_entry -->\n")
 	findings := Analyze(tmpl)
-	f, ok := findFinding(findings, KindBlock, "selected_entry")
-	if !ok {
-		t.Fatalf("expected selected_entry finding, got %+v", findings)
+	if _, ok := findFinding(findings, KindBlock, "selected_entry"); ok {
+		t.Errorf("selected_entry should no longer be flagged, got %+v", findings)
 	}
-	if f.Severity != SevDiffers {
-		t.Errorf("expected differs, got %s", f.Severity)
+	if _, ok := findFinding(findings, KindTag, "selected_entry_list"); ok {
+		t.Errorf("selected_entry_list should no longer be flagged, got %+v", findings)
 	}
 }
 

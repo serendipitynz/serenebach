@@ -132,6 +132,84 @@ func TestApplyLatestEntryBlockHonoursDateFormatList(t *testing.T) {
 	}
 }
 
+// TestApplySelectedEntryBlockSB3Shape pins the SB3 _selected output
+// shape — identical to {latest_entry_list} but driven by the entries
+// the current view is already showing rather than a dedicated query.
+func TestApplySelectedEntryBlockSB3Shape(t *testing.T) {
+	t.Parallel()
+
+	tmpl, err := sbtemplate.Parse(
+		"<!-- BEGIN selected_entry -->\n<section>{selected_entry_list}</section>\n<!-- END selected_entry -->\n",
+		sbtemplate.NoCallback,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := tmpl.New()
+	site := NewSite(domain.Weblog{ID: 1, BaseURL: "https://example.com/", Lang: "ja"}).WithTZ(time.UTC)
+	entries := []domain.Entry{
+		{ID: 42, Title: "Hello", PostedAt: time.Date(2026, 4, 19, 10, 0, 0, 0, time.UTC), Status: domain.EntryPublished},
+		{ID: 7, Title: "World", PostedAt: time.Date(2026, 4, 18, 9, 0, 0, 0, time.UTC), Status: domain.EntryPublished},
+	}
+	applySelectedEntryBlock(site, c, tmpl, entries)
+	out := c.Render()
+	want := `<section><ul>` +
+		`<li><a href="https://example.com/entry/42/">Hello</a> (04/19)</li>` +
+		`<li><a href="https://example.com/entry/7/">World</a> (04/18)</li>` +
+		`</ul></section>`
+	if !strings.Contains(out, want) {
+		t.Errorf("selected_entry_list shape mismatch\nwant substring: %s\ngot: %s", want, out)
+	}
+}
+
+// TestApplySelectedEntryBlockEmptyCollapses confirms an empty context
+// strips the block to count 0 (no leaking {selected_entry_list}).
+func TestApplySelectedEntryBlockEmptyCollapses(t *testing.T) {
+	t.Parallel()
+
+	tmpl, err := sbtemplate.Parse(
+		"before\n<!-- BEGIN selected_entry -->\n{selected_entry_list}\n<!-- END selected_entry -->\nafter\n",
+		sbtemplate.NoCallback,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := tmpl.New()
+	site := NewSite(domain.Weblog{ID: 1, BaseURL: "https://example.com/", Lang: "ja"}).WithTZ(time.UTC)
+	applySelectedEntryBlock(site, c, tmpl, nil)
+	out := c.Render()
+	if strings.Contains(out, "selected_entry_list") || strings.Contains(out, "<ul>") {
+		t.Errorf("empty selected_entry should collapse, got: %s", out)
+	}
+}
+
+// TestEntryViewSelectedEntriesOrder pins the permalink ordering: the
+// "next" (newer) neighbour first, the entry itself, then the "prev"
+// (older) neighbour — matching SB3 _selected's unshift/push.
+func TestEntryViewSelectedEntriesOrder(t *testing.T) {
+	t.Parallel()
+
+	cur := domain.Entry{ID: 5, Title: "current"}
+	prev := domain.Entry{ID: 4, Title: "older"}
+	next := domain.Entry{ID: 6, Title: "newer"}
+
+	got := EntryView{Entry: cur, Prev: &prev, Next: &next}.selectedEntries()
+	want := []int64{6, 5, 4}
+	if len(got) != len(want) {
+		t.Fatalf("len = %d, want %d (%+v)", len(got), len(want), got)
+	}
+	for i, id := range want {
+		if got[i].ID != id {
+			t.Errorf("selectedEntries[%d].ID = %d, want %d", i, got[i].ID, id)
+		}
+	}
+
+	// Edge entry: no neighbours → just the entry itself.
+	if got := (EntryView{Entry: cur}).selectedEntries(); len(got) != 1 || got[0].ID != 5 {
+		t.Errorf("edge entry should yield [5], got %+v", got)
+	}
+}
+
 // TestApplyRecentCommentBlockSB3Shape pins the SB3 _comment shape:
 // `<li>EntryTitle<br />=&gt; <a href="...">AuthorDate</a></li>`.
 // The literal "=&gt;" matches SB3's fallback when no lang resource

@@ -80,6 +80,10 @@ func (v ListView) Render() (string, error) {
 	c.Block("entry", len(v.Entries))
 
 	applyProfileBlock(v.Site, c, tmpl, v.ProfileUsers)
+	// {selected_entry_list} re-lists the entries this view is already
+	// showing (search / archive / category results). Mirrors SB3
+	// _selected, which feeds its own $var{'entry'} array straight in.
+	v.Sidebar.SelectedEntries = v.Entries
 	applySidebarBlocks(v.Site, c, tmpl, v.Sidebar)
 	applyPageBlock(c, tmpl, v.Pagination)
 	stripUnusedListBlocks(c, tmpl)

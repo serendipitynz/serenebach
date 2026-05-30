@@ -89,10 +89,10 @@ The engine carries a compatibility layer so imported SB3 templates render withou
 - **`{subcategory_list}`** emits the nested `<ul>` tree it did in SB3 (the early Go port left it empty).
 - **`{site_rsd}`** resolves to `/rsd.xml` — the discovery XML is served, though the advertised XML-RPC API is not implemented.
 - **sbtext formatter** — format values `sbtext` / `1` / `2` expand the minimal SB3 subset (paragraphs, URL autolink, `''strong''` / `'''italic'''`, `[label|URL]` bracket links).
-- **Template lint** — imports surface warnings for unsupported tags / blocks (`trackback_*`, `amazon_*`, `comment_iconform`, `selected_entry`, …) in `Report.Warnings` and on the editor's status panel.
+- **Template lint** — imports surface warnings for unsupported tags / blocks (`trackback_*`, `amazon_*`, `comment_iconform`, …) in `Report.Warnings` and on the editor's status panel.
 - **`{user_name}` breaking change** — it now returns the **login name** (SB3 semantics). Use `{user_disp_name}` for the display name. `{user_login}` is an alias of `{user_name}`.
 
-Intentionally unsupported (flagged by lint, not implemented): `{site_mobile}`, `{comment_icon}` / `comment_iconform`, `selected_entry` / `selected_entry_list`, the trackback family, amazon-affiliate tags.
+Intentionally unsupported (flagged by lint, not implemented): `{site_mobile}`, `{comment_icon}` / `comment_iconform`, the trackback family, amazon-affiliate tags.
 
 ## Reactions: likes + stamps
 
