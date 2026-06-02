@@ -663,6 +663,41 @@ input[type="reset"]:hover {
 	color: var(--accent);
 }
 
+/* search form in sidebar */
+.navigation dl.search dd form {
+	display: flex;
+	gap: 0.5rem;
+}
+.navigation dl.search dd input[type="search"] {
+	flex: 1;
+	padding: 0.4rem 0.75rem;
+	font-family: inherit;
+	font-size: 0.9375rem;
+	line-height: 1.5;
+	color: var(--text);
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.navigation dl.search dd input[type="search"]:focus {
+	outline: none;
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.navigation dl.search dd button {
+	padding: 0.4rem 0.75rem;
+	font-family: inherit;
+	font-size: 0.9375rem;
+	line-height: 1.5;
+	color: var(--text-soft);
+	background: var(--accent-soft);
+	border: 1px solid transparent;
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+	transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.1s ease;
+}
+
 /* extra (RSS / Powered-by) */
 .navigation dl.extra {
 	background: transparent;

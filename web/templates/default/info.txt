@@ -1,7 +1,7 @@
 Name: default
 Author: takkyun
 Address: http://go.serenebach.net/
-Version: 0.01
+Version: 0.02
 =====
 
 A default template for Serene Bach v4

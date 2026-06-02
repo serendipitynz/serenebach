@@ -34,6 +34,18 @@
 </header>
 <div class="body">
 <div class="contents">
+<!-- BEGIN search_results -->
+<article class="entry">
+<h2>Search results for "{search_query}"</h2>
+<p>{search_total} results found.</p>
+</article>
+<!-- END search_results -->
+<!-- BEGIN search_empty -->
+<article class="entry">
+<h2>Search results for "{search_query}"</h2>
+<p>No results found.</p>
+</article>
+<!-- END search_empty -->
 <!-- BEGIN entry -->
 <article class="entry">
 <!-- BEGIN sequel -->
@@ -130,6 +142,17 @@
 <dd id="profilelist">{user_list}</dd>
 </dl>
 <!-- END profile -->
+<!-- BEGIN search_form -->
+<dl class="search">
+<dt id="searchname">Search</dt>
+<dd id="searchform">
+<form action="{search_url}" method="get" role="search">
+  <input type="search" name="q" value="{search_query}" placeholder="Search...">
+  <button type="submit">Search</button>
+</form>
+</dd>
+</dl>
+<!-- END search_form -->
 <dl class="extra">
 <dt id="extraname">Other</dt>
 <dd id="extralist">
