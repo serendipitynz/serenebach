@@ -26,7 +26,7 @@ Serene Bach では、1 セットのテンプレートとして次のものを使
 <img src="{site_parts}logo.png" alt="">
 ```
 
-`.js` / `.woff` / `.woff2` / `.ttf` / `.otf` もアップロードして `{site_parts}` から参照できます。
+アップロードできるのは画像（`.png` / `.jpg` / `.jpeg` / `.gif` / `.webp` / `.svg`）、CSS・JavaScript・テキスト（`.css` / `.js` / `.txt`）、Web フォント（`.woff` / `.woff2` / `.ttf` / `.otf`）です。いずれも `{site_parts}` から参照できます。
 
 ## HTML テンプレート構造
 
