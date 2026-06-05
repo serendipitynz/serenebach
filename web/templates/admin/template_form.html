@@ -98,7 +98,7 @@
       <tbody>
       {{range .Assets}}
         <tr>
-          <td><button type="button" class="link" data-asset-preview data-asset-url="{{Root}}/template/{{$.Template.ID}}/{{.Filename}}" data-asset-name="{{.Filename}}" title="{{T `templates.form.assets.previewTitle`}}">{{.Filename}}</button></td>
+          <td><button type="button" class="link" data-asset-preview data-asset-base="{{Root}}/template/{{$.Template.ID}}/" data-asset-name="{{.Filename}}" title="{{T `templates.form.assets.previewTitle`}}">{{.Filename}}</button></td>
           <td>{{.MimeType}}</td>
           <td class="num">{{.SizeBytes}}</td>
           <td>{{fmtDate .CreatedAt}}</td>

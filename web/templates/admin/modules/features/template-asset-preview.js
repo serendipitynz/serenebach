@@ -29,13 +29,14 @@ export function initTemplateAssetPreview() {
   document.querySelectorAll('[data-asset-preview]').forEach(function (trigger) {
     trigger.addEventListener('click', function (e) {
       e.preventDefault();
-      var url = trigger.getAttribute('data-asset-url') || '';
+      var base = trigger.getAttribute('data-asset-base') || '';
       var name = trigger.getAttribute('data-asset-name') || '';
-      if (!url) return;
-      // The data attribute carries the raw (unencoded) filename, so a
-      // name with spaces would break fetch(). encodeURI fixes those
-      // without touching the path separators.
-      openPreview(kindForName(name), encodeURI(url), name);
+      if (!base || !name) return;
+      // Build the URL from the raw filename with encodeURIComponent: a
+      // name containing #, ?, &, or spaces must be escaped per-segment,
+      // otherwise the browser would read it as a fragment/query and
+      // request the wrong (or truncated) path.
+      openPreview(kindForName(name), base + encodeURIComponent(name), name);
     });
   });
 }
