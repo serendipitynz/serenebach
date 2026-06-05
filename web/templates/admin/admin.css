@@ -1969,6 +1969,23 @@ table.sortable tbody tr.drop-below td {
   color: var(--text-muted);
 }
 
+/* Text/code preview for template assets (.css / .js / .txt). Fetched
+   content is shown verbatim in a monospace, scrollable block so long
+   lines and tall files stay inside the modal. */
+.modal-text-preview {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: pre;
+  overflow: auto;
+  max-height: 70vh;
+}
+.modal-text-preview.modal-text-error { color: var(--danger); }
+
 /* Plain two-column definition list used in content modals (comment
    details, template info) so labels and values align cleanly. */
 dl.kv {
