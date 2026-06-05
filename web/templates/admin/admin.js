@@ -16,6 +16,7 @@ import { initDateFormatPreview } from './modules/features/date-format-preview.js
 import { initDropToInput } from './modules/features/drop-to-input.js';
 import { initUploadForms } from './modules/features/uploads.js';
 import { initImageLibrary } from './modules/features/image-library.js';
+import { initTemplateAssetPreview } from './modules/features/template-asset-preview.js';
 import { initImagePicker } from './modules/features/image-picker.js';
 import { initAceEditors, setAIButtonCallback } from './modules/features/ace-editor.js';
 import { runAceAI, initAISuggestButtons, initAITestButton } from './modules/features/ai-assist.js';
@@ -32,6 +33,7 @@ initDateFormatPreview();
 initDropToInput();
 initUploadForms();
 initImageLibrary();
+initTemplateAssetPreview();
 initHintTooltips();
 
 const ace = initAceEditors();

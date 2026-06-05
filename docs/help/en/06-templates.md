@@ -26,7 +26,7 @@ Template assets such as images can be uploaded and referenced with `{site_parts}
 <img src="{site_parts}logo.png" alt="">
 ```
 
-`.js` / `.woff` / `.woff2` / `.ttf` / `.otf` files can also be uploaded and referenced from `{site_parts}`.
+You can upload images (`.png` / `.jpg` / `.jpeg` / `.gif` / `.webp` / `.svg`), CSS / JavaScript / text files (`.css` / `.js` / `.txt`), and web fonts (`.woff` / `.woff2` / `.ttf` / `.otf`). All of them are referenced with `{site_parts}`.
 
 ## HTML template syntax
 
