@@ -69,12 +69,13 @@ Commenters can opt into a prefill cookie via the `次回のために…記憶す
 
 ## Templates and design settings
 
-Templates are edited in the browser at `/admin/templates`. The sidebar entry is labelled **デザイン** (the URL stayed `templates` for compatibility — it's now an umbrella for template-related design settings rather than just a template list). The page has multiple tabs:
+Templates are edited in the browser at `/admin/templates`. The sidebar entry is labelled **デザイン** (the URL stayed `templates` for compatibility — it's now an umbrella for template-related design settings rather than just a template list). This is distinct from the **テンプレート編集** sidebar shortcut (`/admin/templates/active/edit`), which jumps straight into editing the currently-active template. Importing or otherwise creating a template happens here, under **デザイン**, not from that shortcut. The page has these tabs (left to right):
 
-- **Templates** — every template row with activate / delete / export / reorder (drag the ≡ handle). Deleting the currently-active template is refused so the public site always has something to render.
+- **Templates** — every template row with activate / delete / export / reorder (drag the ≡ handle). Deleting the currently-active template is refused so the public site always has something to render. New templates are created either by **Import** (below) or by **Save as** on an existing template; there is no blank-template button.
 - **Settings** — pin a template per route family. Archive (year / month / category / tag) pages use the archive pin when set; profile pages use the profile pin when set; everything else stays on the active template.
-- **OG card** — the blog-wide default OG card background and text colour. Per-entry overrides on the entry editor take precedence.
 - **Import** — upload an SB3 `template.txt` (multipart/mixed bundle with base.html / style.css / optional entry.html / binary assets). Each imported asset lands under `SB_TEMPLATE_DIR/<new_id>/`.
+- **OG card** — the blog-wide default OG card background and text colour. Per-entry overrides on the entry editor take precedence.
+- **Custom Tags** — CRUD for user-defined `{custom_*}` tags (name → value), expanded wherever the tag appears in a template.
 
 Per-template assets (logos, background images, CSS, JavaScript, web fonts, etc.) upload to the same editor via drag-and-drop. They are served read-only at `/template/<template_id>/<filename>`, and the sbtemplate tag `{site_parts}` resolves to that prefix for the currently-rendered template so HTML / CSS can reference them as `{site_parts}logo.png`.
 
