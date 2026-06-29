@@ -24,8 +24,8 @@ The conversational language an agent uses with the user is a per-user preference
 
 - **No CGO** — `CGO_ENABLED=0` is required. Pure Go SQLite (`modernc.org/sqlite`) is chosen specifically to keep cross-compilation and CGI execution on shared hosting (e.g. Sakura Internet) working.
 - **Single Linux binary + SQLite + FTP-able** — the silhouette is core to the positioning. Do not introduce dependencies that break it.
-- **No Tailwind CSS** — hard ban (owner's personal policy). Not even "just for some quick styling". Use SCSS or vanilla CSS. `web/static/admin.css` follows "one stylesheet, no build step".
-- **No `.pm`-style dynamic plugins** — extension is handled through other mechanisms (outbound webhooks / sbtemplate tags / shell hooks / wazero).
+- **No Tailwind CSS** — hard ban (owner's personal policy). Not even "just for some quick styling". Use SCSS or vanilla CSS. `web/templates/admin/admin.css` follows "one stylesheet, no build step".
+- **No `.pm`-style dynamic plugins** — extension is handled through other mechanisms (outbound webhooks / sbtemplate tags).
 - **Trackback is permanently out of scope** — keep a "0-stripe" placeholder for SB3 template compatibility, but never implement the feature. It is a spam vector with no upside.
 - **Always confirm with the user before adding a new production dependency.** Build-time tools (`go-task`, `goose`) are a separate bucket but should still not grow casually.
 
@@ -48,15 +48,16 @@ The conversational language an agent uses with the user is a per-user preference
 ## Common commands
 
 ```bash
-task dev               # Run locally on :8080 (./data/dev.db)
-task seed              # Seed an admin user (admin / changeme)
-task migrate           # Auto-applied at startup, but can be run manually
-task import -- <path>  # Import from SB2 / SB3 sources
-task build-site        # Static rebuild → ./data/public
-task test              # go test ./...
-task build             # Native build to bin/serenebach
-task build-all         # Cross-compile to 8 targets
-task release           # Create a GitHub draft release
+task dev                  # Run locally on :8080 (./data/dev.db)
+task seed                 # Seed an admin user (admin / changeme)
+task migrate              # Auto-applied at startup, but can be run manually
+task import -- <path>     # Import from SB2 / SB3 sources
+task import-md -- <path>  # Import from a directory of markdown files
+task build-site           # Static rebuild → ./data/public
+task test                 # go test ./...
+task build                # Native build to bin/serenebach
+task build-all            # Cross-compile to 8 targets
+task release              # Create a GitHub draft release
 ```
 
 ## Conventions
@@ -143,8 +144,9 @@ Read [docs/architecture.md](docs/architecture.md) before starting any new phase 
 | Architecture (CSRF / anti-spam / OG / MCP / AI / …)    | [docs/architecture.md](docs/architecture.md) — **must read** |
 | Public + admin URL reference                           | [docs/url-map.md](docs/url-map.md)               |
 | Environment variables, flags, `task` commands          | [docs/configuration.md](docs/configuration.md)   |
-| Deploy modes (HTTP / CGI / static rebuild)             | [docs/deployment.md](docs/deployment.md)         |
+| Deploy modes (HTTP / CGI / static rebuild / Docker)    | [docs/deployment.md](docs/deployment.md)         |
 | SB2 / SB3 migration                                    | [docs/importing-legacy-sb.md](docs/importing-legacy-sb.md) |
+| Markdown directory import                              | [docs/importing-markdown.md](docs/importing-markdown.md) |
 | End-user help (also served at `/admin/help`)           | [docs/help/](docs/help/)                         |
 
 ## Project status
