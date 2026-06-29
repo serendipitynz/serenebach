@@ -242,21 +242,9 @@ func (s *Server) toolUploadImage(ctx context.Context, raw json.RawMessage) (stri
 		return "", errors.New("decoded image is empty")
 	}
 
-	mime := strings.TrimSpace(args.MimeType)
-	if mime == "" {
-		// http.DetectContentType returns values like "image/jpeg; charset=..."
-		// — split off the parameters before the whitelist check.
-		sniffed := http.DetectContentType(decoded)
-		if i := strings.IndexByte(sniffed, ';'); i >= 0 {
-			sniffed = sniffed[:i]
-		}
-		mime = strings.TrimSpace(sniffed)
-	}
-	if !images.AllowedMIMEs[mime] {
-		return "", fmt.Errorf("unsupported mime %q (accepted: image/jpeg, image/png, image/gif, image/webp)", mime)
-	}
-	if images.KindFor(mime) != domain.KindImage {
-		return "", fmt.Errorf("upload_image accepts only image MIMEs (jpeg, png, gif, webp); got %q", mime)
+	mime, err := resolveUploadMIME(args.MimeType, decoded)
+	if err != nil {
+		return "", err
 	}
 
 	filename := strings.TrimSpace(args.Filename)
@@ -311,6 +299,30 @@ func (s *Server) toolUploadImage(ctx context.Context, raw json.RawMessage) (stri
 		resp["thumb_url"] = "/img/" + stored.ThumbPath
 	}
 	return jsonResponse(resp)
+}
+
+// resolveUploadMIME determines the MIME for an upload_image call: the
+// caller-supplied value when present, otherwise sniffed from the decoded
+// bytes. It rejects anything outside the image whitelist so the tool
+// handler stays linear.
+func resolveUploadMIME(declared string, decoded []byte) (string, error) {
+	mime := strings.TrimSpace(declared)
+	if mime == "" {
+		// http.DetectContentType returns values like "image/jpeg; charset=..."
+		// — split off the parameters before the whitelist check.
+		sniffed := http.DetectContentType(decoded)
+		if i := strings.IndexByte(sniffed, ';'); i >= 0 {
+			sniffed = sniffed[:i]
+		}
+		mime = strings.TrimSpace(sniffed)
+	}
+	if !images.AllowedMIMEs[mime] {
+		return "", fmt.Errorf("unsupported mime %q (accepted: image/jpeg, image/png, image/gif, image/webp)", mime)
+	}
+	if images.KindFor(mime) != domain.KindImage {
+		return "", fmt.Errorf("upload_image accepts only image MIMEs (jpeg, png, gif, webp); got %q", mime)
+	}
+	return mime, nil
 }
 
 // decodeBase64Flexible tolerates padded + raw base64 variants since MCP
