@@ -32,6 +32,17 @@ jobs:
         with:
           version: v2.12.2
 
+      # golangci-lint honours //nolint:gocyclo, but the raw gocyclo that
+      # goreportcard runs ignores it — a suppressed function keeps CI
+      # green while silently dropping the goreportcard score. Ban the
+      # directive so that divergence can never reach main.
+      - name: ban //nolint:gocyclo
+        run: |
+          if git grep -nE 'nolint:.*gocyclo' -- '*.go'; then
+            echo '::error::`//nolint:gocyclo` is banned (goreportcard ignores it). Refactor the function to complexity <=15 instead.'
+            exit 1
+          fi
+
       - name: go build
         run: go build ./...
 
