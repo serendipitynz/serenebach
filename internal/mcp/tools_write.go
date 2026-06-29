@@ -218,8 +218,6 @@ type uploadImageArgs struct {
 // uses. Decoding loosely: stdlib base64 variants all land through
 // RawStdEncoding / StdEncoding — try StdEncoding first and fall back so
 // callers that strip padding still work.
-//
-//nolint:gocyclo
 func (s *Server) toolUploadImage(ctx context.Context, raw json.RawMessage) (string, error) {
 	if s.ImageStore == nil {
 		return "", errors.New("upload_image: server has no image store configured")

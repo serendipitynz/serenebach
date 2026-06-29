@@ -170,8 +170,6 @@ func (h *Handler) imagesListJSON(w http.ResponseWriter, r *http.Request) {
 // client sets Accept: application/json (the drop-zone fetch does), and
 // otherwise redirects back to the gallery so a progressive-enhancement
 // `<form>` without JS still round-trips cleanly.
-//
-//nolint:gocyclo
 func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 	wantsJSON := acceptsJSON(r)
 
