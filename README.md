@@ -87,7 +87,7 @@ For production, prefer a pinned release tag over `latest`. See [docs/deployment.
 
 CI runs the same checks on every push and pull request:
 
-- `task lint` — runs `golangci-lint` against `.golangci.yml` (covers `staticcheck` plus the project lint set, including `gocyclo` at the goreportcard threshold of 15)
+- `task lint` — runs `golangci-lint` against `.golangci.yml` (covers `staticcheck` plus the project lint set, including `gocyclo` at the goreportcard threshold of 15) and fails on any `//nolint:gocyclo`, which goreportcard's raw gocyclo ignores
 - `task test` — runs `go test ./...`
 
 ## Companion tools

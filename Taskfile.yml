@@ -141,6 +141,15 @@ tasks:
     desc: Run golangci-lint across the module (reads .golangci.yml)
     cmds:
       - golangci-lint run ./...
+      # //nolint:gocyclo is banned. golangci-lint honours the directive,
+      # but the raw gocyclo that goreportcard runs ignores it — so a
+      # suppressed function silently drops the goreportcard score while
+      # `task lint` stays green. Fail instead and refactor to <=15.
+      - |
+        if git grep -nE 'nolint:.*gocyclo' -- '*.go'; then
+          echo 'error: //nolint:gocyclo is banned (goreportcard ignores it). Refactor the function to complexity <=15 instead.' >&2
+          exit 1
+        fi
 
   test:
     desc: Run the Go test suite

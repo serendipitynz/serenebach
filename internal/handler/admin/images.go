@@ -170,8 +170,6 @@ func (h *Handler) imagesListJSON(w http.ResponseWriter, r *http.Request) {
 // client sets Accept: application/json (the drop-zone fetch does), and
 // otherwise redirects back to the gallery so a progressive-enhancement
 // `<form>` without JS still round-trips cleanly.
-//
-//nolint:gocyclo
 func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 	wantsJSON := acceptsJSON(r)
 
@@ -219,9 +217,51 @@ func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	u := session.UserFrom(r.Context())
+	img := imageRowFromUpload(h.wid(), u.ID, kind, mime, stored)
+	id, err := h.Store.CreateImage(r.Context(), img)
+	if err != nil {
+		log.Printf("admin.imagesUpload: db insert: %v", err)
+		// Orphan file — best effort clean up so the disk doesn't grow on a
+		// transient DB hiccup.
+		store.DeleteFiles(stored.StoredPath, stored.ThumbPath)
+		respondUpload(w, wantsJSON, http.StatusInternalServerError, tr(r, "common.error.imageDBSaveFailed"), root(r))
+		return
+	}
+
+	img.ID = id
+	if kind == domain.KindImage {
+		h.dispatchImageUploaded(r.Context(), img, imagesPathPrefix+stored.StoredPath)
+	}
+
+	if wantsJSON {
+		// When the uploader opted into auto-alt and has a usable AI
+		// provider wired up, flag it so the client can immediately
+		// POST /admin/images/{id}/alt and show the "alt 生成中…"
+		// badge. Upload stays fast; the second round-trip handles the
+		// slow part visibly.
+		writeJSON(w, http.StatusCreated, map[string]any{
+			"id":                 id,
+			"filename":           stored.Filename,
+			"url":                root(r) + imagesPathPrefix + stored.StoredPath,
+			"thumb_url":          thumbURL(stored, root(r)),
+			"kind":               kind,
+			"width":              stored.Width,
+			"height":             stored.Height,
+			"size":               stored.SizeBytes,
+			"auto_alt_requested": wantsAutoAlt(u, mime),
+		})
+		return
+	}
+	http.Redirect(w, r, root(r)+"/admin/images?ok=1", http.StatusFound)
+}
+
+// imageRowFromUpload assembles the domain.Image to persist from a stored
+// upload. The Width/Height NullInt64 handling lives here so the DB insert
+// and the post-insert webhook dispatch share one construction path.
+func imageRowFromUpload(wid, uploadedBy int64, kind, mime string, stored *images.Stored) domain.Image {
 	img := domain.Image{
-		WID:        h.wid(),
-		UploadedBy: u.ID,
+		WID:        wid,
+		UploadedBy: uploadedBy,
 		Kind:       kind,
 		Filename:   stored.Filename,
 		StoredPath: stored.StoredPath,
@@ -235,61 +275,14 @@ func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 	if stored.Height > 0 {
 		img.Height = sql.NullInt64{Int64: int64(stored.Height), Valid: true}
 	}
-	id, err := h.Store.CreateImage(r.Context(), img)
-	if err != nil {
-		log.Printf("admin.imagesUpload: db insert: %v", err)
-		// Orphan file — best effort clean up so the disk doesn't grow on a
-		// transient DB hiccup.
-		store.DeleteFiles(stored.StoredPath, stored.ThumbPath)
-		respondUpload(w, wantsJSON, http.StatusInternalServerError, tr(r, "common.error.imageDBSaveFailed"), root(r))
-		return
-	}
+	return img
+}
 
-	uploadedImage := domain.Image{
-		ID:         id,
-		WID:        h.wid(),
-		UploadedBy: u.ID,
-		Kind:       kind,
-		Filename:   stored.Filename,
-		StoredPath: stored.StoredPath,
-		ThumbPath:  stored.ThumbPath,
-		MimeType:   mime,
-		SizeBytes:  stored.SizeBytes,
-	}
-	if stored.Width > 0 {
-		uploadedImage.Width = sql.NullInt64{Int64: int64(stored.Width), Valid: true}
-	}
-	if stored.Height > 0 {
-		uploadedImage.Height = sql.NullInt64{Int64: int64(stored.Height), Valid: true}
-	}
-	if kind == domain.KindImage {
-		h.dispatchImageUploaded(r.Context(), uploadedImage, imagesPathPrefix+stored.StoredPath)
-	}
-
-	if wantsJSON {
-		// When the uploader opted into auto-alt and has a usable AI
-		// provider wired up, flag it so the client can immediately
-		// POST /admin/images/{id}/alt and show the "alt 生成中…"
-		// badge. Upload stays fast; the second round-trip handles the
-		// slow part visibly.
-		autoAlt := false
-		if u != nil && u.AIAutoAlt && u.AIKind != "" && mimeSupportsVision(mime) {
-			autoAlt = true
-		}
-		writeJSON(w, http.StatusCreated, map[string]any{
-			"id":                 id,
-			"filename":           stored.Filename,
-			"url":                root(r) + imagesPathPrefix + stored.StoredPath,
-			"thumb_url":          thumbURL(stored, root(r)),
-			"kind":               kind,
-			"width":              stored.Width,
-			"height":             stored.Height,
-			"size":               stored.SizeBytes,
-			"auto_alt_requested": autoAlt,
-		})
-		return
-	}
-	http.Redirect(w, r, root(r)+"/admin/images?ok=1", http.StatusFound)
+// wantsAutoAlt reports whether an upload should immediately trigger
+// alt-text generation: the uploader opted in, has a provider wired up,
+// and the MIME is one every provider can decode.
+func wantsAutoAlt(u *domain.User, mime string) bool {
+	return u != nil && u.AIAutoAlt && u.AIKind != "" && mimeSupportsVision(mime)
 }
 
 // mimeSupportsVision whitelists the MIME types every provider we
