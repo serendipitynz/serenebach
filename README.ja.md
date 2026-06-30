@@ -89,6 +89,7 @@ CI でも push / PR ごとに同じコマンドが走ります:
 
 - `task lint` — `.golangci.yml` を使って `golangci-lint` を実行 (`staticcheck` に加えて gocyclo (しきい値 15、goreportcard と同値) などのプロジェクト lint セットを含む)。あわせて `//nolint:gocyclo` の存在を検出して失敗させる (goreportcard の raw gocyclo は nolint を無視するため)
 - `task test` — `go test ./...` を実行
+- `task cover` — パッケージ横断カバレッジ (`-coverpkg=./...`) 付きでテストを実行し合計を表示。`task cover:html` は HTML レポートをブラウザで開き、`task cover:html:file` はヘッドレス向けに `coverage.html` へ出力
 
 ## 付属ツール
 

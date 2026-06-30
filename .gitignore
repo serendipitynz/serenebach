@@ -7,6 +7,10 @@
 *.db-wal
 *.db-shm
 
+# Coverage artefacts from `task cover` / `task cover:html:file`.
+coverage.out
+coverage.html
+
 # Local secrets loaded by Taskfile's dotenv directive. Keep
 # .env.example checked in as a template so new clones know which
 # vars to set.

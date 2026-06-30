@@ -166,6 +166,24 @@ tasks:
     cmds:
       - go test ./internal/app/
 
+  cover:
+    desc: Run tests with cross-package coverage and print the total
+    cmds:
+      - go test -coverpkg=./... -coverprofile=coverage.out ./...
+      - go tool cover -func=coverage.out | tail -1
+
+  cover:html:
+    desc: Open the cross-package coverage report in a browser
+    deps: [cover]
+    cmds:
+      - go tool cover -html=coverage.out
+
+  cover:html:file:
+    desc: Write the cross-package coverage report to coverage.html (headless)
+    deps: [cover]
+    cmds:
+      - go tool cover -html=coverage.out -o coverage.html
+
   tidy:
     desc: Sync go.mod / go.sum
     cmds:
