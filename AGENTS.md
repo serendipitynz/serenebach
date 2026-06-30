@@ -73,14 +73,14 @@ Strict [Conventional Commits](https://www.conventionalcommits.org/).
 
 ### PR comments
 
-When posting via `gh pr comment` and similar, write **Japanese first, then a `===` separator, then the English translation** (this differs from commit messages, which stay English-only).
+When posting via `gh pr comment` and similar, write **English first, then a `===` separator, then the Japanese translation** (this differs from commit messages, which stay English-only).
 
 ```
-日本語本文
+English message
 
 ===
 
-English translation
+日本語訳
 ```
 
 ### README sync
