@@ -157,6 +157,77 @@ func TestCanonicalOriginLowercasesSchemeAndHost(t *testing.T) {
 	}
 }
 
+func TestOriginBoundaryEdges(t *testing.T) {
+	// Fill the gaps the existing cases don't cover: scheme mismatch,
+	// trailing-slash normalisation on both the allow-list entry and the
+	// request header, and subdomain non-match. Port and case are already
+	// locked by TestPortIsPartOfOriginIdentity /
+	// TestCanonicalOriginLowercasesSchemeAndHost, so they're not repeated.
+	cases := []struct {
+		name    string
+		allowed []string
+		origin  string
+		want    int
+	}{
+		{
+			name:    "scheme mismatch is rejected",
+			allowed: []string{"https://example.com"},
+			origin:  "http://example.com",
+			want:    http.StatusForbidden,
+		},
+		{
+			name:    "trailing slash on allow-list entry still matches (host-only canonicalisation)",
+			allowed: []string{"https://example.com/"},
+			origin:  "https://example.com",
+			want:    http.StatusOK,
+		},
+		{
+			name:    "trailing slash on Origin header still matches",
+			allowed: []string{"https://example.com"},
+			origin:  "https://example.com/",
+			want:    http.StatusOK,
+		},
+		{
+			name:    "subdomain does not match parent",
+			allowed: []string{"https://example.com"},
+			origin:  "https://evil.example.com",
+			want:    http.StatusForbidden,
+		},
+		{
+			name:    "parent does not match subdomain allow-list entry",
+			allowed: []string{"https://www.example.com"},
+			origin:  "https://example.com",
+			want:    http.StatusForbidden,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest("POST", "/", strings.NewReader(""))
+			req.Header.Set("Origin", tc.origin)
+			w := httptest.NewRecorder()
+			guardWith(tc.allowed...).ServeHTTP(w, req)
+			if w.Code != tc.want {
+				t.Errorf("origin %q vs allow %v: status = %d, want %d", tc.origin, tc.allowed, w.Code, tc.want)
+			}
+		})
+	}
+}
+
+func TestUnsafeMethodsBeyondPostAreGuarded(t *testing.T) {
+	// The middleware guards every non-safe method, not just POST. A
+	// fail-open on PUT/PATCH/DELETE would be a silent hole, so assert a
+	// mismatching Origin is rejected on each.
+	for _, m := range []string{"PUT", "PATCH", "DELETE"} {
+		req := httptest.NewRequest(m, "/", strings.NewReader(""))
+		req.Header.Set("Origin", "https://attacker.example")
+		w := httptest.NewRecorder()
+		guardWith("https://example.com").ServeHTTP(w, req)
+		if w.Code != http.StatusForbidden {
+			t.Errorf("%s: status = %d, want 403 (non-safe method must be guarded)", m, w.Code)
+		}
+	}
+}
+
 func TestNewSameOriginGuardDropsGarbage(t *testing.T) {
 	// Typos in SB_PUBLIC_ALLOWED_ORIGINS shouldn't crash startup or
 	// silently widen the allow-list.
