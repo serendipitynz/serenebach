@@ -73,14 +73,14 @@ task release              # gh draft release を作成
 
 ### PR コメント
 
-`gh pr comment` 等は **日本語先 → `===` 区切り → 英語訳** の順で書く (コミットメッセージとは別ルール)。
+`gh pr comment` 等は **英語先 → `===` 区切り → 日本語訳** の順で書く (コミットメッセージとは別ルール)。
 
 ```
-日本語本文
+English message
 
 ===
 
-English translation
+日本語訳
 ```
 
 ### README 同期
