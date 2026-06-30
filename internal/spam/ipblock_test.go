@@ -75,3 +75,34 @@ func TestIPBlocklistEmptyListNeverMatches(t *testing.T) {
 		t.Errorf("empty list should never match")
 	}
 }
+
+func TestIPBlocklistCIDREndAddresses(t *testing.T) {
+	// The existing /24 test checks .1 and .254. The actual prefix ends —
+	// the network (.0) and broadcast (.255) addresses — are also inside
+	// the range, so a blocklist entry must match a client arriving as
+	// either. Locks the "whole prefix is blocked" boundary.
+	bl := ParseIPBlocklist("198.51.100.0/24\n")
+	for _, addr := range []string{"198.51.100.0", "198.51.100.255"} {
+		if !bl.Contains(addr) {
+			t.Errorf("%s should be inside 198.51.100.0/24", addr)
+		}
+	}
+	// One past each end must NOT match.
+	for _, addr := range []string{"198.51.99.255", "198.51.101.0"} {
+		if bl.Contains(addr) {
+			t.Errorf("%s is outside 198.51.100.0/24 and must not match", addr)
+		}
+	}
+}
+
+func TestIPBlocklistInvalidAddrNeverMatches(t *testing.T) {
+	// A garbage address against a NON-empty list must not crash and must
+	// not match. The empty-list case is covered separately; this guards
+	// the parse-failure path on the hot match loop.
+	bl := ParseIPBlocklist("198.51.100.5\n198.51.100.0/24\n")
+	for _, addr := range []string{"not-an-ip", "", "999.999.999.999", "::ffff:zz"} {
+		if bl.Contains(addr) {
+			t.Errorf("unparseable addr %q must never match a blocklist entry", addr)
+		}
+	}
+}

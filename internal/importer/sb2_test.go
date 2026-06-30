@@ -428,6 +428,69 @@ func TestImportSB2EUCJPDecode(t *testing.T) {
 	}
 }
 
+func TestImportSB2NonEUCEncodings(t *testing.T) {
+	// SB2 "usually" ships EUC-JP, but real installs vary by server. The
+	// importer must NOT hardcode the encoding by version — it routes flat
+	// records through jacharset, which auto-detects per content. This
+	// proves a UTF-8 and a Shift_JIS SB2 source decode just as cleanly as
+	// the EUC-JP case above. Companion to TestImportSB2EUCJPDecode.
+	const wantTitle = "日本語タイトル"
+	const wantBody = "これは本文です。"
+
+	cases := []struct {
+		name string
+		enc  func(t *testing.T, s string) string
+	}{
+		{
+			name: "utf-8 (no transform)",
+			enc:  func(_ *testing.T, s string) string { return s },
+		},
+		{
+			name: "shift_jis",
+			enc: func(t *testing.T, s string) string {
+				out, _, err := transform.String(japanese.ShiftJIS.NewEncoder(), s)
+				if err != nil {
+					t.Fatalf("Shift_JIS encode: %v", err)
+				}
+				return out
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			enc := func(s string) string { return tc.enc(t, s) }
+
+			mustWrite(t, filepath.Join(dir, "configure.cgi"), "conf_dbtype\tText\n")
+			mustWrite(t, filepath.Join(dir, "weblog.cgi"), enc("0\tこんにちは\tテスト用\t\n"))
+			mustWrite(t, filepath.Join(dir, "category.cgi"), enc("1\t0\tカテゴリ\t\t\t0\t0\t0\t\t0\t\t0\t\t\n"))
+			mustMkdir(t, filepath.Join(dir, "entry"))
+			mustWrite(t, filepath.Join(dir, "entry", "1.cgi"),
+				enc("1\t0\t"+wantTitle+"\t1\t1700000000\t1\t1\t0\t0\t\t+0900\t\t\t1\t1\t\t\t"+wantBody+"\t\t\t\t\t\n"),
+			)
+
+			a := destApp(t)
+			if _, err := importer.Import(context.Background(), a.DB, dir, importer.Options{
+				TargetWID: 1, AuthorID: 1, OnlyPublished: true, SBVersion: 2,
+			}); err != nil {
+				t.Fatalf("Import: %v", err)
+			}
+
+			var title, body string
+			if err := a.DB.QueryRow(`SELECT title, body FROM entries WHERE wid = 1 AND legacy_id = 1`).Scan(&title, &body); err != nil {
+				t.Fatal(err)
+			}
+			if title != wantTitle {
+				t.Errorf("title = %q, want %q (%s decode failed — version hardcoding?)", title, wantTitle, tc.name)
+			}
+			if body != wantBody {
+				t.Errorf("body = %q, want %q", body, wantBody)
+			}
+		})
+	}
+}
+
 func TestImportSB2RejectsBadVersion(t *testing.T) {
 	a := destApp(t)
 	_, err := importer.Import(context.Background(), a.DB, "/dev/null", importer.Options{

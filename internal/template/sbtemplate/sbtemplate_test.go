@@ -340,6 +340,68 @@ func TestUsedBlocksExcludesRoot(t *testing.T) {
 	}
 }
 
+func TestZeroCountBlockLeaksNoMarkers(t *testing.T) {
+	// AGENTS.md hard constraint: an unused / 0-striped block must not
+	// leak its `<!-- BEGIN foo -->...<!-- END foo -->` comment markers
+	// into public output. TestBlockHiddenWhenCountZero already proves the
+	// body is gone; this locks the markers being gone too, in both the
+	// default (never set) and explicit Block(name, 0) cases.
+	src := "before\n<!-- BEGIN item -->\nbody-X\n<!-- END item -->\nafter\n"
+
+	for _, tc := range []struct {
+		name  string
+		setup func(c *Context)
+	}{
+		{"default count (never set)", func(c *Context) {}},
+		{"explicit zero", func(c *Context) { c.Block("item", 0) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := mustParse(t, src).New()
+			tc.setup(c)
+			got := c.Render()
+			if !strings.Contains(got, "before") || !strings.Contains(got, "after") {
+				t.Errorf("bookends missing in %q", got)
+			}
+			if strings.Contains(got, "body-X") {
+				t.Errorf("block body leaked: %q", got)
+			}
+			if strings.Contains(got, "<!-- BEGIN") || strings.Contains(got, "<!-- END") {
+				t.Errorf("block markers leaked into output: %q", got)
+			}
+		})
+	}
+}
+
+func TestInlineBeginEndRegistersEmptyBody(t *testing.T) {
+	// The parser is strictly line-based (see AGENTS.md): BEGIN/END must
+	// each sit on their own line. When inlined on one line, the BEGIN
+	// directive consumes the whole line and the block body is registered
+	// EMPTY — a well-known foot-gun. This locks both halves so a future
+	// parser change can't silently flip the behaviour either way.
+	const link = "MYLINKS"
+
+	// Inline form: body is swallowed, so {link_list} never renders.
+	inline := mustParse(t, "<!-- BEGIN link --><nav>{link_list}</nav><!-- END link -->\n")
+	if !inline.HasBlock("link") {
+		t.Fatal("inline form should still register the block name 'link'")
+	}
+	ci := inline.New()
+	ci.Block("link", 1)
+	ci.Tag("link_list", link)
+	if got := ci.Render(); strings.Contains(got, "<nav>") || strings.Contains(got, link) {
+		t.Errorf("inline BEGIN/END must register an empty body, but got %q", got)
+	}
+
+	// Line-separated form: body is preserved and renders normally.
+	separated := mustParse(t, "<!-- BEGIN link -->\n<nav>{link_list}</nav>\n<!-- END link -->\n")
+	cs := separated.New()
+	cs.Block("link", 1)
+	cs.Tag("link_list", link)
+	if got := cs.Render(); !strings.Contains(got, "<nav>"+link+"</nav>") {
+		t.Errorf("line-separated BEGIN/END should render the body, got %q", got)
+	}
+}
+
 func TestParseUnmatchedEndReturnsError(t *testing.T) {
 	// An END at the root level used to underflow the block stack and panic.
 	// It must now surface as a syntax error so lint/import/render report it.
