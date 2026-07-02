@@ -68,7 +68,7 @@ Strict [Conventional Commits](https://www.conventionalcommits.org/).
 
 - Summary **≤ 50 characters**, total body **≤ 2048 characters**.
 - Type: `feat` / `fix` / `docs` / `style` / `refactor` / `perf` / `test` / `build` / `ci` / `chore` / `revert`.
-- When adding a co-author, use `Co-Authored-By: Claude <noreply@anthropic.com>`. **Do not include the model name or version.**
+- AI attribution markers (`Co-Authored-By`, "Generated with …", tool/model names) in commits, PRs, and comments are a per-implementer preference, not a project rule — follow your tool's user-level configuration, and **do not add them unless it explicitly says to**.
 - Do not pass `--no-verify` or `--no-gpg-sign` unless the user explicitly asks for it.
 
 ### PR comments

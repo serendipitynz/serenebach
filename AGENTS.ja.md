@@ -68,7 +68,7 @@ task release              # gh draft release を作成
 
 - summary は **50 文字以下**、body 含めて 2048 文字以下
 - type は `feat` / `fix` / `docs` / `style` / `refactor` / `perf` / `test` / `build` / `ci` / `chore` / `revert`
-- co-author は `Co-Authored-By: Claude <noreply@anthropic.com>` の形式。**モデル名/バージョンは含めない**
+- commit / PR / コメントへの AI 帰属マーカー（`Co-Authored-By`・「Generated with …」・ツール名/モデル名）はプロジェクトのルールではなく実装者ごとの設定に従う — 各ツールのユーザレベル設定を優先し、**明示的な設定がない限り付けない**
 - `--no-verify` / `--no-gpg-sign` はユーザの明示指示なき限り禁止
 
 ### PR コメント
