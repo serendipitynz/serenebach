@@ -228,7 +228,7 @@ func (h *Handler) settingsBasicSubmit(w http.ResponseWriter, r *http.Request) {
 }
 
 // regenerateAllOGCards iterates every entry for the weblog and
-// rebuilds the OG card. Runs in a goroutine from settingsBasicSubmit
+// rebuilds the OG card. Runs in a goroutine from templatesOGSave
 // so a blog with hundreds of entries doesn't stall the request; each
 // card's errors are logged individually.
 func (h *Handler) regenerateAllOGCards(ctx context.Context) {

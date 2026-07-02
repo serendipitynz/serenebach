@@ -35,13 +35,21 @@ func Open(path string) (*sql.DB, error) {
 	// ships with both enabled, but we assert that here before any
 	// migration runs so a hypothetical driver swap fails loudly with a
 	// clear message rather than corrupting the migrations table.
-	if _, err := db.Exec(`CREATE VIRTUAL TABLE _fts_probe USING fts5(content, tokenize='trigram')`); err != nil {
+	//
+	// The probe lives in the temp schema, never the main (on-disk) schema.
+	// CGI hosts call Open on every request, so a persistent probe table
+	// would (a) collide with concurrent opens as "table already exists"
+	// and (b) permanently break startup if the process dies between CREATE
+	// and DROP (e.g. shared-host OOM kill). temp.* tables are scoped to the
+	// connection and never touch the DB file, so neither failure mode is
+	// possible.
+	if _, err := db.Exec(`CREATE VIRTUAL TABLE temp._fts_probe USING fts5(content, tokenize='trigram')`); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("sqlite: FTS5 with the trigram tokenizer is required but not available in this driver build: %w", err)
 	}
-	if _, err := db.Exec(`DROP TABLE _fts_probe`); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("sqlite: drop FTS5 probe: %w", err)
-	}
+	// temp.* tables are dropped automatically when the connection closes,
+	// so an explicit DROP is no longer strictly required; keep it defensive
+	// (IF EXISTS tolerates the drop landing on a fresh pooled connection).
+	_, _ = db.Exec(`DROP TABLE IF EXISTS temp._fts_probe`)
 	return db, nil
 }
