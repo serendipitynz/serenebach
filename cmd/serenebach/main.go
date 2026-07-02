@@ -265,6 +265,24 @@ func serveCGI(a *app.App) error {
 // this with an .htaccess RewriteRule that forwards /admin/static/*
 // to the extracted directory. Other deployments don't need to run it;
 // the embedded path keeps working as a fallback.
+// writeAdminCSSBundle writes the concatenated admin stylesheet to
+// out/admin.css. The stylesheet is authored per-component under css/ and
+// served as one bundle; this reproduces that bundle for static/CGI
+// deployments so the extracted file matches what /admin/static/admin.css
+// serves. The css/ sources are not served by any URL, so they are not
+// extracted.
+func writeAdminCSSBundle(out string) {
+	bundle, err := admintpl.AdminCSSBundle()
+	if err != nil {
+		log.Fatalf("extract-assets: admin.css bundle: %v", err)
+	}
+	full := filepath.Join(out, "admin.css")
+	if err := os.WriteFile(full, bundle, 0o644); err != nil {
+		log.Fatalf("extract-assets: write %s: %v", full, err)
+	}
+	fmt.Fprintf(os.Stderr, "extract-assets: wrote %s (%d bytes)\n", full, len(bundle))
+}
+
 func runExtractAssets(args []string) {
 	fset := flag.NewFlagSet("extract-assets", flag.ExitOnError)
 	out := fset.String("out", "./admin-static", "directory to write the embedded admin assets to")
@@ -285,19 +303,8 @@ func runExtractAssets(args []string) {
 	}
 
 	// admin.css is authored per-component under css/ and served as one
-	// bundle. Write the same concatenation the /admin/static/admin.css
-	// route serves so a static/CGI deployment gets a byte-identical
-	// stylesheet. The css/ sources are not served by any URL, so they're
-	// deliberately not extracted.
-	cssBundle, err := admintpl.AdminCSSBundle()
-	if err != nil {
-		log.Fatalf("extract-assets: admin.css bundle: %v", err)
-	}
-	cssPath := filepath.Join(*out, "admin.css")
-	if err := os.WriteFile(cssPath, cssBundle, 0o644); err != nil {
-		log.Fatalf("extract-assets: write %s: %v", cssPath, err)
-	}
-	fmt.Fprintf(os.Stderr, "extract-assets: wrote %s (%d bytes)\n", cssPath, len(cssBundle))
+	// bundle; write the same concatenation for static/CGI deployments.
+	writeAdminCSSBundle(*out)
 
 	for _, f := range files {
 		body, err := admintpl.Raw(f.name)
