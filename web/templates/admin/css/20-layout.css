@@ -1,0 +1,265 @@
+/* === layout ========================================================= */
+
+/* The admin shell is a 2-column grid (sidebar + content) that fills the
+   viewport. Both columns scroll internally; the document never scrolls.
+   On phones the sidebar collapses into an off-canvas drawer and a
+   slim mobile header appears with hamburger + logo. */
+
+.brand-logo {
+  height: 28px;
+  width: auto;
+  display: block;
+}
+/* Two logo images live in the DOM; CSS picks the one matching the
+   active theme so the runtime never has to swap <img> src. */
+.brand-logo-dark { display: none; }
+[data-theme="dark"] .brand-logo-light { display: none; }
+[data-theme="dark"] .brand-logo-dark { display: block; }
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] .brand-logo-light { display: none; }
+  [data-theme="auto"] .brand-logo-dark { display: block; }
+}
+
+/* Mobile-only header. Hidden on desktop; shown below 768px. Hamburger
+   on the left, centered logo. No account info — that lives in the
+   drawer's footer (alongside the logout button). */
+.mobile-header {
+  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: var(--topbar-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  padding: 0 0.75rem;
+}
+.mobile-menu-btn {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.mobile-menu-btn:hover { background: var(--surface-alt); }
+.mobile-logo {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  height: 100vh;
+}
+
+.sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  /* Flex column with three slots: logo (top, fixed) → nav (middle,
+     scroll) → footer (bottom, fixed). The sidebar itself doesn't
+     scroll; only .sidebar-nav does. */
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+.sidebar-logo {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--topbar-h);
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem 0.625rem;
+}
+.sidebar-top {
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-nav section + section { margin-top: 1.25rem; }
+.sidebar-nav h3 {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  margin: 0 0 0.375rem 0.625rem;
+  font-weight: 600;
+}
+.sidebar-nav ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.125rem; }
+
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.4rem 0.625rem;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.nav-item:hover {
+  background: var(--surface-alt);
+  text-decoration: none;
+}
+.nav-item .nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.nav-item .nav-label {
+  flex: 1;
+  min-width: 0;
+}
+.nav-item.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  font-weight: 500;
+}
+.nav-item.is-active .nav-icon { color: var(--accent-hover); }
+.nav-item.is-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.3rem;
+  bottom: 0.3rem;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+
+.sidebar-footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  padding: 0.625rem;
+}
+.sidebar-account {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.85rem;
+  text-decoration: none;
+  min-width: 0;
+}
+.sidebar-account:hover { background: var(--surface-alt); text-decoration: none; }
+.sidebar-account[aria-current="page"] { background: var(--accent-soft); color: var(--accent-hover); }
+.account-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+.account-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.account-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-role {
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-logout {
+  margin-top: 0.25rem;
+}
+.sidebar-logout button.link {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.4rem 0.625rem;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.sidebar-logout button.link .nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+.sidebar-logout button.link:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+.sidebar-logout button.link:hover .nav-icon { color: var(--text-muted); }
+
+.content {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow-y: auto;
+}
+.content-inner {
+  flex: 1;
+  padding: 1.5rem clamp(1rem, 2.5vw, 2rem);
+  max-width: var(--content-max);
+  width: 100%;
+}
+.content h1 {
+  font-size: 1.375rem;
+  margin: 0 0 1.5rem;
+  letter-spacing: -0.01em;
+}
+.content h2 { font-size: 1.05rem; margin: 1.5rem 0 0.75rem; }
+.content p.hint { color: var(--text-muted); font-size: 0.875rem; }
+
+.content-footer {
+  flex-shrink: 0;
+  padding: 0.875rem clamp(1rem, 2.5vw, 2rem);
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 0.8rem;
+}
+.content-footer .build-stamp {
+  margin-left: 0.5rem;
+  color: var(--text-faint);
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+

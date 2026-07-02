@@ -1,0 +1,165 @@
+/* === dark theme ==================================================== */
+/* The whole admin style is variable-driven; the dark block simply
+   rewrites those variables. The runtime toggle sets data-theme="dark"
+   on <html>; when data-theme is missing or "auto" the prefers-color-
+   scheme query decides. */
+[data-theme="dark"] {
+  --accent: #60a5fa;
+  --accent-hover: #93c5fd;
+  --accent-soft: #1e3a8a;
+  --text: #e5e7eb;
+  --text-muted: #9ca3af;
+  --text-faint: #6b7280;
+  --surface: #1f2937;
+  --surface-alt: #111827;
+  --surface-sunken: #0f172a;
+  --border: #374151;
+  --border-strong: #4b5563;
+  --success: #4ade80;
+  --success-soft: #14532d;
+  --warn: #fbbf24;
+  --warn-soft: #78350f;
+  --danger: #f87171;
+  --danger-soft: #7f1d1d;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
+  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.45), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] {
+    --accent: #60a5fa;
+    --accent-hover: #93c5fd;
+    --accent-soft: #1e3a8a;
+    --text: #e5e7eb;
+    --text-muted: #9ca3af;
+    --text-faint: #6b7280;
+    --surface: #1f2937;
+    --surface-alt: #111827;
+    --surface-sunken: #0f172a;
+    --border: #374151;
+    --border-strong: #4b5563;
+    --success: #4ade80;
+    --success-soft: #14532d;
+    --warn: #fbbf24;
+    --warn-soft: #78350f;
+    --danger: #f87171;
+    --danger-soft: #7f1d1d;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
+    --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.45), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN", "Yu Gothic Medium", "Meiryo", sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--surface-sunken);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  padding: 0.375rem 0.875rem;
+  transition: background 120ms, border-color 120ms;
+}
+button:hover { background: var(--surface-alt); border-color: var(--text-muted); }
+button.primary {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+button.danger {
+  background: var(--surface); color: var(--danger); border-color: var(--danger);
+}
+button.danger:hover { background: var(--danger-soft); }
+button.link {
+  background: none; border: none; color: var(--accent); padding: 0;
+}
+button.link:hover { text-decoration: underline; background: none; }
+/* .copy-tag is a click-to-copy wrapper around a <code> token. Keep the
+   monospace colour neutral so the cell reads as code, not a link, but
+   signal interactivity on hover. */
+button.link.copy-tag {
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+button.link.copy-tag:hover { text-decoration: none; }
+button.link.copy-tag:hover code { text-decoration: underline; }
+button[disabled], button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Inline spinner used while AI requests are in flight. JS swaps the
+   button label for <span class="sb-spinner"></span>; the spin
+   inherits currentColor so it works on both default and .primary
+   buttons without theming care. */
+@keyframes sb-spinner-rotate { to { transform: rotate(360deg); } }
+.sb-spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  /* Lock the box dimensions so a flex parent can't shrink the
+     spinner asymmetrically — without this, .entry-title-ai (inline-
+     flex with align-self: stretch) squashes the 1em circle into an
+     ellipse mid-animation and the rotation looks wobbly. */
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: sb-spinner-rotate 0.7s linear infinite;
+  /* Rotate around the geometric centre regardless of inline-block
+     baseline quirks. */
+  transform-origin: 50% 50%;
+  vertical-align: middle;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-spinner { animation-duration: 2s; }
+}
+
+/* Compact monospace formatting for the AI audit-log Extra column —
+   reads as a single key=value line, never wraps mid-token. */
+.audit-log .col-detail { font-size: 0.8125rem; }
+.audit-log .audit-extra {
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+}
+
+input[type="text"], input[type="email"], input[type="url"], input[type="password"],
+input[type="datetime-local"], input[type="number"], select, textarea {
+  font: inherit;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 120ms, box-shadow 120ms;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; min-height: 10rem; }
+label { display: grid; gap: 0.25rem; font-size: 0.875rem; color: var(--text-muted); }
+label > input, label > select, label > textarea { color: var(--text); }
+form { display: grid; gap: 0.875rem; }
+form.inline { display: inline; }
+

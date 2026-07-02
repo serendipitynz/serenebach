@@ -4,6 +4,7 @@
 package admintpl
 
 import (
+	"bytes"
 	"embed"
 	"io/fs"
 	"os"
@@ -15,8 +16,42 @@ import (
 // development so template edits are reflected without rebuilding.
 var DevRoot string
 
-//go:embed *.html *.css *.js modules assets i18n
+//go:embed *.html *.js modules assets i18n css
 var files embed.FS
+
+// adminCSSSources is the fixed concatenation order for the admin
+// stylesheet, which is authored per-component under css/ but served as a
+// single /admin/static/admin.css bundle. The cascade order IS this
+// order — never derive it from fs.WalkDir / directory sorting, and keep
+// dark-theme in its original position (right after tokens) so the
+// cascade matches the pre-split single file.
+var adminCSSSources = []string{
+	"css/00-tokens.css",
+	"css/10-theme.css",
+	"css/20-layout.css",
+	"css/30-components.css",
+	"css/40-features.css",
+	"css/90-responsive.css",
+}
+
+// AdminCSSBundle concatenates the per-component stylesheet sources in
+// adminCSSSources order and returns the combined bytes. Both the
+// /admin/static/admin.css route and `extract-assets` go through this, so
+// the served and extracted stylesheets stay identical. Reads honour
+// DevRoot via Raw, so the bundle works from the embedded FS and from
+// disk during development. The sources are concatenated verbatim; each
+// ends with a newline so no rule glues onto the next file's first rule.
+func AdminCSSBundle() ([]byte, error) {
+	var buf bytes.Buffer
+	for _, name := range adminCSSSources {
+		b, err := Raw(name)
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(b)
+	}
+	return buf.Bytes(), nil
+}
 
 // I18nCatalogues returns the admin-side string catalogues as
 // locale-code → JSON bytes, ready to hand to i18n.LoadBundle. Kept

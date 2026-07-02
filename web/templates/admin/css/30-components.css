@@ -1,0 +1,387 @@
+/* === cards / tables ================================================= */
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.875rem;
+  margin: 0 0 1.5rem;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.875rem 1rem;
+}
+.card .label { color: var(--text-muted); font-size: 0.8rem; }
+.card .value { font-size: 1.5rem; font-weight: 600; margin-top: 0.25rem; }
+.card .sub { color: var(--text-faint); font-size: 0.8rem; margin-top: 0.25rem; }
+.card a.more { font-size: 0.8rem; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin: 0 0 1.25rem;
+  overflow: hidden;
+}
+.panel .panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-alt);
+}
+.panel .panel-head h2 { margin: 0; font-size: 0.95rem; }
+.panel .panel-body { padding: 0.875rem; }
+
+table.listing {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  font-size: 0.875rem;
+}
+table.listing th, table.listing td {
+  text-align: left;
+  padding: 0.5rem 0.625rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+table.listing thead th {
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+table.listing tbody tr:hover { background: var(--surface-alt); }
+table.listing td.body { max-width: 26rem; color: var(--text-muted); }
+table.listing td.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.listing td.actions { white-space: nowrap; }
+
+/* === shared inline icons ============================================ */
+
+.icon {
+  width: 1.05em;
+  height: 1.05em;
+  vertical-align: -0.15em;
+}
+/* Icon-only buttons (trash, etc.) — square hit target, no visible border
+   so they look like affordances rather than heavy secondary buttons. */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.btn-icon:hover { background: var(--surface-alt); color: var(--text); border-color: var(--border); }
+.btn-icon.danger { color: var(--danger); }
+.btn-icon.danger:hover { background: var(--danger-soft); border-color: var(--danger); }
+
+/* Template edit screen: keep the rename pencil aligned with the heading
+   text instead of breaking onto its own line. */
+.template-edit-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Column-width helpers — list tables all share these so the same
+   narrow metadata (ID / dates / actions) stays a predictable width and
+   the wide columns (title / body) get whatever's left. */
+.col-id { width: 3.5rem; white-space: nowrap; }
+.col-date { width: 9rem; white-space: nowrap; }
+.col-datetime { width: 11rem; white-space: nowrap; }
+.col-status { width: 6rem; white-space: nowrap; }
+.col-count { width: 5rem; white-space: nowrap; }
+.col-drag { width: 1.75rem; }
+.col-action { width: 3rem; white-space: nowrap; text-align: center; }
+/* col-actions = one cell carrying multiple action buttons inline, so
+   desktop stays compact and mobile card-reflow can group them with a
+   top divider without merging cells. */
+.col-actions { white-space: nowrap; text-align: right; }
+.col-actions > * + * { margin-left: 0.35rem; }
+.col-icon { width: 7rem; }
+.col-role { width: 7rem; white-space: nowrap; }
+
+/* MCP token list: name column shouldn't eat the whole row and push
+   the date / status / delete columns to single-character widths. */
+.mcp-token-list { table-layout: fixed; }
+.mcp-token-list th:nth-child(3),
+.mcp-token-list td:nth-child(3) { width: auto; word-break: break-all; }
+
+/* Webhook list: same problem as the MCP token list — without fixed
+   table-layout the long Slack/Discord URLs (no break points) stretch
+   the URL column and crush the date / status / actions columns to
+   single-character widths. table-layout:fixed forces the smaller
+   columns to honour their .col-* widths and lets the URL cell pick
+   up the remainder with ellipsis truncation. col-webhook-events caps
+   the badge column so a webhook subscribed to every event doesn't
+   monopolise the row. */
+.webhook-list { table-layout: fixed; }
+.col-webhook-events { width: 18rem; }
+.webhook-list .col-webhook-events {
+  white-space: normal;
+  line-height: 1.6;
+}
+.webhook-list .col-webhook-events .badge + .badge { margin-left: 0.25rem; }
+
+/* Webhook delivery log — same auto-layout pathology as the list view.
+   Without fixed widths the 詳細 / detail column (delivery id, error
+   text) stretches and the timestamp wraps to three lines. Pin the
+   metadata columns and let the detail cell absorb the remainder. */
+.webhook-delivery-list { table-layout: fixed; }
+.col-webhook-event-name { width: 11rem; }
+.webhook-delivery-list .col-flex-wide {
+  white-space: normal;
+}
+.webhook-delivery-list pre.muted {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.8rem;
+}
+
+/* Payload-format selector hint list under the <select>. Each format
+   gets a one-liner so the operator can scan envelope vs flat without
+   leaving the form. List markers are stripped because the <code>
+   leader already plays that role visually. */
+.webhook-format-hints {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.webhook-format-hints li + li { margin-top: 0.2rem; }
+
+.panel-subhead {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+/* User list: force a fixed layout so the flex columns share remaining
+   width evenly rather than letting long display names push siblings
+   into cramped single-line truncation. */
+table.listing.user-list { table-layout: fixed; }
+/* col-flex / col-flex-wide mark variable-width columns. They don't set
+   an explicit width — the browser distributes remaining space between
+   them after the fixed-width columns above. When content is long a
+   single-line overflow ellipsis kicks in. col-flex-wide still takes a
+   width hint so titles / bodies get more room than sibling flex cols. */
+.col-flex { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-flex-wide {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+/* Two-line clamp for body cells (comments). The clamp lives on a
+   nested <div>, not the <td> itself — otherwise display:-webkit-box
+   would disable the cell's vertical-align and break row alignment.
+   The enclosing <td> keeps col-flex-wide, and relaxes its
+   white-space:nowrap so the inner content can wrap before clamping. */
+table.listing td.cell-clamp-host {
+  white-space: normal;
+  max-width: 0; /* lets the clamp div pick up the cell's allotted width */
+}
+.cell-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  overflow: hidden;
+  white-space: normal;
+  word-break: break-word;
+  max-height: 3em;
+}
+.cell-clickable { cursor: pointer; color: var(--accent); }
+.cell-clickable:hover { background: var(--surface-alt); text-decoration: underline; }
+
+.badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+}
+.badge.published { background: var(--success-soft); color: var(--success); }
+.badge.draft { background: var(--warn-soft); color: var(--warn); }
+.badge.closed, .badge.hidden { background: var(--danger-soft); color: var(--danger); }
+.badge.approved { background: var(--success-soft); color: var(--success); }
+.badge.waiting { background: var(--warn-soft); color: var(--warn); }
+
+/* === forms specific ================================================= */
+
+.form-stack { display: grid; gap: 1rem; }
+/* Browser default [hidden] { display: none } loses the specificity
+   fight against .form-stack's display: grid, so anything tagged
+   `hidden` on a .form-stack container would stay visible without
+   this override. */
+.form-stack[hidden] { display: none; }
+
+/* field-stack: label-above-input layout. Used by forms that prefer
+   vertical stacking (category form) over the form-row sidebar-label
+   layout. field-head lets the row carry an inline counterweight like
+   a record count next to the label. */
+.field-stack { display: grid; gap: 0.35rem; }
+.field-stack > .label { padding: 0; }
+.field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+/* field-grid-3: three stacked fields side-by-side. Collapses to a
+   single column under 720px so mobile editors don't get shoulder-
+   squeezed. */
+.field-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .field-grid-3 { grid-template-columns: 1fr; }
+}
+.form-row {
+  display: grid;
+  grid-template-columns: 11rem 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+.form-row > .label { padding-top: 0.5rem; color: var(--text-muted); }
+.form-row .grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.625rem;
+}
+
+/* === date-format section (デザイン設定 > 設定 > 時刻表記設定) ======== */
+.date-format-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+.date-format-field input { width: 100%; }
+.date-format-preview {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  white-space: nowrap;
+}
+.form-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  margin-top: 1.5rem;
+}
+
+/* === alerts ========================================================= */
+
+.alert {
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  margin: 0 0 1rem;
+  border: 1px solid transparent;
+}
+.alert.error { background: var(--danger-soft); color: var(--danger); border-color: var(--danger); }
+.alert.success { background: var(--success-soft); color: var(--success); border-color: var(--success); }
+.alert.warning { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+
+/* Template-edit lint panel: per-body sections of unsupported / differs
+   findings, surfaced under the editor + asset table. The badge variant
+   leans on the existing .badge styling so dark-mode + colour tokens
+   come for free. */
+.badge.warning { background: var(--warn-soft); color: var(--warn); text-decoration: none; }
+/* When the body section has both the lint ⚠️ badge and the 利用中 /
+   approved badge, the panel-head's `justify-content: space-between`
+   would scatter the three children evenly (h2 — warn — approved).
+   Pull the warn badge to the right so it sits next to its sibling
+   instead of floating in the middle. The 0.4rem margin keeps the
+   two badges from butting against each other. */
+.panel-head .badge.warning { margin-left: auto; margin-right: 0.4rem; }
+.lint-section { margin-top: 0.75rem; }
+.lint-section h3 { margin: 0 0 0.5rem 0; font-size: 0.95rem; }
+.lint-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.4rem; }
+.lint-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 0.4rem 0.6rem;
+  align-items: baseline;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-sunken);
+}
+.lint-row.lint-unsupported { border-color: var(--danger); background: var(--danger-soft); }
+.lint-row.lint-differs { border-color: var(--warn); background: var(--warn-soft); }
+.lint-row code { background: transparent; }
+.lint-note { color: var(--text-muted); }
+.lint-lines { color: var(--text-muted); font-size: 0.85rem; white-space: nowrap; }
+
+/* === login ========================================================== */
+
+.login-wrap {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1rem;
+  background: var(--surface-sunken);
+}
+.login-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2rem;
+  width: min(24rem, 100%);
+  box-shadow: var(--shadow);
+}
+.login-card h1 { font-size: 1.25rem; margin: 0 0 1.25rem; text-align: center; }
+.login-card h1 img { width: auto; height: 2.5rem; }
+.login-card button { width: 100%; }
+
+/* Setup card — wider than login because it has more fields. */
+.setup-card { width: min(32rem, 100%); }
+.setup-card h2 { font-size: 1rem; margin: 0 0 0.5rem; text-align: center; }
+.setup-card .setup-intro {
+  margin: 0 0 1.25rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+.setup-card label.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.setup-card label.checkbox input { width: auto; }
+.setup-card small.hint {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  margin-top: 0.25rem;
+}
+
+/* Template edit: aesthetic breathing room between the form actions
+   and the asset panel that sits just below them. */
+.template-asset-panel { margin-top: 1.5rem; }
+

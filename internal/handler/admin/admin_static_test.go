@@ -4,17 +4,56 @@ import (
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	admintpl "github.com/serendipitynz/serenebach/web/templates/admin"
 )
+
+// TestServeAdminCSSBundleOrder verifies the concatenated admin stylesheet
+// serves with the CSS MIME type and preserves the authored cascade order
+// across the css/ sources. The cascade is a behavioural contract (dark
+// theme must stay after tokens; responsive is last), so we assert the
+// section banners appear in sequence rather than snapshotting the file.
+func TestServeAdminCSSBundleOrder(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/static/admin.css", nil)
+	serveAdminCSS()(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("GET admin.css: status = %d", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "text/css; charset=utf-8" {
+		t.Errorf("Content-Type = %q, want text/css; charset=utf-8", ct)
+	}
+	body := rec.Body.String()
+	// One stable marker per source, in the order they must concatenate.
+	markers := []string{
+		":root",          // 00-tokens
+		"dark theme",     // 10-theme
+		"=== layout ===", // 20-layout
+		"=== alerts ===", // 30-components
+		"=== modal ===",  // 40-features
+		"=== responsive", // 90-responsive
+	}
+	prev := -1
+	for _, m := range markers {
+		idx := strings.Index(body, m)
+		if idx < 0 {
+			t.Fatalf("bundle missing marker %q", m)
+		}
+		if idx <= prev {
+			t.Errorf("marker %q out of cascade order (idx %d <= prev %d)", m, idx, prev)
+		}
+		prev = idx
+	}
+}
 
 // TestServeAssetReturns304OnMatchingETag verifies that admin static
 // asset handlers honour If-None-Match for browser-side cache reuse.
 // Without 304, Sakura CGI hosts re-pay the ~200ms cgi.Serve startup
 // cost on every page load even when the asset hasn't changed.
 func TestServeAssetReturns304OnMatchingETag(t *testing.T) {
-	h := serveAsset("admin.css", "text/css; charset=utf-8")
+	h := serveAdminCSS()
 
 	// First request: get the ETag.
 	rec := httptest.NewRecorder()
@@ -47,7 +86,7 @@ func TestServeAssetReturns304OnMatchingETag(t *testing.T) {
 // TestServeAssetReturns200OnDifferentETag verifies that a mismatched
 // If-None-Match still returns 200 with the full body.
 func TestServeAssetReturns200OnDifferentETag(t *testing.T) {
-	h := serveAsset("admin.css", "text/css; charset=utf-8")
+	h := serveAdminCSS()
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/static/admin.css", nil)

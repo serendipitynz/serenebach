@@ -118,7 +118,7 @@ func root(r *http.Request) string {
 func (h *Handler) MountPublic(r chi.Router) {
 	r.Get("/login", h.loginForm)
 	r.Post("/login", h.loginSubmit)
-	r.Get("/static/admin.css", serveAsset("admin.css", "text/css; charset=utf-8"))
+	r.Get("/static/admin.css", serveAdminCSS())
 	r.Get("/static/admin.js", serveAsset("admin.js", "text/javascript; charset=utf-8"))
 
 	// Admin JS modules are served as a subtree so the browser module
@@ -189,6 +189,23 @@ func assetETag(body []byte) string {
 	return `"` + hex.EncodeToString(sum[:8]) + `"` // 16 hex chars is plenty
 }
 
+// writeAsset writes body with the given Content-Type / Cache-Control,
+// honouring If-None-Match against etag (304 when it matches). Shared by
+// the admin static asset handlers so the ETag / 304 contract stays
+// identical across them.
+func writeAsset(w http.ResponseWriter, r *http.Request, body []byte, etag, contentType, cacheControl string) {
+	if match := r.Header.Get("If-None-Match"); match != "" && match == etag {
+		w.Header().Set("ETag", etag)
+		w.Header().Set("Cache-Control", cacheControl)
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", cacheControl)
+	w.Header().Set("ETag", etag)
+	_, _ = w.Write(body)
+}
+
 // serveAsset reads one embedded admin asset and writes it with the given
 // Content-Type. The file list is fixed at build time so there's no path
 // traversal surface to worry about.
@@ -201,16 +218,44 @@ func serveAsset(name, contentType string) http.HandlerFunc {
 	}
 	etag := assetETag(body)
 	return func(w http.ResponseWriter, r *http.Request) {
-		if match := r.Header.Get("If-None-Match"); match != "" && match == etag {
-			w.Header().Set("ETag", etag)
-			w.Header().Set("Cache-Control", "public, max-age=300")
-			w.WriteHeader(http.StatusNotModified)
-			return
+		writeAsset(w, r, body, etag, contentType, "public, max-age=300")
+	}
+}
+
+// serveAdminCSS serves the concatenated admin stylesheet at
+// /admin/static/admin.css. The stylesheet is authored per-component
+// under css/ (see admintpl.AdminCSSBundle) but served as one bundle so
+// the URL and request count are unchanged from the pre-split single
+// file.
+//
+// In embedded (production) builds the bundle is assembled and hashed
+// once at startup — identical to the old single-file behaviour, ETag /
+// 304 included. When admintpl.DevRoot is set (SB_DEV=1) the bundle is
+// rebuilt per request so edits to any css/*.css source reflect without
+// restarting, matching the template hot-reload developers already rely
+// on (plain CSS was never hot-reloaded before either, so this is a
+// strict improvement).
+func serveAdminCSS() http.HandlerFunc {
+	const contentType = "text/css; charset=utf-8"
+	if admintpl.DevRoot != "" {
+		return func(w http.ResponseWriter, r *http.Request) {
+			body, err := admintpl.AdminCSSBundle()
+			if err != nil {
+				http.Error(w, "admin asset missing", http.StatusInternalServerError)
+				return
+			}
+			writeAsset(w, r, body, assetETag(body), contentType, "public, max-age=300")
 		}
-		w.Header().Set("Content-Type", contentType)
-		w.Header().Set("Cache-Control", "public, max-age=300")
-		w.Header().Set("ETag", etag)
-		_, _ = w.Write(body)
+	}
+	body, err := admintpl.AdminCSSBundle()
+	if err != nil {
+		return func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "admin asset missing", http.StatusInternalServerError)
+		}
+	}
+	etag := assetETag(body)
+	return func(w http.ResponseWriter, r *http.Request) {
+		writeAsset(w, r, body, etag, contentType, "public, max-age=300")
 	}
 }
 

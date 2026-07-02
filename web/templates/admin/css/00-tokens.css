@@ -1,0 +1,32 @@
+/* === Serene Bach admin UI ===========================================
+   One stylesheet, no build step. Vanilla CSS variables drive the theme
+   so a dark mode can land later as a single [data-theme="dark"] block.
+   ==================================================================== */
+
+:root {
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: #dbeafe;
+  --text: #1f2937;
+  --text-muted: #6b7280;
+  --text-faint: #9ca3af;
+  --surface: #ffffff;
+  --surface-alt: #f9fafb;
+  --surface-sunken: #f3f4f6;
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
+  --success: #16a34a;
+  --success-soft: #dcfce7;
+  --warn: #d97706;
+  --warn-soft: #fef3c7;
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+  --radius: 6px;
+  --radius-sm: 4px;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  --topbar-h: 56px;
+  --sidebar-w: 232px;
+  --content-max: 72rem;
+}
+

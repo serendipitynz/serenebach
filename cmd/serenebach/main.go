@@ -274,7 +274,6 @@ func runExtractAssets(args []string) {
 		name   string // path within the admin template FS
 		outRel string // path relative to --out
 	}{
-		{"admin.css", "admin.css"},
 		{"admin.js", "admin.js"},
 		{"assets/sb_logo_dark.svg", "sb_logo_dark.svg"},
 		{"assets/sb_logo_light.svg", "sb_logo_light.svg"},
@@ -284,6 +283,22 @@ func runExtractAssets(args []string) {
 	if err := os.MkdirAll(*out, 0o755); err != nil {
 		log.Fatalf("extract-assets: mkdir: %v", err)
 	}
+
+	// admin.css is authored per-component under css/ and served as one
+	// bundle. Write the same concatenation the /admin/static/admin.css
+	// route serves so a static/CGI deployment gets a byte-identical
+	// stylesheet. The css/ sources are not served by any URL, so they're
+	// deliberately not extracted.
+	cssBundle, err := admintpl.AdminCSSBundle()
+	if err != nil {
+		log.Fatalf("extract-assets: admin.css bundle: %v", err)
+	}
+	cssPath := filepath.Join(*out, "admin.css")
+	if err := os.WriteFile(cssPath, cssBundle, 0o644); err != nil {
+		log.Fatalf("extract-assets: write %s: %v", cssPath, err)
+	}
+	fmt.Fprintf(os.Stderr, "extract-assets: wrote %s (%d bytes)\n", cssPath, len(cssBundle))
+
 	for _, f := range files {
 		body, err := admintpl.Raw(f.name)
 		if err != nil {

@@ -1,0 +1,155 @@
+/* === responsive (drawer) ============================================ */
+
+@media (max-width: 768px) {
+  .mobile-header { display: flex; }
+  .layout {
+    grid-template-columns: 1fr;
+    height: calc(100vh - var(--topbar-h));
+  }
+  .sidebar {
+    position: fixed;
+    top: var(--topbar-h);
+    left: 0;
+    width: var(--sidebar-w);
+    height: calc(100vh - var(--topbar-h));
+    transform: translateX(-100%);
+    transition: transform 180ms ease;
+    z-index: 15;
+    box-shadow: var(--shadow);
+  }
+  /* The drawer carries the same DOM as the desktop sidebar — but the
+     mobile header already shows the logo, so hide the in-drawer logo
+     to avoid duplication. */
+  .sidebar .sidebar-logo { display: none; }
+  body.nav-open .sidebar { transform: translateX(0); }
+  body.nav-open::after {
+    content: "";
+    position: fixed;
+    inset: var(--topbar-h) 0 0 var(--sidebar-w);
+    background: rgba(15, 23, 42, 0.3);
+    z-index: 14;
+  }
+  .content {
+    height: calc(100vh - var(--topbar-h));
+  }
+  .form-row { grid-template-columns: 1fr; }
+  .form-row > .label { padding-top: 0; }
+  dl.kv { grid-template-columns: 1fr; gap: 0.15rem 0; }
+  dl.kv dd { padding-left: 0.25rem; }
+}
+
+/* Phone-class viewports: mobile polish (touch targets, horizontal-
+   scrollable tables, Ace toolbar breathing room). Lives in a single
+   720px breakpoint rather than two (720 / 600) so the interaction
+   fixes activate together. */
+@media (max-width: 720px) {
+  /* Trim outer chrome so more of the viewport is content. */
+  .content { padding: 1rem; }
+  .content h1 { font-size: 1.15rem; }
+  .card .value { font-size: 1.25rem; }
+
+  /* Mobile header is fixed-height and the toast is screen-fixed, so
+     drop the toast below the header to keep it visible. */
+  .toast { top: calc(var(--topbar-h) + 0.75rem); }
+  .content-inner { padding: 1rem; }
+
+  /* Tables: card reflow for wide tables, column hide for narrow
+     ones. Horizontal scroll remains the last-resort fallback
+     (.panel-body overflow-x: auto) for anything that's still too wide
+     after the per-column rules fire (e.g. analytics daily grid). */
+  .panel-body { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .listing { font-size: 0.9rem; }
+
+  /* --- Card reflow ----------------------------------------------------
+     `.listing-cards` tables drop their tabular shape on phones: each
+     <tr> becomes a bordered card, <thead> hides, and each <td> stacks
+     with its column label (attr data-label) rendered above. Cells
+     with data-label="" (or missing) render unlabeled — use that for
+     the primary identifier and action buttons. */
+  .listing-cards { display: block; border: none; font-size: 0.95rem; }
+  .listing-cards thead { display: none; }
+  .listing-cards tbody { display: block; }
+  .listing-cards tr {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 0.875rem;
+    margin-bottom: 0.6rem;
+    background: var(--surface);
+  }
+  .listing-cards tr:hover { background: var(--surface); }
+  .listing-cards td {
+    display: block;
+    padding: 0.25rem 0;
+    border: none;
+    width: auto !important;
+    min-width: 0 !important;
+    text-align: left !important;
+    white-space: normal;
+  }
+  .listing-cards td[data-label]:not([data-label=""])::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 0.15rem;
+  }
+  .listing-cards td.col-primary { font-size: 1rem; font-weight: 500; margin-bottom: 0.25rem; }
+  .listing-cards td.col-drag { display: none; }
+  /* Action buttons group on their own row, pushed apart from the meta
+     fields by a subtle rule so the card reads as meta → divider → actions. */
+  .listing-cards td.col-actions {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  /* --- Column hide ----------------------------------------------------
+     `.col-hide-mobile` drops a cell (both <th> and <td>) on phones.
+     Used for secondary metadata that doesn't earn its row on a narrow
+     viewport — id columns, sort-order, timestamps the primary row
+     label already implies. */
+  .col-hide-mobile { display: none !important; }
+
+  /* Touch-target baseline: 44×44 (iOS HIG) / 48dp (Material). The
+     2rem desktop size is too tight for a fingertip; bumping here so
+     the destructive / info / copy / preview actions aren't a
+     finger-roulette. */
+  .btn-icon { width: 2.75rem; height: 2.75rem; }
+  .col-action { width: auto; min-width: 3rem; }
+
+  /* Ace editor chrome — give the toolbar / search row real breathing
+     room so the icons sit at touch-target size. */
+  .ace-chrome-toolbar { padding: 0.35rem 0.5rem; gap: 0.35rem; }
+  .ace-chrome-search { padding: 0.35rem 0.5rem; gap: 0.4rem; }
+  .ace-chrome-toolbar .btn-icon,
+  .ace-chrome-search .btn-icon { width: 2.5rem; height: 2.5rem; }
+  .ace-chrome-search-input { font-size: 16px; } /* stops iOS focus zoom */
+
+  /* iOS zooms the viewport in when a form field's computed font-size
+     is under 16px — the UI is technically still usable but every tap
+     on an input jumps the layout. Raising the minimum across the
+     common form controls is a cheap one-liner that dramatically
+     improves the feel on iPhone. */
+  input, select, textarea { font-size: 16px; }
+
+  /* Tabbar: wrap multi-tab rows instead of forcing horizontal overflow,
+     and tighten the padding so three tabs fit on a 375px viewport. */
+  .tabbar { flex-wrap: wrap; gap: 0.25rem; }
+  .tabbar a { padding: 0.5rem 0.75rem; }
+
+  /* Entry form header: when Preview + View-public + updated-timestamp
+     don't fit on one line, wrap to the next row cleanly. */
+  .entry-form-head { flex-wrap: wrap; gap: 0.5rem; }
+  .entry-form-head-right { flex-wrap: wrap; gap: 0.4rem 0.6rem; }
+
+  /* Form-actions row (save / cancel / preview buttons) — let them
+     wrap to two rows rather than overflow the right edge. */
+  .form-actions { flex-wrap: wrap; gap: 0.5rem; }
+}
