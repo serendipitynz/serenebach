@@ -5,6 +5,7 @@
 package sqlite
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -35,13 +36,33 @@ func Open(path string) (*sql.DB, error) {
 	// ships with both enabled, but we assert that here before any
 	// migration runs so a hypothetical driver swap fails loudly with a
 	// clear message rather than corrupting the migrations table.
-	if _, err := db.Exec(`CREATE VIRTUAL TABLE _fts_probe USING fts5(content, tokenize='trigram')`); err != nil {
+	//
+	// The probe runs on a single dedicated connection against the temp
+	// schema. CGI hosts call Open on every request, so a persistent probe
+	// table on the main schema would (a) collide with concurrent opens as
+	// "table already exists" and (b) permanently break startup if the
+	// process dies between CREATE and DROP (e.g. shared-host OOM kill).
+	// temp.* tables live only for the connection's lifetime and never
+	// touch the DB file, so neither failure mode is possible. Pinning one
+	// connection guarantees the CREATE and DROP hit the same connection
+	// rather than two different ones from the pool.
+	conn, err := db.Conn(context.Background())
+	if err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("sqlite: acquire FTS5 probe connection: %w", err)
+	}
+	if _, err := conn.ExecContext(context.Background(), `CREATE VIRTUAL TABLE temp._fts_probe USING fts5(content, tokenize='trigram')`); err != nil {
+		_ = conn.Close()
 		_ = db.Close()
 		return nil, fmt.Errorf("sqlite: FTS5 with the trigram tokenizer is required but not available in this driver build: %w", err)
 	}
-	if _, err := db.Exec(`DROP TABLE _fts_probe`); err != nil {
+	// temp.* tables are dropped automatically when the connection closes;
+	// this explicit drop keeps the pinned connection clean before it is
+	// returned to the pool. Best-effort — a failure here is harmless.
+	_, _ = conn.ExecContext(context.Background(), `DROP TABLE IF EXISTS temp._fts_probe`)
+	if err := conn.Close(); err != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("sqlite: drop FTS5 probe: %w", err)
+		return nil, fmt.Errorf("sqlite: release FTS5 probe connection: %w", err)
 	}
 	return db, nil
 }
