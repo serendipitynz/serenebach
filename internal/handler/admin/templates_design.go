@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -201,7 +202,11 @@ func (h *Handler) templatesOGSave(w http.ResponseWriter, r *http.Request) {
 	// its own override needs a fresh card. Best-effort — per-entry
 	// errors are logged, the save still succeeds.
 	if updated.OGBGImagePath != current.OGBGImagePath || updated.OGTextColor != current.OGTextColor {
-		go h.regenerateAllOGCards(r.Context())
+		// Detach from the request context: ServeHTTP returns as soon as the
+		// redirect below is written, which cancels r.Context() and would
+		// abort the goroutine's first DB call (ListEntriesForAdmin). Keep
+		// request-scoped values but drop cancellation. Mirrors webhook.Dispatch.
+		go h.regenerateAllOGCards(context.WithoutCancel(r.Context()))
 	}
 	http.Redirect(w, r, root(r)+"/admin/templates/og?ok=saved", http.StatusFound)
 }
