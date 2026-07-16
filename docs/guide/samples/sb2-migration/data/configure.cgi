@@ -1,0 +1,12 @@
+conf_timezone	+0900
+conf_lang	ja
+conf_srv_base	https://example.com/blog/
+conf_srv_cgi	https://example.com/blog/
+conf_srv_admin	https://example.com/blog/
+conf_dir_log	log/
+conf_dir_img	img/
+conf_entry_archive	Individual
+conf_newent_disp	8
+conf_entry_disp	5
+conf_com_disp	1
+conf_tb_disp	1

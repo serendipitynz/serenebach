@@ -1,0 +1,12 @@
+link	3
+category	6
+image	3
+template	2
+message	10
+amazon	1
+plugin	4
+weblog	1
+trackback	3
+session	0
+user	2
+entry	12
