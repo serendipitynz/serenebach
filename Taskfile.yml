@@ -246,6 +246,11 @@ tasks:
         set -euo pipefail
         TAG="{{.TAG}}"
 
+        # macOS otherwise embeds AppleDouble sidecar files (._*) into the
+        # archives, because cp/tar carry extended attributes (e.g.
+        # com.apple.provenance). Strip xattrs from each staging dir, and tell
+        # tar/zip not to store macOS metadata, so FreeBSD/Linux/Windows users
+        # get clean archives. All of this is a no-op on Linux.
         echo "==> Packaging tar.gz for unix targets"
         for target in {{.UNIX_TARGETS}}; do
           name="serenebach-${TAG}-${target}"
@@ -253,7 +258,8 @@ tasks:
           mkdir -p "$stage"
           cp "bin/serenebach-${target}" "${stage}/serenebach"
           cp README.md README.ja.md LICENSE THIRD-PARTY-NOTICES.txt internal/og/assets/NotoSansJP-LICENSE.txt "$stage/"
-          tar -C dist -czf "dist/${name}.tar.gz" "$name"
+          xattr -cr "$stage" 2>/dev/null || true
+          COPYFILE_DISABLE=1 tar -C dist -czf "dist/${name}.tar.gz" "$name"
           rm -rf "$stage"
         done
 
@@ -264,7 +270,8 @@ tasks:
           mkdir -p "$stage"
           cp "bin/serenebach-${target}.exe" "${stage}/serenebach.exe"
           cp README.md README.ja.md LICENSE THIRD-PARTY-NOTICES.txt internal/og/assets/NotoSansJP-LICENSE.txt "$stage/"
-          (cd dist && zip -qr "${name}.zip" "$name")
+          xattr -cr "$stage" 2>/dev/null || true
+          (cd dist && zip -qrX "${name}.zip" "$name")
           rm -rf "$stage"
         done
 
