@@ -180,13 +180,23 @@ func applySB2WeblogAndConfig(ctx context.Context, tx *sql.Tx, weblog *sb2Weblog,
 // future use cases can pull from them without re-parsing.
 type sb2Entry struct {
 	ID, WID, Cat, Date, Auth, Stat int64
-	Subj, File, TZ, Form           string
-	Body, More, Sum, Key           string
+	// HasCat records whether SB2's entry `cat` column was non-empty. As
+	// with category parents, SB2 ids are 0-based: `cat==""` means
+	// uncategorised while `cat=="0"` is the real category 0. SB2 itself
+	// tests `cat ne ''` (Admin/Entry.pm, Data/Entry.pm), so collapsing
+	// both to Cat==0 would drop category 0 assignments.
+	HasCat               bool
+	Subj, File, TZ, Form string
+	Body, More, Sum, Key string
 }
 
 type sb2Category struct {
 	ID, WID, Main, Order int64
-	Name, Text, Dir      string
+	// HasParent records whether SB2's `main` column was non-empty. SB2
+	// ids are 0-based, so "" (no parent) and "0" (child of category 0)
+	// are distinct; collapsing both to Main==0 loses the latter's parent.
+	HasParent       bool
+	Name, Text, Dir string
 }
 
 type sb2Message struct {
@@ -232,14 +242,16 @@ func readSB2Categories(dir string) ([]sb2Category, error) {
 	out := make([]sb2Category, 0, len(rows))
 	for _, r := range rows {
 		// elements: id, wid, name, text, url, main, order, temp, dir, disp, sub, num, idx
+		mainRaw := strings.TrimSpace(at(r, 5))
 		out = append(out, sb2Category{
-			ID:    atoi64(at(r, 0)),
-			WID:   atoi64(at(r, 1)),
-			Name:  at(r, 2),
-			Text:  at(r, 3),
-			Main:  atoi64(at(r, 5)),
-			Order: atoi64(at(r, 6)),
-			Dir:   at(r, 8),
+			ID:        atoi64(at(r, 0)),
+			WID:       atoi64(at(r, 1)),
+			Name:      at(r, 2),
+			Text:      at(r, 3),
+			Main:      atoi64(mainRaw),
+			HasParent: mainRaw != "",
+			Order:     atoi64(at(r, 6)),
+			Dir:       at(r, 8),
 		})
 	}
 	return out, nil
@@ -276,21 +288,23 @@ func readSB2Entries(dir string) ([]sb2Entry, error) {
 		// elements: id, wid, subj, cat, date, auth, stat, com, tb, file,
 		// tz, add, edit, acm, atb, form, ping, body, more, sum, key,
 		// ext, tmp
+		catRaw := strings.TrimSpace(at(r, 3))
 		out = append(out, sb2Entry{
-			ID:   atoi64(at(r, 0)),
-			WID:  atoi64(at(r, 1)),
-			Subj: at(r, 2),
-			Cat:  atoi64(at(r, 3)),
-			Date: atoi64(at(r, 4)),
-			Auth: atoi64(at(r, 5)),
-			Stat: atoi64(at(r, 6)),
-			File: at(r, 9),
-			TZ:   at(r, 10),
-			Form: at(r, 15),
-			Body: at(r, 17),
-			More: at(r, 18),
-			Sum:  at(r, 19),
-			Key:  at(r, 20),
+			ID:     atoi64(at(r, 0)),
+			WID:    atoi64(at(r, 1)),
+			Subj:   at(r, 2),
+			Cat:    atoi64(catRaw),
+			HasCat: catRaw != "",
+			Date:   atoi64(at(r, 4)),
+			Auth:   atoi64(at(r, 5)),
+			Stat:   atoi64(at(r, 6)),
+			File:   at(r, 9),
+			TZ:     at(r, 10),
+			Form:   at(r, 15),
+			Body:   at(r, 17),
+			More:   at(r, 18),
+			Sum:    at(r, 19),
+			Key:    at(r, 20),
 		})
 	}
 	// Sort by ID so import order is deterministic. SB2's directory
@@ -533,7 +547,9 @@ func importSB2Categories(ctx context.Context, tx *sql.Tx, cats []sb2Category, op
 			return nil, err
 		}
 		idMap[c.ID] = newID
-		if c.Main != 0 {
+		// Empty SB2 `main` means top-level; "0" means child of category 0.
+		// Key off HasParent, not Main!=0, so parent==0 survives.
+		if c.HasParent {
 			fixups = append(fixups, fixup{destID: newID, legacyParent: c.Main})
 		}
 		report.Categories++
@@ -584,10 +600,12 @@ func importSB2Entries(ctx context.Context, tx *sql.Tx, entries []sb2Entry, catMa
 		}
 
 		// entries.category_id is NOT NULL in the destination schema, so
-		// missing or zero category ids must fall back to -1 (the
-		// "uncategorised" sentinel the SB3 importer also uses).
+		// an empty (uncategorised) category must fall back to -1 (the
+		// "uncategorised" sentinel the SB3 importer also uses). An empty
+		// SB2 `cat` means uncategorised; "0" is the real category 0, so
+		// key off HasCat rather than Cat!=0.
 		var catID int64 = -1
-		if e.Cat != 0 {
+		if e.HasCat {
 			if mapped, ok := catMap[e.Cat]; ok {
 				catID = mapped
 			} else {
