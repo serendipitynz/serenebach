@@ -67,10 +67,11 @@ func buildSB2Fixture(t *testing.T) string {
 	mustWrite(t, filepath.Join(dir, "entry", "101.cgi"),
 		sb2Entry("101", "Draft Post", "1", "1700001000", "0", "Draft body.", "", ""),
 	)
-	// entry/102.cgi — published but cat=0 (uncategorised in SB2). Must
-	// land with category_id = -1, NOT a NULL constraint failure.
+	// entry/102.cgi — published but uncategorised. SB2 marks that with an
+	// EMPTY cat (not "0", which is the real category 0). Must land with
+	// category_id = -1, NOT a NULL constraint failure.
 	mustWrite(t, filepath.Join(dir, "entry", "102.cgi"),
-		sb2Entry("102", "Uncategorised Post", "0", "1700002000", "1", "No category here.", "", ""),
+		sb2Entry("102", "Uncategorised Post", "", "1700002000", "1", "No category here.", "", ""),
 	)
 	// entry/103.cgi — published but references a non-existent category.
 	mustWrite(t, filepath.Join(dir, "entry", "103.cgi"),
@@ -297,9 +298,11 @@ func sb2BasicAssertCommentsOnPublishedOnly(t *testing.T, db *sql.DB) {
 }
 
 // TestImportSB2CategoryParentZero is a regression for the SB2 quirk that
-// category ids are 0-based: an EMPTY `main` means top-level, while
-// main="0" means "child of category 0". Collapsing both to the integer 0
-// (the old bug) detached every child of category 0 into a top-level row.
+// category ids are 0-based: an EMPTY string means "none", while "0" is the
+// real category 0. Collapsing both to the integer 0 (the old bug) detached
+// every child of category 0 into a top-level row on the category-parent
+// side, and dropped every entry assigned to category 0 to uncategorised on
+// the entry side. Both sides are covered here.
 func TestImportSB2CategoryParentZero(t *testing.T) {
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "configure.cgi"), "conf_dbtype\tText\n")
@@ -312,6 +315,13 @@ func TestImportSB2CategoryParentZero(t *testing.T) {
 		sb2Row("1", "0", "ChildOfZero", "", "", "0", "0", "0", "child/", "0", "", "0", ""),
 		sb2Row("2", "0", "OtherTop", "", "", "", "0", "0", "other/", "0", "", "0", ""),
 	)
+	// entry 100: cat="0" (real category 0) must map to category 0, NOT -1.
+	// entry 101: cat="" (uncategorised) must land at -1.
+	mustMkdir(t, filepath.Join(dir, "entry"))
+	mustWrite(t, filepath.Join(dir, "entry", "100.cgi"),
+		sb2Entry("100", "In Category Zero", "0", "1700000000", "1", "body", "", ""))
+	mustWrite(t, filepath.Join(dir, "entry", "101.cgi"),
+		sb2Entry("101", "Uncategorised", "", "1700000100", "1", "body", "", ""))
 
 	a := destApp(t)
 	report, err := importer.Import(context.Background(), a.DB, dir, importer.Options{
@@ -345,6 +355,24 @@ func TestImportSB2CategoryParentZero(t *testing.T) {
 	_, otherParent := byLegacy(2)
 	if otherParent != 0 {
 		t.Errorf("OtherTop (empty main) parent_id = %d, want 0 (top-level)", otherParent)
+	}
+
+	// Entry side: cat="0" must map to category 0's dest id, cat="" to -1.
+	entryCat := func(title string) int64 {
+		t.Helper()
+		var cat int64
+		if err := a.DB.QueryRow(
+			`SELECT category_id FROM entries WHERE wid = 1 AND title = ?`, title,
+		).Scan(&cat); err != nil {
+			t.Fatalf("entry %q: %v", title, err)
+		}
+		return cat
+	}
+	if got := entryCat("In Category Zero"); got != rootDest {
+		t.Errorf("entry in category 0 category_id = %d, want %d (dest of category 0)", got, rootDest)
+	}
+	if got := entryCat("Uncategorised"); got != -1 {
+		t.Errorf("uncategorised entry category_id = %d, want -1", got)
 	}
 
 	// The parent (category 0) exists, so no "parent not found" warning
