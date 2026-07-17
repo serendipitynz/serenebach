@@ -385,9 +385,9 @@ func TestImportSB2CategoryParentZero(t *testing.T) {
 }
 
 func TestImportSB2UncategorisedFallback(t *testing.T) {
-	// Regression: entries.category_id is NOT NULL. SB2 entries with
-	// cat=0 (uncategorised) or cat referencing a missing row must
-	// land at -1 instead of triggering a NULL constraint rollback.
+	// Regression: entries.category_id is NOT NULL. SB2 entries with an
+	// empty cat="" (uncategorised) or a cat referencing a missing row
+	// must land at -1 instead of triggering a NULL constraint rollback.
 	dir := buildSB2Fixture(t)
 	a := destApp(t)
 	report, err := importer.Import(context.Background(), a.DB, dir, importer.Options{
