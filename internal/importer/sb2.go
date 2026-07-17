@@ -186,7 +186,11 @@ type sb2Entry struct {
 
 type sb2Category struct {
 	ID, WID, Main, Order int64
-	Name, Text, Dir      string
+	// HasParent records whether SB2's `main` column was non-empty. SB2
+	// ids are 0-based, so "" (no parent) and "0" (child of category 0)
+	// are distinct; collapsing both to Main==0 loses the latter's parent.
+	HasParent       bool
+	Name, Text, Dir string
 }
 
 type sb2Message struct {
@@ -232,14 +236,16 @@ func readSB2Categories(dir string) ([]sb2Category, error) {
 	out := make([]sb2Category, 0, len(rows))
 	for _, r := range rows {
 		// elements: id, wid, name, text, url, main, order, temp, dir, disp, sub, num, idx
+		mainRaw := strings.TrimSpace(at(r, 5))
 		out = append(out, sb2Category{
-			ID:    atoi64(at(r, 0)),
-			WID:   atoi64(at(r, 1)),
-			Name:  at(r, 2),
-			Text:  at(r, 3),
-			Main:  atoi64(at(r, 5)),
-			Order: atoi64(at(r, 6)),
-			Dir:   at(r, 8),
+			ID:        atoi64(at(r, 0)),
+			WID:       atoi64(at(r, 1)),
+			Name:      at(r, 2),
+			Text:      at(r, 3),
+			Main:      atoi64(mainRaw),
+			HasParent: mainRaw != "",
+			Order:     atoi64(at(r, 6)),
+			Dir:       at(r, 8),
 		})
 	}
 	return out, nil
@@ -533,7 +539,9 @@ func importSB2Categories(ctx context.Context, tx *sql.Tx, cats []sb2Category, op
 			return nil, err
 		}
 		idMap[c.ID] = newID
-		if c.Main != 0 {
+		// Empty SB2 `main` means top-level; "0" means child of category 0.
+		// Key off HasParent, not Main!=0, so parent==0 survives.
+		if c.HasParent {
 			fixups = append(fixups, fixup{destID: newID, legacyParent: c.Main})
 		}
 		report.Categories++

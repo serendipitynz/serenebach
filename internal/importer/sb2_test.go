@@ -48,8 +48,11 @@ func buildSB2Fixture(t *testing.T) string {
 
 	// category.cgi — Data/Category.pm elements: id, wid, name, text,
 	// url, main, order, temp, dir, disp, sub, num, idx
+	// Tech is top-level: SB2 marks that with an EMPTY main, not "0"
+	// ("0" would mean "child of category 0"). Sub-tech's main="1" makes
+	// it Tech's child.
 	mustWrite(t, filepath.Join(dir, "category.cgi"),
-		sb2Row("1", "0", "Tech", "tech posts", "", "0", "0", "0", "tech/", "0", "", "0", ""),
+		sb2Row("1", "0", "Tech", "tech posts", "", "", "0", "0", "tech/", "0", "", "0", ""),
 		sb2Row("2", "0", "Sub-tech", "child of tech", "", "1", "0", "0", "tech/sub/", "0", "", "0", ""),
 	)
 
@@ -293,6 +296,66 @@ func sb2BasicAssertCommentsOnPublishedOnly(t *testing.T, db *sql.DB) {
 	}
 }
 
+// TestImportSB2CategoryParentZero is a regression for the SB2 quirk that
+// category ids are 0-based: an EMPTY `main` means top-level, while
+// main="0" means "child of category 0". Collapsing both to the integer 0
+// (the old bug) detached every child of category 0 into a top-level row.
+func TestImportSB2CategoryParentZero(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "configure.cgi"), "conf_dbtype\tText\n")
+	mustWrite(t, filepath.Join(dir, "weblog.cgi"),
+		sb2Row("0", "Zero-parent Blog", "category 0 is a real parent"))
+	// cat 0: top-level (empty main). cat 1: child of cat 0 (main="0").
+	// cat 2: top-level (empty main) — proves empty main is NOT remapped.
+	mustWrite(t, filepath.Join(dir, "category.cgi"),
+		sb2Row("0", "0", "Root", "", "", "", "0", "0", "root/", "0", "", "0", ""),
+		sb2Row("1", "0", "ChildOfZero", "", "", "0", "0", "0", "child/", "0", "", "0", ""),
+		sb2Row("2", "0", "OtherTop", "", "", "", "0", "0", "other/", "0", "", "0", ""),
+	)
+
+	a := destApp(t)
+	report, err := importer.Import(context.Background(), a.DB, dir, importer.Options{
+		TargetWID: 1, AuthorID: 1, OnlyPublished: true, SBVersion: 2,
+	})
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	if report.Categories != 3 {
+		t.Errorf("categories = %d, want 3", report.Categories)
+	}
+
+	byLegacy := func(id int64) (destID, parentID int64) {
+		t.Helper()
+		if err := a.DB.QueryRow(
+			`SELECT id, parent_id FROM categories WHERE wid = 1 AND legacy_id = ?`, id,
+		).Scan(&destID, &parentID); err != nil {
+			t.Fatalf("category legacy_id=%d: %v", id, err)
+		}
+		return destID, parentID
+	}
+
+	rootDest, rootParent := byLegacy(0)
+	if rootParent != 0 {
+		t.Errorf("Root (legacy 0) parent_id = %d, want 0 (top-level)", rootParent)
+	}
+	_, childParent := byLegacy(1)
+	if childParent != rootDest {
+		t.Errorf("ChildOfZero parent_id = %d, want %d (dest of category 0)", childParent, rootDest)
+	}
+	_, otherParent := byLegacy(2)
+	if otherParent != 0 {
+		t.Errorf("OtherTop (empty main) parent_id = %d, want 0 (top-level)", otherParent)
+	}
+
+	// The parent (category 0) exists, so no "parent not found" warning
+	// should be emitted for this fixture.
+	for _, w := range report.Warnings {
+		if strings.Contains(w, "parent legacy id") {
+			t.Errorf("unexpected parent-fixup warning: %q", w)
+		}
+	}
+}
+
 func TestImportSB2UncategorisedFallback(t *testing.T) {
 	// Regression: entries.category_id is NOT NULL. SB2 entries with
 	// cat=0 (uncategorised) or cat referencing a missing row must
@@ -401,7 +464,7 @@ func TestImportSB2EUCJPDecode(t *testing.T) {
 		return out
 	}
 	mustWrite(t, filepath.Join(dir, "weblog.cgi"), encEUC("0\tこんにちは\tテスト用\t\n"))
-	mustWrite(t, filepath.Join(dir, "category.cgi"), encEUC("1\t0\tカテゴリ\t\t\t0\t0\t0\t\t0\t\t0\t\t\n"))
+	mustWrite(t, filepath.Join(dir, "category.cgi"), encEUC("1\t0\tカテゴリ\t\t\t\t0\t0\t\t0\t\t0\t\t\n"))
 	mustMkdir(t, filepath.Join(dir, "entry"))
 	mustWrite(t, filepath.Join(dir, "entry", "1.cgi"),
 		encEUC("1\t0\t日本語タイトル\t1\t1700000000\t1\t1\t0\t0\t\t+0900\t\t\t1\t1\t\t\tこれは本文です。\t\t\t\t\t\n"),
@@ -464,7 +527,7 @@ func TestImportSB2NonEUCEncodings(t *testing.T) {
 
 			mustWrite(t, filepath.Join(dir, "configure.cgi"), "conf_dbtype\tText\n")
 			mustWrite(t, filepath.Join(dir, "weblog.cgi"), enc("0\tこんにちは\tテスト用\t\n"))
-			mustWrite(t, filepath.Join(dir, "category.cgi"), enc("1\t0\tカテゴリ\t\t\t0\t0\t0\t\t0\t\t0\t\t\n"))
+			mustWrite(t, filepath.Join(dir, "category.cgi"), enc("1\t0\tカテゴリ\t\t\t\t0\t0\t\t0\t\t0\t\t\n"))
 			mustMkdir(t, filepath.Join(dir, "entry"))
 			mustWrite(t, filepath.Join(dir, "entry", "1.cgi"),
 				enc("1\t0\t"+wantTitle+"\t1\t1700000000\t1\t1\t0\t0\t\t+0900\t\t\t1\t1\t\t\t"+wantBody+"\t\t\t\t\t\n"),
