@@ -555,10 +555,16 @@ func importCategories(ctx context.Context, src *sql.DB, tx *sql.Tx, opts Options
 	// Second pass: rebuild parent_id using the id map now that every row is in.
 	for sb3ID, newID := range idMap {
 		var sb3Parent int64
-		if err := src.QueryRowContext(ctx, `SELECT COALESCE(category_main,0) FROM sb_category WHERE category_id = ?`, sb3ID).Scan(&sb3Parent); err != nil {
+		// SB3 category ids are 0-based, so category 0 is real data that can
+		// have children. `category_main` marks top-level with -1 (see
+		// _base/lib/sb/Data/Category.pm, which normalises "" → -1 and treats
+		// -1 as top-level), so 0 is a valid "child of category 0" parent.
+		// Defaulting a NULL to -1 keeps that distinction; defaulting to 0
+		// would collapse top-level and child-of-0 and detach the latter.
+		if err := src.QueryRowContext(ctx, `SELECT COALESCE(category_main,-1) FROM sb_category WHERE category_id = ?`, sb3ID).Scan(&sb3Parent); err != nil {
 			continue
 		}
-		if sb3Parent == 0 {
+		if sb3Parent < 0 {
 			continue
 		}
 		if newParent, ok := idMap[sb3Parent]; ok {

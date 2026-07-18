@@ -42,7 +42,10 @@ func buildSB3Fixture(t *testing.T) string {
 
 	seed := []string{
 		`INSERT INTO sb_weblog VALUES (0, 'Imported Title', 'imported description')`,
-		`INSERT INTO sb_category VALUES (1, 0, 'parent', 0, 0, 'log/')`,
+		// SB3 marks a top-level category with category_main=-1, not 0
+		// ("0" would mean "child of category 0", since SB3 ids are 0-based).
+		// child's main=1 makes it parent's child.
+		`INSERT INTO sb_category VALUES (1, 0, 'parent', -1, 0, 'log/')`,
 		`INSERT INTO sb_category VALUES (2, 0, 'child', 1, 1, 'log/sub/')`,
 		`INSERT INTO sb_template VALUES (10, 0, 'summer', '<html>{site_title}</html>', '', 'body{}', 'info')`,
 		// "legacy" carries a trackback block + amazon tag so the lint
@@ -473,6 +476,81 @@ func TestImportFailsOnMissingAuthor(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for missing author")
+	}
+}
+
+// TestImportSB3CategoryParentZero is a regression for the SB3 quirk that
+// category ids are 0-based: category_main=-1 means top-level, while
+// category_main=0 means "child of category 0". Defaulting the sentinel to
+// 0 (the old bug) collapsed both and detached every child of category 0
+// into a top-level row.
+func TestImportSB3CategoryParentZero(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sb3.db")
+	db, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	// The importer queries sb_weblog/sb_template/sb_category/sb_entry, so
+	// every table must exist even when a pass has nothing to read.
+	ddl := []string{
+		`CREATE TABLE sb_weblog (weblog_id INTEGER PRIMARY KEY, weblog_title TEXT, weblog_text TEXT)`,
+		`CREATE TABLE sb_category (category_id INTEGER PRIMARY KEY, category_wid INTEGER, category_name TEXT, category_main INTEGER, category_order INTEGER, category_dir TEXT)`,
+		`CREATE TABLE sb_template (template_id INTEGER PRIMARY KEY, template_wid INTEGER, template_name TEXT, template_main TEXT, template_entry TEXT, template_css TEXT, template_info TEXT)`,
+		`CREATE TABLE sb_entry (entry_id INTEGER PRIMARY KEY, entry_wid INTEGER, entry_subj TEXT, entry_cat INTEGER, entry_date INTEGER, entry_auth INTEGER, entry_stat INTEGER, entry_body TEXT, entry_more TEXT, entry_form TEXT, entry_mod INTEGER, entry_file TEXT, entry_key TEXT, entry_sum TEXT)`,
+	}
+	for _, s := range ddl {
+		if _, err := db.Exec(s); err != nil {
+			t.Fatalf("ddl: %v", err)
+		}
+	}
+	seed := []string{
+		`INSERT INTO sb_weblog VALUES (0, 'Zero-parent Blog', 'category 0 is a real parent')`,
+		// cat 0: top-level (main=-1). cat 1: child of cat 0 (main=0).
+		// cat 2: top-level (main=-1) — proves -1 is NOT remapped.
+		`INSERT INTO sb_category VALUES (0, 0, 'Root', -1, 0, 'root/')`,
+		`INSERT INTO sb_category VALUES (1, 0, 'ChildOfZero', 0, 1, 'child/')`,
+		`INSERT INTO sb_category VALUES (2, 0, 'OtherTop', -1, 2, 'other/')`,
+	}
+	for _, s := range seed {
+		if _, err := db.Exec(s); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+
+	a := destApp(t)
+	report, err := importer.Import(context.Background(), a.DB, path, importer.Options{
+		TargetWID: 1, AuthorID: 1, OnlyPublished: true,
+	})
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	if report.Categories != 3 {
+		t.Errorf("categories = %d, want 3", report.Categories)
+	}
+
+	byLegacy := func(id int64) (destID, parentID int64) {
+		t.Helper()
+		if err := a.DB.QueryRow(
+			`SELECT id, parent_id FROM categories WHERE wid = 1 AND legacy_id = ?`, id,
+		).Scan(&destID, &parentID); err != nil {
+			t.Fatalf("category legacy_id=%d: %v", id, err)
+		}
+		return destID, parentID
+	}
+
+	rootDest, rootParent := byLegacy(0)
+	if rootParent != 0 {
+		t.Errorf("Root (legacy 0) parent_id = %d, want 0 (top-level)", rootParent)
+	}
+	_, childParent := byLegacy(1)
+	if childParent != rootDest {
+		t.Errorf("ChildOfZero parent_id = %d, want %d (dest of category 0)", childParent, rootDest)
+	}
+	_, otherParent := byLegacy(2)
+	if otherParent != 0 {
+		t.Errorf("OtherTop (main=-1) parent_id = %d, want 0 (top-level)", otherParent)
 	}
 }
 
