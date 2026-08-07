@@ -151,6 +151,18 @@ tasks:
           exit 1
         fi
 
+  lint:js:
+    desc: Run biome against the admin JavaScript (reads biome.json)
+    # Biome rather than ESLint/Prettier: it ships as a standalone Rust
+    # binary, so JS linting costs no Node runtime, no package manager and
+    # no node_modules in a project whose whole silhouette is "one Go
+    # binary". Prettier was ruled out outright — it preserves brace-less
+    # bodies, so it cannot enforce the rule this exists for.
+    # Only style/useBlockStatements is enabled; broadening the ruleset is
+    # a separate decision, not a side effect of installing the tool.
+    cmds:
+      - biome lint .
+
   test:
     desc: Run the Go test suite
     cmds:

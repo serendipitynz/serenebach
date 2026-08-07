@@ -88,6 +88,7 @@ For production, prefer a pinned release tag over `latest`. See [docs/deployment.
 CI runs the same checks on every push and pull request:
 
 - `task lint` — runs `golangci-lint` against `.golangci.yml` (covers `staticcheck` plus the project lint set, including `gocyclo` at the goreportcard threshold of 15) and fails on any `//nolint:gocyclo`, which goreportcard's raw gocyclo ignores
+- `task lint:js` — runs `biome lint .` against the admin JavaScript using `biome.json`. Install with `brew install biome` or download a binary from [biome releases](https://github.com/biomejs/biome/releases); it is a standalone Rust binary, so no Node runtime or `node_modules` is involved. Only `style/useBlockStatements` is enabled, which requires braces on every control-flow body
 - `task test` — runs `go test ./...`
 - `task cover` — runs the suite with cross-package coverage (`-coverpkg=./...`) and prints the total; `task cover:html` opens the HTML report, `task cover:html:file` writes it to `coverage.html` for headless use
 
