@@ -213,9 +213,11 @@ function wireChrome(chrome, wrap, editor, aceEditors) {
     editor.findPrevious();
   }
 
-  if (toggleBtn) { toggleBtn.addEventListener('click', function () {
-    if (searchBar.hidden) { openSearch();  }else { closeSearch(); }
-  }); }
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', function () {
+      if (searchBar.hidden) { openSearch(); } else { closeSearch(); }
+    });
+  }
   if (closeBtn) { closeBtn.addEventListener('click', closeSearch); }
   if (nextBtn) { nextBtn.addEventListener('click', findNext); }
   if (prevBtn) { prevBtn.addEventListener('click', findPrev); }
@@ -224,7 +226,7 @@ function wireChrome(chrome, wrap, editor, aceEditors) {
     searchInput.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') {
         e.preventDefault();
-        if (e.shiftKey) { findPrev();  }else { findNext(); }
+        if (e.shiftKey) { findPrev(); } else { findNext(); }
       } else if (e.key === 'Escape') {
         e.preventDefault();
         closeSearch();

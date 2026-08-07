@@ -129,7 +129,7 @@ function initOGTextColor() {
     var transparent = field.querySelector('[data-og-text-transparent]');
     var unset = field.querySelector('[data-og-text-color-unset]');
     var clear = field.querySelector('[data-og-text-color-clear]');
-    function armUnset(v) { if (unset) { unset.value = v ? '1' : '0';  }}
+    function armUnset(v) { if (unset) { unset.value = v ? '1' : '0'; } }
     if (transparent) {
       transparent.addEventListener('change', function () {
         if (picker) { picker.disabled = transparent.checked; }

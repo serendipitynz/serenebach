@@ -160,6 +160,16 @@ tasks:
     # bodies, so it cannot enforce the rule this exists for.
     # Only style/useBlockStatements is enabled; broadening the ruleset is
     # a separate decision, not a side effect of installing the tool.
+    #
+    # Scope is *.js only. Inline <script> in web/templates/**/*.html stays
+    # uncovered because these are html/template sources: biome's HTML
+    # parser rejects `{{...}}` actions, so pointing it at them yields
+    # parse errors, not findings (116 of them on layout.html alone).
+    # Inline scripts therefore rely on review — keep them tiny.
+    #
+    # CI pins biome to the version named in .github/workflows/ci.yml,
+    # while this target uses whatever is on PATH. If a finding here
+    # disagrees with CI, compare `biome --version` against that pin first.
     cmds:
       - biome lint .
 

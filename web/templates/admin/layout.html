@@ -13,7 +13,7 @@
 (function () {
   try {
     var pref = localStorage.getItem('sb_admin_appearance') || 'auto';
-    if (pref !== 'light' && pref !== 'dark' && pref !== 'auto') pref = 'auto';
+    if (pref !== 'light' && pref !== 'dark' && pref !== 'auto') { pref = 'auto'; }
     document.documentElement.setAttribute('data-theme', pref);
 
     // Image library view mode: if /admin/images was opened without an

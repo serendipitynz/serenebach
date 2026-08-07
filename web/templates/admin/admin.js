@@ -69,7 +69,7 @@ document.querySelectorAll('.cell-clickable[data-comment-body]').forEach(function
 function appendKV(dl, key, value) {
   var dt = document.createElement('dt'); dt.textContent = key;
   var dd = document.createElement('dd');
-  if (value && value.nodeType) { dd.appendChild(value);  }else { dd.textContent = value; }
+  if (value && value.nodeType) { dd.appendChild(value); } else { dd.textContent = value; }
   dl.appendChild(dt); dl.appendChild(dd);
 }
 function linkifyNode(u) {
