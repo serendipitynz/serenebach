@@ -1,5 +1,5 @@
 export function setButtonLoading(btn) {
-  if (!btn) return function () {};
+  if (!btn) { return function () {}; }
   var originalLabel = btn.textContent;
   btn.disabled = true;
   btn.setAttribute('aria-busy', 'true');

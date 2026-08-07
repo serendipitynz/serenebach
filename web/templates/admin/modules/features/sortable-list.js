@@ -7,19 +7,19 @@ export function initSortableLists(sbT) {
 
 function initSortableList(sbT, kind) {
   var table = document.querySelector('[data-' + kind + '-sortable]');
-  if (!table) return;
+  if (!table) { return; }
   var tbody = table.querySelector('tbody');
   var status = table.parentNode.querySelector('[data-reorder-status]');
   var token = table.getAttribute('data-csrf') || '';
   var idAttr = 'data-' + kind + '-id';
   var endpoint = table.getAttribute('data-sort-endpoint') || '/admin/' + kind + 's/reorder';
-  if (!tbody) return;
+  if (!tbody) { return; }
 
   var dragged = null;
 
   tbody.addEventListener('dragstart', function (e) {
     var row = closestRow(e.target);
-    if (!row) return;
+    if (!row) { return; }
     dragged = row;
     row.classList.add('dragging');
     if (e.dataTransfer) {
@@ -29,16 +29,16 @@ function initSortableList(sbT, kind) {
   });
 
   tbody.addEventListener('dragend', function () {
-    if (dragged) dragged.classList.remove('dragging');
+    if (dragged) { dragged.classList.remove('dragging'); }
     clearDropMarkers();
     dragged = null;
   });
 
   tbody.addEventListener('dragover', function (e) {
-    if (!dragged) return;
+    if (!dragged) { return; }
     e.preventDefault();
     var row = closestRow(e.target);
-    if (!row || row === dragged) return;
+    if (!row || row === dragged) { return; }
     clearDropMarkers();
     if (insertBefore(e, row)) {
       row.classList.add('drop-above');
@@ -48,11 +48,11 @@ function initSortableList(sbT, kind) {
   });
 
   tbody.addEventListener('drop', function (e) {
-    if (!dragged) return;
+    if (!dragged) { return; }
     e.preventDefault();
     var row = closestRow(e.target);
     clearDropMarkers();
-    if (!row || row === dragged) return;
+    if (!row || row === dragged) { return; }
     if (insertBefore(e, row)) {
       tbody.insertBefore(dragged, row);
     } else {
@@ -63,7 +63,7 @@ function initSortableList(sbT, kind) {
 
   function closestRow(el) {
     while (el && el !== tbody) {
-      if (el.tagName === 'TR' && el.hasAttribute(idAttr)) return el;
+      if (el.tagName === 'TR' && el.hasAttribute(idAttr)) { return el; }
       el = el.parentNode;
     }
     return null;
@@ -86,7 +86,7 @@ function initSortableList(sbT, kind) {
     tbody.querySelectorAll('tr[' + idAttr + ']').forEach(function (r) {
       var raw = r.getAttribute(idAttr);
       var n = parseInt(raw, 10);
-      if (!isNaN(n)) ids.push(n);
+      if (!isNaN(n)) { ids.push(n); }
     });
     flashStatus(sbT('js.reorder.saving'), '');
     fetch(endpoint, {
@@ -99,15 +99,15 @@ function initSortableList(sbT, kind) {
       },
       body: JSON.stringify({ ids: ids })
     }).then(function (res) {
-      if (res.ok) flashStatus(sbT('js.reorder.saved'), 'success');
-      else flashStatus(sbT('js.reorder.errorHTTP', res.status), 'error');
+      if (res.ok) { flashStatus(sbT('js.reorder.saved'), 'success'); }
+      else { flashStatus(sbT('js.reorder.errorHTTP', res.status), 'error'); }
     }).catch(function () {
       flashStatus(sbT('js.reorder.errorGeneric'), 'error');
     });
   }
 
   function flashStatus(msg, cls) {
-    if (!status) return;
+    if (!status) { return; }
     status.hidden = false;
     status.textContent = msg;
     status.className = 'reorder-status' + (cls ? ' ' + cls : '');

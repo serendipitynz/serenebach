@@ -1,10 +1,10 @@
 export function initDateFormatPreview() {
   var section = document.querySelector('[data-date-format-section]');
-  if (!section) return;
+  if (!section) { return; }
   var lang = section.getAttribute('data-lang') || 'en';
   section.querySelectorAll('[data-date-format-input]').forEach(function (input) {
     var preview = input.parentNode.querySelector('[data-date-format-preview]');
-    if (!preview) return;
+    if (!preview) { return; }
     var update = function () {
       var out = expandDateFormat(input.value, new Date(), lang);
       preview.textContent = out;
@@ -14,7 +14,7 @@ export function initDateFormatPreview() {
 }
 
 function expandDateFormat(pattern, d, lang) {
-  if (!pattern) return '';
+  if (!pattern) { return ''; }
   var tokens = dateFormatTokens(d, lang);
   return pattern.replace(/%([A-Za-z0-9]+)%/g, function (match, name) {
     return Object.prototype.hasOwnProperty.call(tokens, name) ? tokens[name] : match;
@@ -43,9 +43,9 @@ function dateFormatTokens(d, lang) {
   var weekLongJA = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'];
   var weekShortJA = ['日', '月', '火', '水', '木', '金', '土'];
   var dayOrd = (function () {
-    if (lang === 'ja') return day + '日';
+    if (lang === 'ja') { return day + '日'; }
     var mod100 = day % 100;
-    if (mod100 >= 11 && mod100 <= 13) return day + 'th';
+    if (mod100 >= 11 && mod100 <= 13) { return day + 'th'; }
     switch (day % 10) {
       case 1: return day + 'st';
       case 2: return day + 'nd';

@@ -1,6 +1,6 @@
 export function initNavigation() {
   var burger = document.querySelector('[data-toggle-nav]');
-  if (!burger) return;
+  if (!burger) { return; }
 
   burger.addEventListener('click', function (e) {
     e.stopPropagation();
@@ -15,8 +15,8 @@ export function initNavigation() {
   }
 
   document.addEventListener('click', function (e) {
-    if (!document.body.classList.contains('nav-open')) return;
-    if (e.target.closest && e.target.closest('.sidebar')) return;
+    if (!document.body.classList.contains('nav-open')) { return; }
+    if (e.target.closest && e.target.closest('.sidebar')) { return; }
     document.body.classList.remove('nav-open');
   });
 

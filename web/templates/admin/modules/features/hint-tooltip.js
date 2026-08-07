@@ -5,7 +5,7 @@
 // floating boxes never stack on top of each other.
 export function initHintTooltips() {
   var tips = document.querySelectorAll('[data-hint-tip]');
-  if (!tips.length) return;
+  if (!tips.length) { return; }
 
   // The body defaults to left: 0 (anchored to the icon) in CSS. Because
   // the (?) follows the label text, on a narrow viewport the icon can
@@ -20,7 +20,7 @@ export function initHintTooltips() {
     var overflowRight = rect.right - (vw - margin);
     if (overflowRight > 0) {
       var shift = -overflowRight;
-      if (rect.left + shift < margin) shift = margin - rect.left;
+      if (rect.left + shift < margin) { shift = margin - rect.left; }
       body.style.left = Math.round(shift) + 'px';
     }
   }
@@ -28,7 +28,7 @@ export function initHintTooltips() {
   function close(tip) {
     var btn = tip.querySelector('.hint-tip-btn');
     var body = tip.querySelector('.hint-tip-body');
-    if (btn) btn.setAttribute('aria-expanded', 'false');
+    if (btn) { btn.setAttribute('aria-expanded', 'false'); }
     if (body) {
       body.setAttribute('hidden', '');
       body.style.left = '';
@@ -37,14 +37,14 @@ export function initHintTooltips() {
 
   function closeAll(except) {
     tips.forEach(function (tip) {
-      if (tip !== except) close(tip);
+      if (tip !== except) { close(tip); }
     });
   }
 
   tips.forEach(function (tip) {
     var btn = tip.querySelector('.hint-tip-btn');
     var body = tip.querySelector('.hint-tip-body');
-    if (!btn || !body) return;
+    if (!btn || !body) { return; }
     btn.addEventListener('click', function (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -61,10 +61,10 @@ export function initHintTooltips() {
   });
 
   document.addEventListener('click', function (e) {
-    if (e.target.closest('[data-hint-tip]')) return;
+    if (e.target.closest('[data-hint-tip]')) { return; }
     closeAll(null);
   });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') closeAll(null);
+    if (e.key === 'Escape') { closeAll(null); }
   });
 }

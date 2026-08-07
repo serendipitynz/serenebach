@@ -81,16 +81,16 @@ export function initUploadForms() {
     var zone = form.querySelector('[data-drop-zone]');
     var input = form.querySelector('[data-drop-input]');
     var progress = form.querySelector('.drop-zone-progress');
-    if (!zone || !input) return;
+    if (!zone || !input) { return; }
 
     wireDragHover(zone, 'drag-over');
     zone.addEventListener('drop', function (e) {
       var files = e.dataTransfer && e.dataTransfer.files;
-      if (!files || !files.length) return;
+      if (!files || !files.length) { return; }
       submitFiles(files);
     });
     input.addEventListener('change', function () {
-      if (!input.files || !input.files.length) return;
+      if (!input.files || !input.files.length) { return; }
       submitFiles(input.files);
     });
 
