@@ -228,9 +228,6 @@ function renderPickerItems(items) {
       tile.className = 'upload-icon-wrap';
       tile.innerHTML = uploadIconSVG[kind] || '';
     }
-    tile.dataset.fullUrl = img.url;
-    tile.dataset.filename = img.filename || '';
-    tile.dataset.kind = kind;
     li.addEventListener('click', function () {
       if (ogBgTargetInput) {
         applyOGBGPick(img);

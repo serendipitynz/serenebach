@@ -1767,8 +1767,8 @@ table.listing-sortable thead .sort-link.desc::after { content: " ▼"; }
 .image-picker img { height: 96px; }
 .image-picker .image-tile { cursor: pointer; }
 /* Scoped to the picker on purpose: .upload-icon-wrap / .icon-upload carry no
-   rules of their own, so the library grid relies on the SVG's intrinsic size.
-   Sizing them globally would resize the library tiles as a side effect. */
+   rules anywhere else, so sizing them without the .image-picker prefix would
+   resize the library grid's icons as a side effect. */
 .image-picker .upload-icon-wrap {
   display: flex;
   align-items: center;
