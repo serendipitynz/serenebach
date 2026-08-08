@@ -151,6 +151,28 @@ tasks:
           exit 1
         fi
 
+  lint:js:
+    desc: Run biome against the admin JavaScript (reads biome.json)
+    # Biome rather than ESLint/Prettier: it ships as a standalone Rust
+    # binary, so JS linting costs no Node runtime, no package manager and
+    # no node_modules in a project whose whole silhouette is "one Go
+    # binary". Prettier was ruled out outright — it preserves brace-less
+    # bodies, so it cannot enforce the rule this exists for.
+    # Only style/useBlockStatements is enabled; broadening the ruleset is
+    # a separate decision, not a side effect of installing the tool.
+    #
+    # Scope is *.js only. Inline <script> in web/templates/**/*.html stays
+    # uncovered because these are html/template sources: biome's HTML
+    # parser rejects `{{...}}` actions, so pointing it at them yields
+    # parse errors, not findings (116 of them on layout.html alone).
+    # Inline scripts therefore rely on review — keep them tiny.
+    #
+    # CI pins biome to the version named in .github/workflows/ci.yml,
+    # while this target uses whatever is on PATH. If a finding here
+    # disagrees with CI, compare `biome --version` against that pin first.
+    cmds:
+      - biome lint .
+
   test:
     desc: Run the Go test suite
     cmds:

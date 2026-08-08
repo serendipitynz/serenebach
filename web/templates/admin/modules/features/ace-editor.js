@@ -33,24 +33,24 @@ export function initAceEditors() {
   }
 
   aceReady.then(function (loaded) {
-    if (!loaded) return;
+    if (!loaded) { return; }
     document.querySelectorAll('select[data-code-editor-format]').forEach(function (sel) {
       sel.addEventListener('change', function () {
         var mode = aceModeForFormat(sel.value);
         var scope = sel.closest('form') || document;
         scope.querySelectorAll('textarea[data-code-editor-dynamic]').forEach(function (ta) {
-          if (ta.__aceEditor) ta.__aceEditor.session.setMode('ace/mode/' + mode);
+          if (ta.__aceEditor) { ta.__aceEditor.session.setMode('ace/mode/' + mode); }
         });
         var form = sel.closest('form[data-entry-form]');
-        if (form) safeWrite('sb_admin_entry_format', sel.value);
+        if (form) { safeWrite('sb_admin_entry_format', sel.value); }
       });
     });
     applyStoredEntryFormatDefault();
     document.querySelectorAll('details').forEach(function (details) {
       details.addEventListener('toggle', function () {
-        if (!details.open) return;
+        if (!details.open) { return; }
         details.querySelectorAll('textarea').forEach(function (ta) {
-          if (ta.__aceEditor) ta.__aceEditor.resize(true);
+          if (ta.__aceEditor) { ta.__aceEditor.resize(true); }
         });
       });
     });
@@ -156,12 +156,12 @@ function upgradeTextareaToAce(textarea, aceEditors) {
 }
 
 function applyEditorHeightToAll(h, exceptWrap, aceEditors) {
-  if (!(h > 0)) return;
+  if (!(h > 0)) { return; }
   aceEditors.forEach(function (ed) {
     var ta = ed.__hostTextarea;
-    if (!ta) return;
+    if (!ta) { return; }
     var w = ta.__aceWrap;
-    if (!w || w === exceptWrap) return;
+    if (!w || w === exceptWrap) { return; }
     w.style.height = h + 'px';
     ed.resize(true);
   });
@@ -179,10 +179,10 @@ function wireChrome(chrome, wrap, editor, aceEditors) {
   var resize = chrome.querySelector('[data-ace-resize]');
 
   function openSearch() {
-    if (!searchBar) return;
+    if (!searchBar) { return; }
     searchBar.hidden = false;
     var sel = editor.getSelectedText();
-    if (sel) searchInput.value = sel;
+    if (sel) { searchInput.value = sel; }
     searchInput.focus();
     searchInput.select();
     runSearch(false);
@@ -205,26 +205,28 @@ function wireChrome(chrome, wrap, editor, aceEditors) {
     searchCount.textContent = found ? '' : sbT('js.ace.noMatch');
   }
   function findNext() {
-    if (!searchInput.value) return;
+    if (!searchInput.value) { return; }
     editor.findNext();
   }
   function findPrev() {
-    if (!searchInput.value) return;
+    if (!searchInput.value) { return; }
     editor.findPrevious();
   }
 
-  if (toggleBtn) toggleBtn.addEventListener('click', function () {
-    if (searchBar.hidden) openSearch(); else closeSearch();
-  });
-  if (closeBtn) closeBtn.addEventListener('click', closeSearch);
-  if (nextBtn) nextBtn.addEventListener('click', findNext);
-  if (prevBtn) prevBtn.addEventListener('click', findPrev);
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', function () {
+      if (searchBar.hidden) { openSearch(); } else { closeSearch(); }
+    });
+  }
+  if (closeBtn) { closeBtn.addEventListener('click', closeSearch); }
+  if (nextBtn) { nextBtn.addEventListener('click', findNext); }
+  if (prevBtn) { prevBtn.addEventListener('click', findPrev); }
   if (searchInput) {
     searchInput.addEventListener('input', function () { runSearch(false); });
     searchInput.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') {
         e.preventDefault();
-        if (e.shiftKey) findPrev(); else findNext();
+        if (e.shiftKey) { findPrev(); } else { findNext(); }
       } else if (e.key === 'Escape') {
         e.preventDefault();
         closeSearch();
@@ -252,7 +254,7 @@ function wireChrome(chrome, wrap, editor, aceEditors) {
       editor.focus();
     }
   }
-  if (fsBtn) fsBtn.addEventListener('click', toggleFullscreen);
+  if (fsBtn) { fsBtn.addEventListener('click', toggleFullscreen); }
   editor.commands.addCommand({
     name: 'admin-fullscreen-exit',
     bindKey: { win: 'Esc', mac: 'Esc' },
@@ -285,14 +287,14 @@ function wireChrome(chrome, wrap, editor, aceEditors) {
       e.preventDefault();
     });
     resize.addEventListener('pointermove', function (e) {
-      if (!dragging) return;
+      if (!dragging) { return; }
       var dy = e.clientY - startY;
       var next = Math.max(120, startH + dy);
       wrap.style.height = next + 'px';
       editor.resize(true);
     });
     resize.addEventListener('pointerup', function (e) {
-      if (!dragging) return;
+      if (!dragging) { return; }
       dragging = false;
       try { resize.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
       var finalH = Math.round(wrap.getBoundingClientRect().height);
@@ -312,14 +314,14 @@ function applyEditorMode(editor, mode) {
   }
   editor.session.setMode('ace/mode/html');
   ensureSBMode().then(function (Ctor) {
-    if (!Ctor) return;
+    if (!Ctor) { return; }
     editor.session.setMode(new Ctor());
   });
 }
 
 function ensureSBMode() {
-  if (sbModeCtor) return Promise.resolve(sbModeCtor);
-  if (sbModePending) return sbModePending;
+  if (sbModeCtor) { return Promise.resolve(sbModeCtor); }
+  if (sbModePending) { return sbModePending; }
   sbModePending = new Promise(function (resolve) {
     window.ace.config.loadModule('ace/mode/html', function () {
       try {
@@ -366,15 +368,15 @@ function applyAceTheme(editor) {
 
 function aceCurrentDark() {
   var t = document.documentElement.getAttribute('data-theme');
-  if (t === 'dark') return true;
-  if (t === 'light') return false;
+  if (t === 'dark') { return true; }
+  if (t === 'light') { return false; }
   return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
 new MutationObserver(function () {
   var editors = document.querySelectorAll('[data-code-editor]');
   editors.forEach(function (ta) {
-    if (ta.__aceEditor) applyAceTheme(ta.__aceEditor);
+    if (ta.__aceEditor) { applyAceTheme(ta.__aceEditor); }
   });
 }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
@@ -384,34 +386,34 @@ if (window.matchMedia) {
     if (document.documentElement.getAttribute('data-theme') === 'auto') {
       var editors = document.querySelectorAll('[data-code-editor]');
       editors.forEach(function (ta) {
-        if (ta.__aceEditor) applyAceTheme(ta.__aceEditor);
+        if (ta.__aceEditor) { applyAceTheme(ta.__aceEditor); }
       });
     }
   };
-  if (mql.addEventListener) mql.addEventListener('change', listener);
-  else if (mql.addListener) mql.addListener(listener);
+  if (mql.addEventListener) { mql.addEventListener('change', listener); }
+  else if (mql.addListener) { mql.addListener(listener); }
 }
 
 function applyStoredEntryFormatDefault() {
   var form = document.querySelector('form[data-entry-form]');
-  if (!form) return;
+  if (!form) { return; }
   var action = form.getAttribute('action') || '';
-  if (!/\/admin\/entries\/new$/.test(action)) return;
+  if (!/\/admin\/entries\/new$/.test(action)) { return; }
   var sel = form.querySelector('select[data-code-editor-format]');
-  if (!sel) return;
+  if (!sel) { return; }
   var stored = safeRead('sb_admin_entry_format');
-  if (!stored || stored === sel.value) return;
+  if (!stored || stored === sel.value) { return; }
   var valid = false;
   for (var i = 0; i < sel.options.length; i++) {
     if (sel.options[i].value === stored) { valid = true; break; }
   }
-  if (!valid) return;
+  if (!valid) { return; }
   sel.value = stored;
   sel.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 function aceModeForFormat(value) {
-  if (value === 'markdown') return 'markdown';
-  if (value === 'sbtext') return 'text';
+  if (value === 'markdown') { return 'markdown'; }
+  if (value === 'sbtext') { return 'text'; }
   return 'html';
 }

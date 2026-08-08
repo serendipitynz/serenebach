@@ -20,7 +20,7 @@ var fontIconSVG = '<svg class="icon-upload modal-doc-icon" viewBox="0 0 24 24" f
 
 function kindForName(name) {
   var dot = name.lastIndexOf('.');
-  if (dot < 0) return 'text';
+  if (dot < 0) { return 'text'; }
   var ext = name.slice(dot + 1).toLowerCase();
   return ASSET_KIND[ext] || 'text';
 }
@@ -31,7 +31,7 @@ export function initTemplateAssetPreview() {
       e.preventDefault();
       var base = trigger.getAttribute('data-asset-base') || '';
       var name = trigger.getAttribute('data-asset-name') || '';
-      if (!base || !name) return;
+      if (!base || !name) { return; }
       // Build the URL from the raw filename with encodeURIComponent: a
       // name containing #, ?, &, or spaces must be escaped per-segment,
       // otherwise the browser would read it as a fragment/query and
@@ -64,7 +64,7 @@ function openPreview(kind, url, name) {
   openModal({ title: name, variant: 'wide', bodyNode: pre });
   fetch(url, { credentials: 'same-origin' })
     .then(function (res) {
-      if (!res.ok) throw new Error('HTTP ' + res.status);
+      if (!res.ok) { throw new Error('HTTP ' + res.status); }
       return res.text();
     })
     .then(function (text) {

@@ -9,7 +9,7 @@ export function showToast(msg, variant) {
   var perChar = variant === 'error' ? 60 : 40;
   var dwell = base + Math.max(0, len - 20) * perChar;
   var ceiling = variant === 'error' ? 12000 : 6000;
-  if (dwell > ceiling) dwell = ceiling;
+  if (dwell > ceiling) { dwell = ceiling; }
   setTimeout(function () {
     el.classList.remove('visible');
     setTimeout(function () { el.remove(); }, 200);
@@ -19,11 +19,11 @@ export function showToast(msg, variant) {
 export function initToastPromotion() {
   document.querySelectorAll('.alert.success').forEach(function (el) {
     var msg = (el.textContent || '').trim();
-    if (msg) showToast(msg);
+    if (msg) { showToast(msg); }
     el.remove();
   });
   document.querySelectorAll('.alert.error').forEach(function (el) {
     var msg = (el.textContent || '').trim();
-    if (msg) showToast(msg, 'error');
+    if (msg) { showToast(msg, 'error'); }
   });
 }

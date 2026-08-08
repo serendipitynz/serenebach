@@ -48,7 +48,7 @@ initAITestButton();
 // the complete body (no line clamp inside the dialog).
 document.querySelectorAll('.cell-clickable[data-comment-body]').forEach(function (cell) {
   cell.addEventListener('click', function (e) {
-    if (e.target.closest('a, button, form')) return;
+    if (e.target.closest('a, button, form')) { return; }
     e.preventDefault();
     var author = cell.getAttribute('data-comment-author') || '';
     var email = cell.getAttribute('data-comment-email') || '';
@@ -69,7 +69,7 @@ document.querySelectorAll('.cell-clickable[data-comment-body]').forEach(function
 function appendKV(dl, key, value) {
   var dt = document.createElement('dt'); dt.textContent = key;
   var dd = document.createElement('dd');
-  if (value && value.nodeType) dd.appendChild(value); else dd.textContent = value;
+  if (value && value.nodeType) { dd.appendChild(value); } else { dd.textContent = value; }
   dl.appendChild(dt); dl.appendChild(dd);
 }
 function linkifyNode(u) {
@@ -142,7 +142,7 @@ if (saveAsBtn) {
     ok.addEventListener('click', function () {
       var v = input.value.trim();
       if (!v) { input.focus(); return; }
-      if (nameField) nameField.value = v;
+      if (nameField) { nameField.value = v; }
       form.action = '/admin/templates/' + tplID + '/save-as';
       if (form.requestSubmit) {
         form.requestSubmit();
@@ -232,7 +232,7 @@ if (renameBtn) {
           currentName = newName;
           renameBtn.setAttribute('data-current-name', newName);
           var span = document.querySelector('[data-template-name]');
-          if (span) span.textContent = newName;
+          if (span) { span.textContent = newName; }
           // Rebuild document.title from server-supplied prefix/suffix
           // attributes rather than parsing the current title — a name
           // containing ": " or " | " would otherwise be split mid-name.
@@ -243,9 +243,9 @@ if (renameBtn) {
           }
           // Keep the save-as / export buttons' pre-fill in sync.
           var saveAsBtn = document.querySelector('[data-template-save-as]');
-          if (saveAsBtn) saveAsBtn.setAttribute('data-current-name', newName);
+          if (saveAsBtn) { saveAsBtn.setAttribute('data-current-name', newName); }
           var exportBtn = document.querySelector('[data-template-export]');
-          if (exportBtn) exportBtn.setAttribute('data-current-name', newName);
+          if (exportBtn) { exportBtn.setAttribute('data-current-name', newName); }
           closeModal();
         })
         .catch(function () {
@@ -380,7 +380,7 @@ initUnsavedWarn(ace.ready);
 
 function initUnsavedWarn(aceReady) {
   var forms = document.querySelectorAll('form[data-unsaved-warn]');
-  if (!forms.length) return;
+  if (!forms.length) { return; }
   var submitting = false;
   forms.forEach(function (form) {
     var initial = null;
@@ -392,10 +392,10 @@ function initUnsavedWarn(aceReady) {
     document.addEventListener('submit', function () { submitting = true; }, true);
 
     window.addEventListener('beforeunload', function (e) {
-      if (submitting) return;
-      if (!document.body.contains(form)) return;
-      if (initial === null) return;
-      if (snapshot(form) === initial) return;
+      if (submitting) { return; }
+      if (!document.body.contains(form)) { return; }
+      if (initial === null) { return; }
+      if (snapshot(form) === initial) { return; }
       e.preventDefault();
       e.returnValue = '';
       return '';
@@ -407,7 +407,7 @@ function initUnsavedWarn(aceReady) {
 // `form`, suitable for comparison. Keys are URI-encoded and sorted
 // so unordered FormData iteration doesn't produce false positives.
 function snapshot(form) {
-  if (!window.FormData) return '';
+  if (!window.FormData) { return ''; }
   var fd = new FormData(form);
   var pairs = [];
   fd.forEach(function (v, k) {

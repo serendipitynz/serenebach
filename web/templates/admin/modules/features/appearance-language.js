@@ -8,7 +8,7 @@ export function initAppearanceLanguage() {
     appearanceSelect.value = stored;
     appearanceSelect.addEventListener('change', function () {
       var v = appearanceSelect.value;
-      if (v !== 'light' && v !== 'dark' && v !== 'auto') return;
+      if (v !== 'light' && v !== 'dark' && v !== 'auto') { return; }
       safeWrite('sb_admin_appearance', v);
       document.documentElement.setAttribute('data-theme', v);
     });
@@ -18,7 +18,7 @@ export function initAppearanceLanguage() {
   if (languageSelect) {
     languageSelect.addEventListener('change', function () {
       var v = languageSelect.value;
-      if (v !== 'ja' && v !== 'en') return;
+      if (v !== 'ja' && v !== 'en') { return; }
       var body = new URLSearchParams({ lang: v, csrf_token: readCSRFToken() });
       var endpoint = (window.__sbRoot || '') + '/admin/settings/language';
       fetch(endpoint, {
@@ -27,7 +27,7 @@ export function initAppearanceLanguage() {
         body: body,
         credentials: 'same-origin',
       }).then(function (res) {
-        if (res.ok) window.location.reload();
+        if (res.ok) { window.location.reload(); }
       });
     });
   }

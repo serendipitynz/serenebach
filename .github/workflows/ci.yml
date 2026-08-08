@@ -43,6 +43,17 @@ jobs:
             exit 1
           fi
 
+      # Admin JS is served as plain ES modules with no bundler, so nothing
+      # else in the pipeline would ever parse it. biome is a standalone
+      # Rust binary, which keeps this job free of Node and node_modules.
+      - name: Set up biome
+        uses: biomejs/setup-biome@v2
+        with:
+          version: 2.5.7
+
+      - name: biome lint
+        run: biome lint .
+
       - name: go build
         run: go build ./...
 

@@ -6,13 +6,13 @@ var modalDialog = modalHost && modalHost.querySelector('.modal');
 var modalLastFocus = null;
 
 export function openModal(opts) {
-  if (!modalHost) return;
+  if (!modalHost) { return; }
   modalLastFocus = document.activeElement;
   modalTitle.textContent = opts.title || '';
   modalBody.innerHTML = '';
-  if (opts.bodyNode) modalBody.appendChild(opts.bodyNode);
-  else if (typeof opts.bodyHTML === 'string') modalBody.innerHTML = opts.bodyHTML;
-  else if (typeof opts.bodyText === 'string') modalBody.textContent = opts.bodyText;
+  if (opts.bodyNode) { modalBody.appendChild(opts.bodyNode); }
+  else if (typeof opts.bodyHTML === 'string') { modalBody.innerHTML = opts.bodyHTML; }
+  else if (typeof opts.bodyText === 'string') { modalBody.textContent = opts.bodyText; }
   modalDialog.className = 'modal' + (opts.variant ? ' modal-' + opts.variant : '');
   modalFoot.innerHTML = '';
   if (opts.footerNode) {
@@ -26,7 +26,7 @@ export function openModal(opts) {
 }
 
 export function closeModal() {
-  if (!modalHost) return;
+  if (!modalHost) { return; }
   modalHost.hidden = true;
   modalBody.innerHTML = '';
   modalFoot.innerHTML = '';
@@ -37,12 +37,12 @@ export function closeModal() {
 
 if (modalHost) {
   modalHost.addEventListener('click', function (e) {
-    if (e.target === modalHost) closeModal();
+    if (e.target === modalHost) { closeModal(); }
   });
   var closeBtn = modalHost.querySelector('[data-modal-close]');
-  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  if (closeBtn) { closeBtn.addEventListener('click', closeModal); }
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && !modalHost.hidden) closeModal();
+    if (e.key === 'Escape' && !modalHost.hidden) { closeModal(); }
   });
 }
 

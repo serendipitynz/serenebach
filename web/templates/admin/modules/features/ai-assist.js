@@ -9,7 +9,7 @@ var aiPopupInstance = null;
 var aiPopupRequestCounter = 0;
 
 function getAIPopup() {
-  if (aiPopupInstance) return aiPopupInstance;
+  if (aiPopupInstance) { return aiPopupInstance; }
   var root = document.createElement('div');
   root.className = 'ai-popup';
   root.innerHTML =
@@ -64,11 +64,11 @@ function getAIPopup() {
 
   closeBtn.addEventListener('click', function () { root.hidden = true; });
   copyBtn.addEventListener('click', function () {
-    if (!currentText) return;
+    if (!currentText) { return; }
     navigator.clipboard.writeText(currentText).catch(function () {});
   });
   insertBtn.addEventListener('click', function () {
-    if (!currentText || !currentEditor) return;
+    if (!currentText || !currentEditor) { return; }
     applyAIResult(currentEditor, currentAction, currentSelection, currentText);
     root.hidden = true;
   });
@@ -84,19 +84,19 @@ function getAIPopup() {
   var dragOffsetY = 0;
 
   function onPopupDragMove(e) {
-    if (!dragging) return;
+    if (!dragging) { return; }
     root.style.left = (e.clientX - dragOffsetX) + 'px';
     root.style.top = (e.clientY - dragOffsetY) + 'px';
   }
   function onPopupDragUp() {
-    if (!dragging) return;
+    if (!dragging) { return; }
     dragging = false;
     document.removeEventListener('pointermove', onPopupDragMove);
     document.removeEventListener('pointerup', onPopupDragUp);
   }
 
   header.addEventListener('pointerdown', function (e) {
-    if (e.target.closest('.ai-popup-minimize')) return;
+    if (e.target.closest('.ai-popup-minimize')) { return; }
     dragging = true;
     var rect = root.getBoundingClientRect();
     dragOffsetX = e.clientX - rect.left;
@@ -135,7 +135,7 @@ function getAIPopup() {
       }
     },
     setContent: function (text, requestId) {
-      if (requestId !== currentRequestId) return;
+      if (requestId !== currentRequestId) { return; }
       currentText = text || '';
       textEl.textContent = currentText;
       textEl.className = 'ai-popup-text';
@@ -143,7 +143,7 @@ function getAIPopup() {
       updateButtons();
     },
     setError: function (msg, requestId) {
-      if (requestId !== currentRequestId) return;
+      if (requestId !== currentRequestId) { return; }
       currentText = '';
       textEl.textContent = msg || sbT('js.ai.err.provider_error');
       textEl.className = 'ai-popup-text ai-popup-text--error';
@@ -171,7 +171,7 @@ function postCompose(payload) {
 }
 
 export function runAceAI(editor, btn, action) {
-  if (!editor || !action) return;
+  if (!editor || !action) { return; }
   var selection = (editor.getSelectedText() || '').trim();
   var full = editor.getValue();
   var req = {
@@ -218,7 +218,7 @@ export function runAceAI(editor, btn, action) {
 }
 
 function applyAIResult(editor, action, selection, text) {
-  if (!text) return;
+  if (!text) { return; }
   editor.focus();
   if (action === 'rewrite') {
     editor.session.replace(editor.selection.getRange(), text);
@@ -238,11 +238,11 @@ function applyAIResult(editor, action, selection, text) {
 
 function detectEditorFormat(editor) {
   var textarea = editor && editor.__hostTextarea;
-  if (!textarea) return 'html';
+  if (!textarea) { return 'html'; }
   var form = textarea.closest && textarea.closest('form');
-  if (!form) return 'html';
+  if (!form) { return 'html'; }
   var sel = form.querySelector('select[data-code-editor-format]');
-  if (sel && sel.value) return sel.value;
+  if (sel && sel.value) { return sel.value; }
   return 'html';
 }
 
@@ -251,10 +251,10 @@ export function initAISuggestButtons() {
     btn.addEventListener('click', function () {
       var action = btn.getAttribute('data-ai-suggest');
       var form = btn.closest('form');
-      if (!form) return;
+      if (!form) { return; }
       var bodyEl = form.querySelector('textarea[name="body"]');
       var titleEl = form.querySelector('input[name="title"]');
-      if (!bodyEl) return;
+      if (!bodyEl) { return; }
       var body = bodyEl.__aceEditor ? bodyEl.__aceEditor.getValue() : bodyEl.value;
       var title = titleEl ? titleEl.value : '';
       var textForPrompt = (title ? title + '\n\n' : '') + body;
@@ -297,7 +297,7 @@ function applySuggestion(form, action, suggestion) {
   }
   var targetName = action === 'tags' ? 'tags' : 'keywords';
   var target = form.querySelector('input[name="' + targetName + '"]');
-  if (!target) return;
+  if (!target) { return; }
   var existing = (target.value || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
   var suggested = clean.split(/[,、]/).map(function (s) { return s.trim(); }).filter(Boolean);
   var merged = existing.slice();
@@ -313,10 +313,10 @@ function applySuggestion(form, action, suggestion) {
 
 export function initAITestButton() {
   var aiTestBtn = document.querySelector('[data-ai-test-btn]');
-  if (!aiTestBtn) return;
+  if (!aiTestBtn) { return; }
   var aiResultSlot = document.querySelector('[data-ai-test-result]');
   aiTestBtn.addEventListener('click', function () {
-    if (!aiResultSlot) return;
+    if (!aiResultSlot) { return; }
     var restore = setButtonLoading(aiTestBtn);
     aiResultSlot.hidden = false;
     aiResultSlot.classList.remove('error');
@@ -324,7 +324,7 @@ export function initAITestButton() {
 
     var form = new FormData();
     var csrf = document.querySelector('input[name="csrf_token"]');
-    if (csrf) form.append('csrf_token', csrf.value);
+    if (csrf) { form.append('csrf_token', csrf.value); }
 
     fetch('/admin/settings/ai/test', {
       method: 'POST',
