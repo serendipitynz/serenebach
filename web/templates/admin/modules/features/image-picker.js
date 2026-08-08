@@ -9,6 +9,16 @@ const sbT = createI18n((typeof window !== 'undefined' && window.__sbI18n) || {})
 
 var lastFocusedTextarea = null;
 
+// Mirrors the uploadIcon template func in internal/handler/admin/templates.go.
+// The library grid is rendered server-side and the picker builds its tiles in
+// JS, so the same three lucide icons have to exist on both sides — change one
+// and change the other.
+var uploadIconSVG = {
+  audio: '<svg class="icon-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 11.55V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2h-1.95"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M12 15a5 5 0 0 1 0 6"/><path d="M8 14.502a.5.5 0 0 0-.826-.381l-1.893 1.631a1 1 0 0 1-.651.243H3.5a.5.5 0 0 0-.5.501v3.006a.5.5 0 0 0 .5.501h1.129a1 1 0 0 1 .652.243l1.893 1.633a.5.5 0 0 0 .826-.38z"/></svg>',
+  document: '<svg class="icon-upload" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 2v6h6M8 13h8M8 17h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  movie: '<svg class="icon-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 12V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="m10 17.843 3.033-1.755a.64.64 0 0 1 .967.56v4.704a.65.65 0 0 1-.967.56L10 20.157"/><rect width="7" height="6" x="3" y="16" rx="1"/></svg>'
+};
+
 export function initImagePicker(aceReady) {
   var picker = document.querySelector('[data-image-picker]');
   var pickerOpen = document.querySelector('[data-image-picker-open]');
@@ -206,8 +216,9 @@ function renderPickerItems(items) {
   visibleItems.forEach(function (img) {
     var li = document.createElement('li');
     li.className = 'image-tile';
+    var kind = img.kind || 'image';
     var tile;
-    if ((img.kind || 'image') === 'image') {
+    if (kind === 'image') {
       tile = document.createElement('img');
       tile.src = img.thumb_url || img.url;
       tile.alt = img.filename || '';
@@ -215,21 +226,17 @@ function renderPickerItems(items) {
     } else {
       tile = document.createElement('div');
       tile.className = 'upload-icon-wrap';
-      tile.textContent = img.filename || '';
-      tile.style.display = 'flex';
-      tile.style.alignItems = 'center';
-      tile.style.justifyContent = 'center';
-      tile.style.minHeight = '80px';
+      tile.innerHTML = uploadIconSVG[kind] || '';
     }
     tile.dataset.fullUrl = img.url;
     tile.dataset.filename = img.filename || '';
-    tile.dataset.kind = img.kind || 'image';
-    tile.addEventListener('click', function () {
+    tile.dataset.kind = kind;
+    li.addEventListener('click', function () {
       if (ogBgTargetInput) {
         applyOGBGPick(img);
         return;
       }
-      insertFileMarkup(img.url, img.alt || img.filename || '', img.kind || 'image');
+      insertFileMarkup(img.url, img.alt || img.filename || '', kind);
     });
     if (tile.draggable) {
       tile.addEventListener('dragstart', function (e) {
@@ -237,15 +244,31 @@ function renderPickerItems(items) {
         e.dataTransfer.setData('text/uri-list', img.url);
         e.dataTransfer.setData('text/plain', img.url);
         e.dataTransfer.setData('application/x-sb-image', JSON.stringify({
-          url: img.url, filename: img.filename || '', alt: img.alt || '', kind: img.kind || 'image'
+          url: img.url, filename: img.filename || '', alt: img.alt || '', kind: kind
         }));
         e.dataTransfer.effectAllowed = 'copy';
       });
     }
-    li.appendChild(tile);
+    li.appendChild(pickerFigure(tile, img.filename || ''));
     ul.appendChild(li);
   });
   pickerBody.appendChild(ul);
+}
+
+// Same figure/figcaption shape the library grid renders from images.html, so
+// the .image-tile rules (fixed media height, ellipsised name) apply here too
+// and a long filename can no longer stretch the card.
+function pickerFigure(tile, filename) {
+  var figure = document.createElement('figure');
+  figure.appendChild(tile);
+  var caption = document.createElement('figcaption');
+  var name = document.createElement('span');
+  name.className = 'name';
+  name.textContent = filename;
+  name.title = filename;
+  caption.appendChild(name);
+  figure.appendChild(caption);
+  return figure;
 }
 
 // ---- Picker drag-and-drop upload -------------------------------------
