@@ -57,6 +57,7 @@ task build-site           # Static rebuild → ./data/public
 task test                 # go test ./...
 task build                # Native build to bin/serenebach
 task build-all            # Cross-compile to 8 targets
+task bump-version -- 4.0.0-beta.23   # Rewrite the Public version constant and commit it
 task release              # Create a GitHub draft release
 ```
 

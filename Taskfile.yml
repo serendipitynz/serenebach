@@ -9,6 +9,7 @@ dotenv: ['.env']
 vars:
   PKG: ./cmd/serenebach
   OUT: bin/serenebach
+  VERSION_FILE: internal/version/version.go
 
 tasks:
   default:
@@ -216,11 +217,60 @@ tasks:
     cmds:
       - rm -rf bin data dist
 
+  bump-version:
+    desc: "Rewrite the Public version constant and commit it. Usage: task bump-version -- 4.0.0-beta.23"
+    # The version lives in Go source rather than a tag or ldflag, so the bump
+    # is an edit + commit. `task release` derives its tag from this constant
+    # and refuses to run on a dirty tree, hence the commit here.
+    #
+    # CLI_ARGS arrives as an env var, not as text interpolated into the script,
+    # so a stray quote or metacharacter cannot escape into the shell.
+    env:
+      VERSION: '{{.CLI_ARGS}}'
+    silent: true
+    cmds:
+      - |
+        set -euo pipefail
+
+        # The pattern also keeps VERSION free of sed/grep metacharacters,
+        # which the substitution and the verification below both rely on.
+        # Build metadata ("+...") stays rejected on purpose: '+' is a grep -E
+        # metacharacter, and the pattern doubles as that guard.
+        if ! printf '%s' "${VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
+          echo "Usage: task bump-version -- <version>   (e.g. 4.0.0-beta.23, no leading 'v')" >&2
+          exit 1
+        fi
+        # Compare against HEAD rather than the working tree, so a run whose
+        # commit failed (locked signing key, hook) can simply be re-run
+        # instead of tripping this guard on its own half-finished edit.
+        if git show "HEAD:{{.VERSION_FILE}}" 2>/dev/null | grep -qE "^const Public = \"${VERSION}\"$"; then
+          echo "ERROR: {{.VERSION_FILE}} is already at ${VERSION} in HEAD." >&2
+          exit 1
+        fi
+
+        # Write through a temp file so one sed invocation works on both BSD
+        # (macOS) and GNU sed, which disagree on in-place editing.
+        tmp="$(mktemp)"
+        trap 'rm -f "$tmp"' EXIT
+        sed -E "s|^(const Public = \")[^\"]+(\")|\1${VERSION}\2|" {{.VERSION_FILE}} > "$tmp"
+        if ! grep -qE "^const Public = \"${VERSION}\"$" "$tmp"; then
+          echo "ERROR: could not find 'const Public = \"...\"' in {{.VERSION_FILE}}." >&2
+          exit 1
+        fi
+        # Copy the contents rather than `mv` the temp file into place: mktemp
+        # creates it 0600, and mv would carry that mode onto a tracked source
+        # file, which git does not record and so would never show up.
+        cat "$tmp" > {{.VERSION_FILE}}
+
+        # Pathspec instead of `git add`: the bump must not sweep up whatever
+        # else the operator happens to have staged.
+        git commit -m "chore: bump version to ${VERSION}" -- {{.VERSION_FILE}}
+
   release:
     desc: Cross-build all targets, package, checksum, and stage a draft GitHub release (tag is created when the draft is published)
     vars:
       VERSION:
-        sh: awk -F'"' '/^const Public/ {print $2}' internal/version/version.go
+        sh: awk -F'"' '/^const Public/ {print $2}' {{.VERSION_FILE}}
       TAG: 'v{{.VERSION}}'
       UNIX_TARGETS: linux-amd64 linux-arm64 freebsd-amd64 freebsd-arm64 darwin-amd64 darwin-arm64
       WIN_TARGETS: windows-amd64 windows-arm64
@@ -242,7 +292,7 @@ tasks:
           exit 1
         fi
         if git rev-parse --verify --quiet "$TAG" >/dev/null; then
-          echo "ERROR: tag $TAG already exists locally. Bump internal/version/version.go first." >&2
+          echo "ERROR: tag $TAG already exists locally. Run 'task bump-version -- <version>' first." >&2
           exit 1
         fi
         if git ls-remote --tags --exit-code origin "$TAG" >/dev/null 2>&1; then

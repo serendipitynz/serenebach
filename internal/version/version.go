@@ -9,7 +9,8 @@ import (
 
 // Public is the human-facing version shown on every admin page.
 // Format: SemVer pre-release style — "4.0.0-beta.N" during beta, "4.0.0" at GA.
-// Bump this BEFORE running "task release"; the tag is derived from this value.
+// Bump this BEFORE running "task release" — via "task bump-version -- <version>",
+// which rewrites this line and commits it; the tag is derived from this value.
 // After publishing a release on GitHub, immediately bump to the next beta so
 // main always reflects what the next release will be.
 const Public = "4.0.0-beta.22"

@@ -57,6 +57,7 @@ task build-site           # 静的書き出し → ./data/public
 task test                 # go test ./...
 task build                # bin/serenebach をネイティブビルド
 task build-all            # 8 ターゲットへクロスコンパイル
+task bump-version -- 4.0.0-beta.23   # version.go の Public を書き換えてコミット
 task release              # gh draft release を作成
 ```
 
