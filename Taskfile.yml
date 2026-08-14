@@ -234,12 +234,17 @@ tasks:
 
         # The pattern also keeps VERSION free of sed/grep metacharacters,
         # which the substitution and the verification below both rely on.
-        if ! printf '%s' "${VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$'; then
+        # Build metadata ("+...") stays rejected on purpose: '+' is a grep -E
+        # metacharacter, and the pattern doubles as that guard.
+        if ! printf '%s' "${VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
           echo "Usage: task bump-version -- <version>   (e.g. 4.0.0-beta.23, no leading 'v')" >&2
           exit 1
         fi
-        if grep -qE "^const Public = \"${VERSION}\"$" {{.VERSION_FILE}}; then
-          echo "ERROR: {{.VERSION_FILE}} is already at ${VERSION}." >&2
+        # Compare against HEAD rather than the working tree, so a run whose
+        # commit failed (locked signing key, hook) can simply be re-run
+        # instead of tripping this guard on its own half-finished edit.
+        if git show "HEAD:{{.VERSION_FILE}}" 2>/dev/null | grep -qE "^const Public = \"${VERSION}\"$"; then
+          echo "ERROR: {{.VERSION_FILE}} is already at ${VERSION} in HEAD." >&2
           exit 1
         fi
 
@@ -252,8 +257,10 @@ tasks:
           echo "ERROR: could not find 'const Public = \"...\"' in {{.VERSION_FILE}}." >&2
           exit 1
         fi
-        mv "$tmp" {{.VERSION_FILE}}
-        trap - EXIT
+        # Copy the contents rather than `mv` the temp file into place: mktemp
+        # creates it 0600, and mv would carry that mode onto a tracked source
+        # file, which git does not record and so would never show up.
+        cat "$tmp" > {{.VERSION_FILE}}
 
         # Pathspec instead of `git add`: the bump must not sweep up whatever
         # else the operator happens to have staged.
