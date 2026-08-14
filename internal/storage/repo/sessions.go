@@ -53,7 +53,7 @@ func (s *Store) SessionUser(ctx context.Context, token string) (*domain.User, er
 	return &u, nil
 }
 
-// DeleteSession removes the session row for a given token (idempotent).
+// Idempotent: an unknown token is not an error.
 func (s *Store) DeleteSession(ctx context.Context, token string) error {
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE token = ?`, token); err != nil {
 		return fmt.Errorf("repo: DeleteSession: %w", err)

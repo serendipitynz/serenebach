@@ -16,7 +16,6 @@ type cacheEntry struct {
 	err    error
 }
 
-// NewCache returns an empty Cache.
 func NewCache() *Cache {
 	return &Cache{items: map[string]*cacheEntry{}}
 }

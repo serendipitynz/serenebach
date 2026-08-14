@@ -72,7 +72,6 @@ var AllEvents = []string{
 	EventImageUploaded,
 }
 
-// IsKnownEvent reports whether the id appears in AllEvents.
 func IsKnownEvent(id string) bool {
 	for _, e := range AllEvents {
 		if e == id {

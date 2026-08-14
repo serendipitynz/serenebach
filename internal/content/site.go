@@ -429,12 +429,10 @@ func (s Site) FormatEntryDate(t time.Time) string {
 	return s.formatWith(s.Weblog.DateFormatEntry, dateformat.DefaultEntryDate, t)
 }
 
-// FormatEntryTime renders t as the entry-time pattern.
 func (s Site) FormatEntryTime(t time.Time) string {
 	return s.formatWith(s.Weblog.TimeFormatEntry, dateformat.DefaultEntryTime, t)
 }
 
-// FormatCommentTime renders t as the comment-timestamp pattern.
 func (s Site) FormatCommentTime(t time.Time) string {
 	return s.formatWith(s.Weblog.DateFormatComment, dateformat.DefaultCommentDate, t)
 }
@@ -446,7 +444,6 @@ func (s Site) FormatListDate(t time.Time) string {
 	return s.formatWith(s.Weblog.DateFormatList, dateformat.DefaultListDate, t)
 }
 
-// FormatArchiveDate renders t as the archive-heading pattern.
 func (s Site) FormatArchiveDate(t time.Time) string {
 	return s.formatWith(s.Weblog.DateFormatArchive, dateformat.DefaultArchiveDate, t)
 }

@@ -34,7 +34,7 @@ const (
 	WebhookSortLastStatus
 )
 
-// String returns the URL-form name of the sort key.
+// The ?sort= query value; round-trips with ParseWebhookSortKey.
 func (k WebhookSortKey) String() string {
 	switch k {
 	case WebhookSortURL:
@@ -144,7 +144,7 @@ func (s *Store) ListWebhooks(ctx context.Context, wid int64, q ListWebhooksQuery
 	return out, rows.Err()
 }
 
-// WebhookByID fetches one webhook row. ErrNotFound on miss.
+// ErrNotFound on miss.
 func (s *Store) WebhookByID(ctx context.Context, wid, id int64) (*domain.Webhook, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT `+webhookColumns+`
@@ -188,7 +188,6 @@ func (s *Store) ActiveWebhooksForEvent(ctx context.Context, wid int64, event str
 	return out, rows.Err()
 }
 
-// CreateWebhook inserts a new webhook subscription and returns its id.
 func (s *Store) CreateWebhook(ctx context.Context, w domain.Webhook) (int64, error) {
 	eventsJSON, err := encodeEvents(w.Events)
 	if err != nil {

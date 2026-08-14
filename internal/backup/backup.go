@@ -38,7 +38,6 @@ type Options struct {
 	Hostname string
 }
 
-// Report is returned on successful completion.
 type Report struct {
 	OutPath string
 	Size    int64

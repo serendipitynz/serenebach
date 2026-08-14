@@ -14,7 +14,7 @@ func NewContext(ctx context.Context, base string) context.Context {
 	return context.WithValue(ctx, contextKey{}, base)
 }
 
-// FromContext returns the base path stored by NewContext, or "" if none was set.
+// Yields "" when NewContext was never called on this context.
 func FromContext(ctx context.Context) string {
 	if v, ok := ctx.Value(contextKey{}).(string); ok {
 		return v

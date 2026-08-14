@@ -9,7 +9,7 @@ import (
 	"github.com/serendipitynz/serenebach/internal/domain"
 )
 
-// ArchivePeriod is one (year, month) bucket for which entries exist.
+// Periods holding no entries are never produced.
 type ArchivePeriod struct {
 	Year  int
 	Month int

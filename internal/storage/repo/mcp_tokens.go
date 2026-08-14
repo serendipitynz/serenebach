@@ -91,7 +91,7 @@ func (k MCPTokenSortKey) col() string {
 	}
 }
 
-// String returns the URL-form name of the sort key.
+// The ?sort= query value; round-trips with ParseMCPTokenSortKey.
 func (k MCPTokenSortKey) String() string {
 	switch k {
 	case MCPTokenSortName:

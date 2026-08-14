@@ -106,7 +106,7 @@ func Parse(src string, cb ParseCallback) (*Template, error) {
 	return &Template{blocks: blocks}, nil
 }
 
-// NoCallback is a no-op ParseCallback, used when no tag injection is desired.
+// Pass when no tag injection is desired.
 func NoCallback(name string, isEnd bool, blocks map[string]*block) {}
 
 // DefaultCallback reproduces sb::Template::_default_callback, which adds
@@ -127,7 +127,6 @@ func DefaultCallback(name string, isEnd bool, blocks map[string]*block) {
 	blocks[name].tags = append(blocks[name].tags, tag)
 }
 
-// HasBlock reports whether the parsed template contains a block of this name.
 func (t *Template) HasBlock(name string) bool {
 	_, ok := t.blocks[name]
 	return ok
@@ -195,7 +194,6 @@ type Context struct {
 	num       int
 }
 
-// New returns a fresh render context for this template.
 func (t *Template) New() *Context {
 	return &Context{
 		tmpl:      t,

@@ -190,7 +190,7 @@ type Summary struct {
 	ReturnVisitors int64 // visitor_ids seen before Since
 }
 
-// Summarise returns a Summary for the window [since, now].
+// The window is [since, now]; `now` is taken at call time.
 func (s *Store) Summarise(ctx context.Context, since time.Time) (*Summary, error) {
 	if s == nil || s.db == nil {
 		return &Summary{Since: since}, nil
@@ -402,9 +402,8 @@ func buildEntryHits(ids []int64, viewsByID, likesByID, stampsByID map[int64]int6
 	return out
 }
 
-// DayPoint is one bucket for a daily PV chart (date formatted YYYY-MM-DD).
 type DayPoint struct {
-	Day   string
+	Day   string // YYYY-MM-DD
 	Views int64
 }
 

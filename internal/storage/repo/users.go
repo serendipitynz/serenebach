@@ -343,7 +343,6 @@ func (s *Store) UserByID(ctx context.Context, id int64) (*domain.User, error) {
 	return &u, nil
 }
 
-// UsersByIDs returns the users matching the given ids as a map keyed by id.
 func (s *Store) UsersByIDs(ctx context.Context, ids []int64) (map[int64]domain.User, error) {
 	if len(ids) == 0 {
 		return map[int64]domain.User{}, nil
