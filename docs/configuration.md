@@ -75,6 +75,7 @@ Everything below is a `go run` or `go build` under the hood, so the Taskfile is 
 | `task build` | Build a native binary at `./bin/serenebach` |
 | `task build-{os}-{arch}` | Cross-compile for a specific target. `{os}` ∈ `linux` / `freebsd` / `windows` / `darwin`, `{arch}` ∈ `amd64` / `arm64`. Output: `bin/serenebach-{os}-{arch}` (`.exe` on Windows). Run `task --list` for the full set. |
 | `task build-all` | Cross-compile all eight targets into `bin/` in parallel. |
+| `task bump-version -- <version>` | Rewrite `const Public` in `internal/version/version.go` to the given SemVer string (no leading `v`) and commit just that file as `chore: bump version to <version>`. Refuses a malformed version or one already in the file. Run this before `task release`, which derives its tag from the constant |
 | `task release` | Cross-compile all 8 targets, package as `tar.gz` / `zip` with README + LICENSE, generate `SHA256SUMS`, and create a **draft** GitHub release via `gh` for `v{version}` (read from `internal/version/version.go`). The tag is created server-side only when the draft is published, so a failed run leaves no half-state. Refuses to run on a dirty tree, with unpushed commits, over an existing tag, or when a release already exists for the tag. |
 | `task seed` | Create / update the admin user, bundled template, and sample entries |
 | `task migrate` | Apply pending migrations (also runs on every startup) |
