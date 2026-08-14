@@ -121,10 +121,14 @@ flag them instead.
   guarantees, preconditions, side effects, error semantics, or compatibility
   constraints.
 - **This overrides the Go convention of opening a doc comment with the declared
-  symbol's name.** Every package here lives under `internal/`, so the searchability
-  benefit that <https://go.dev/doc/comment> gives as the reason for that convention
-  does not apply, and `revive`'s `exported` rule is deliberately off in
-  `.golangci.yml`. Write the caller-relevant contract directly.
+  symbol's name.** <https://go.dev/doc/comment> gives searchability as the reason
+  for that convention, and this repository is an application rather than a
+  library, so no package here is an API anyone imports. Almost everything sits
+  under `internal/`; the packages that do not are the `cmd/*` mains and the
+  `embed.go` holders in `migrations/`, `web/templates/` and `docs/help/`, which
+  live outside only because `//go:embed` has to sit beside the files it embeds.
+  `revive`'s `exported` rule is deliberately off in `.golangci.yml` for the same
+  reason. Write the caller-relevant contract directly.
 - **Section-divider comments are exempt** (e.g. `// ---- list ----`). They are
   navigation aids for long files, not restatements of behaviour. Keep the existing
   `// ---- <name> ----` form for consistency.
