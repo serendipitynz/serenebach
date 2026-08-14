@@ -1,7 +1,6 @@
 <a href="https://go.serenebach.net/"><img src="https://raw.githubusercontent.com/serendipitynz/serenebach/main/web/templates/admin/assets/sb_logo_dark.svg?sanitize=true" alt="Serene Bach" width="400"></a>
 
 [![CI result](https://github.com/serendipitynz/serenebach/workflows/CI/badge.svg)](https://github.com/serendipitynz/serenebach/actions?query=workflow%3ACI)
-[![Go Report Card](https://goreportcard.com/badge/github.com/serendipitynz/serenebach)](https://goreportcard.com/report/github.com/serendipitynz/serenebach)
 
 ---
 
@@ -87,7 +86,7 @@ docker run -d -p 8080:8080 -v serenebach-data:/home/nonroot/data ghcr.io/serendi
 
 CI でも push / PR ごとに同じコマンドが走ります:
 
-- `task lint` — `.golangci.yml` を使って `golangci-lint` を実行 (`staticcheck` に加えて gocyclo (しきい値 15、goreportcard と同値) などのプロジェクト lint セットを含む)。あわせて `//nolint:gocyclo` の存在を検出して失敗させる (goreportcard の raw gocyclo は nolint を無視するため)
+- `task lint` — `.golangci.yml` を使って `golangci-lint` を実行 (`staticcheck` に加えて gocyclo (上限 15) などのプロジェクト lint セットを含む)。あわせて `//nolint:gocyclo` の存在を検出して失敗させる。この上限は lint の好みではなく設計上のルール (上限を超えた関数は抑制せず分割する) なので、箇所ごとの opt-out は禁止しています
 - `task lint:js` — `biome.json` を使って管理画面 JavaScript に `biome lint .` を実行。導入は `brew install biome`、または [biome のリリース](https://github.com/biomejs/biome/releases) からバイナリを取得。Rust 製の単一バイナリなので Node ランタイムも `node_modules` も不要です。有効にしているルールは `style/useBlockStatements` のみで、制御フローの本体に必ず波括弧を要求します。対象は `*.js` のみです。HTML テンプレート内の inline `<script>` は対象外で、これは biome の HTML パーサが `html/template` の `{{...}}` を解釈できないためです。CI は biome のバージョンを固定していますが、このターゲットは `PATH` 上の biome を使います。結果が食い違う場合は `biome --version` と `.github/workflows/ci.yml` の固定値を比べてください
 - `task test` — `go test ./...` を実行
 - `task cover` — パッケージ横断カバレッジ (`-coverpkg=./...`) 付きでテストを実行し合計を表示。`task cover:html` は HTML レポートをブラウザで開き、`task cover:html:file` はヘッドレス向けに `coverage.html` へ出力

@@ -32,14 +32,14 @@ jobs:
         with:
           version: v2.12.2
 
-      # golangci-lint honours //nolint:gocyclo, but the raw gocyclo that
-      # goreportcard runs ignores it — a suppressed function keeps CI
-      # green while silently dropping the goreportcard score. Ban the
-      # directive so that divergence can never reach main.
+      # The gocyclo cap is a design rule — complex functions get split,
+      # not excused — so the one linter whose //nolint golangci-lint
+      # would honour is banned outright. Without this, the cap degrades
+      # into a suggestion that any PR can opt out of in one line.
       - name: ban //nolint:gocyclo
         run: |
           if git grep -nE 'nolint:.*gocyclo' -- '*.go'; then
-            echo '::error::`//nolint:gocyclo` is banned (goreportcard ignores it). Refactor the function to complexity <=15 instead.'
+            echo '::error::`//nolint:gocyclo` is banned. Split the function to complexity <=15 instead of suppressing.'
             exit 1
           fi
 

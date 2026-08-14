@@ -88,7 +88,7 @@ Everything below is a `go run` or `go build` under the hood, so the Taskfile is 
 | `./bin/serenebach extract-assets` | Write embedded admin assets (`admin.css`, `admin.js`, logos, favicon) to disk so Apache can serve them directly in CGI mode. See [docs/deployment.md](docs/deployment.md) |
 | `./bin/serenebach backup` | Create a consistent ZIP snapshot of the database, images, templates, and optional analytics / static output. See **Backup** below |
 | `./bin/serenebach reindex` | Rebuild the `entries_fts` trigram index from the base entries table. INSERT/UPDATE/DELETE keep the index synchronized via triggers in normal operation; this command is a repair path for suspected drift (manual DB edits, dropped trigger, tokenizer change) |
-| `task lint` | Run `golangci-lint` against `.golangci.yml` (covers `staticcheck` plus the project lint set, including `gocyclo` at the goreportcard threshold of 15) |
+| `task lint` | Run `golangci-lint` against `.golangci.yml` (covers `staticcheck` plus the project lint set, including `gocyclo` at a cap of 15). Also fails on any `//nolint:gocyclo`: the cap is a design rule, so an over-limit function gets split rather than suppressed |
 | `task lint:js` | Run `biome lint .` against the admin JavaScript (reads `biome.json`; only `style/useBlockStatements` is enabled). Requires `biome` on `PATH` — `brew install biome` or a binary from [biome releases](https://github.com/biomejs/biome/releases). Standalone Rust binary, so no Node runtime or `node_modules` |
 | `task test` | `go test ./...` |
 | `task tidy` | `go mod tidy` |
