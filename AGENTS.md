@@ -99,6 +99,57 @@ Any change visible to operators (env vars / CLI flags / Task targets / URL route
 
 If the work touches lint or tests, run them before finishing. If you cannot run them, state why explicitly.
 
+### Coding style
+
+Applies to code being written or changed. Do not delete, rewrite, or reshape
+pre-existing comments or untouched code unasked just to satisfy the rules below —
+flag them instead.
+
+#### Comments
+
+- Don't write comments by default. Prefer clear naming and structure.
+- When a comment is warranted, prefer ones that explain **why** and, when relevant,
+  **why not** — the reasoning behind the chosen approach, including why obvious
+  alternatives were rejected.
+- Use comments only for information that cannot be expressed clearly by the code
+  itself, such as intent, constraints, invariants, external requirements, or
+  non-obvious trade-offs.
+- Never use comments merely to restate what the code does.
+- API documentation comments follow the same principle: don't document what is
+  already clear from names, types, and signatures. Document only caller-relevant
+  contracts that cannot be expressed clearly in code, such as behavioral
+  guarantees, preconditions, side effects, error semantics, or compatibility
+  constraints.
+- **This overrides the Go convention of opening a doc comment with the declared
+  symbol's name.** <https://go.dev/doc/comment> gives searchability as the reason
+  for that convention, and this repository is an application rather than a
+  library, so no package here is an API anyone imports. Almost everything sits
+  under `internal/`; the packages that do not are the `cmd/*` mains and the
+  `embed.go` holders in `migrations/`, `web/templates/` and `docs/help/`, which
+  live outside only because `//go:embed` has to sit beside the files it embeds.
+  `revive`'s `exported` rule is deliberately off in `.golangci.yml` for the same
+  reason. Write the caller-relevant contract directly.
+- **Section-divider comments are exempt** (e.g. `// ---- list ----`). They are
+  navigation aids for long files, not restatements of behaviour. Keep the existing
+  `// ---- <name> ----` form for consistency.
+
+#### Control flow
+
+- Always use explicit block syntax for control-flow bodies where the language
+  allows omission. Go enforces this already; it is a real constraint for the admin
+  JavaScript under `web/templates/admin/`.
+
+#### Functions
+
+- Extract a function when a block represents a coherent, nameable responsibility.
+- Extraction should improve abstraction, readability, or testability — not merely
+  reduce line count.
+- Call count is not a criterion in either direction: two call sites do not by
+  themselves justify extraction, and a single call site does not by itself rule it
+  out.
+- Keep tightly coupled, trivial operations local when extraction would reduce
+  locality or introduce unnecessary indirection.
+
 ## SB3 template compatibility — read before touching sbtemplate
 
 The owner cares strongly that **existing SB3 templates keep working unmodified**. When adding or modifying sbtemplate tags or blocks:

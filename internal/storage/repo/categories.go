@@ -95,7 +95,7 @@ func (s *Store) queryCategoriesWithCounts(ctx context.Context, wid int64, status
 	return out, rows.Err()
 }
 
-// CategoryByID fetches one category row. ErrNotFound on miss.
+// ErrNotFound on miss.
 func (s *Store) CategoryByID(ctx context.Context, wid, id int64) (*domain.Category, error) {
 	var c domain.Category
 	err := s.db.QueryRowContext(ctx, `
@@ -197,7 +197,6 @@ func (s *Store) CategoriesByIDs(ctx context.Context, ids []int64) (map[int64]dom
 
 // ---- categories (admin CRUD) -------------------------------------------
 
-// CreateCategory inserts a new category and returns its id.
 func (s *Store) CreateCategory(ctx context.Context, c domain.Category, sortOrder int) (int64, error) {
 	now := time.Now().Unix()
 	res, err := s.db.ExecContext(ctx, `

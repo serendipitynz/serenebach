@@ -9,7 +9,7 @@ import (
 	"github.com/serendipitynz/serenebach/internal/domain"
 )
 
-// WeblogByID returns the weblog with the given id; ErrNotFound if missing.
+// ErrNotFound if missing.
 func (s *Store) WeblogByID(ctx context.Context, id int64) (*domain.Weblog, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, title, description, base_url, lang, comment_mode, spam_words, ip_blacklist, llms_enabled,

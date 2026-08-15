@@ -29,7 +29,6 @@ const tagColumnsQualified = `t.id, t.wid, t.name, t.slug, t.created_at, t.update
 // slug so URL rules stay uniform across the site.
 var tagSlugPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
-// IsValidTagSlug reports whether s is an acceptable tag slug.
 func IsValidTagSlug(s string) bool {
 	if len(s) == 0 || len(s) > 100 {
 		return false
@@ -90,7 +89,7 @@ func (k TagSortKey) orderClause() string {
 	}
 }
 
-// String returns the URL-form name of the sort key.
+// The ?sort= query value; round-trips with ParseTagSortKey.
 func (k TagSortKey) String() string {
 	switch k {
 	case TagSortID:

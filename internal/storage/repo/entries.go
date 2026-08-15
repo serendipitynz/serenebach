@@ -667,7 +667,6 @@ func (s *Store) PublishedEntriesInRangePage(ctx context.Context, wid int64, from
 	return scanEntries(rows)
 }
 
-// SetEntryPinned sets or clears the pinned flag on an entry.
 func (s *Store) SetEntryPinned(ctx context.Context, wid, id int64, pinned bool) error {
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE entries SET pinned = ? WHERE wid = ? AND id = ?`, pinned, wid, id)

@@ -1,7 +1,6 @@
 <a href="https://go.serenebach.net/"><img src="https://raw.githubusercontent.com/serendipitynz/serenebach/main/web/templates/admin/assets/sb_logo_dark.svg?sanitize=true" alt="Serene Bach" width="400"></a>
 
 [![CI result](https://github.com/serendipitynz/serenebach/workflows/CI/badge.svg)](https://github.com/serendipitynz/serenebach/actions?query=workflow%3ACI)
-[![Go Report Card](https://goreportcard.com/badge/github.com/serendipitynz/serenebach)](https://goreportcard.com/report/github.com/serendipitynz/serenebach)
 
 ---
 
@@ -87,7 +86,7 @@ For production, prefer a pinned release tag over `latest`. See [docs/deployment.
 
 CI runs the same checks on every push and pull request:
 
-- `task lint` — runs `golangci-lint` against `.golangci.yml` (covers `staticcheck` plus the project lint set, including `gocyclo` at the goreportcard threshold of 15) and fails on any `//nolint:gocyclo`, which goreportcard's raw gocyclo ignores
+- `task lint` — runs `golangci-lint` against `.golangci.yml` (covers `staticcheck` plus the project lint set, including `gocyclo` at a cap of 15) and fails on any `//nolint:gocyclo`. The cap is a design rule rather than a lint preference — a function over the limit gets split, not excused — so the per-site opt-out is banned outright
 - `task lint:js` — runs `biome lint .` against the admin JavaScript using `biome.json`. Install with `brew install biome` or download a binary from [biome releases](https://github.com/biomejs/biome/releases); it is a standalone Rust binary, so no Node runtime or `node_modules` is involved. Only `style/useBlockStatements` is enabled, which requires braces on every control-flow body. Scope is `*.js`; inline `<script>` in the HTML templates is not covered, because biome's HTML parser rejects `html/template` `{{...}}` actions. CI pins the biome version, this target uses whatever is on `PATH` — compare `biome --version` with the pin in `.github/workflows/ci.yml` if the two disagree
 - `task test` — runs `go test ./...`
 - `task cover` — runs the suite with cross-package coverage (`-coverpkg=./...`) and prints the total; `task cover:html` opens the HTML report, `task cover:html:file` writes it to `coverage.html` for headless use

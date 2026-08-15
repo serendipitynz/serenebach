@@ -16,7 +16,7 @@ const customTagColumns = `id, wid, name, value, created_at, updated_at`
 
 // ---- custom tags ---------------------------------------------------------
 
-// ListCustomTags returns every custom tag for the weblog, ordered by name.
+// Ordered by name.
 func (s *Store) ListCustomTags(ctx context.Context, wid int64) ([]domain.CustomTag, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+customTagColumns+`
@@ -42,7 +42,7 @@ func (s *Store) ListCustomTags(ctx context.Context, wid int64) ([]domain.CustomT
 	return out, rows.Err()
 }
 
-// CustomTagByID fetches one custom tag row. ErrNotFound on miss.
+// ErrNotFound on miss.
 func (s *Store) CustomTagByID(ctx context.Context, wid, id int64) (*domain.CustomTag, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT `+customTagColumns+`
@@ -61,7 +61,6 @@ func (s *Store) CustomTagByID(ctx context.Context, wid, id int64) (*domain.Custo
 	return &ct, nil
 }
 
-// CreateCustomTag inserts a new custom tag and returns its id.
 func (s *Store) CreateCustomTag(ctx context.Context, ct domain.CustomTag) (int64, error) {
 	now := time.Now().Unix()
 	res, err := s.db.ExecContext(ctx, `
@@ -100,7 +99,7 @@ func (s *Store) UpdateCustomTag(ctx context.Context, ct domain.CustomTag) error 
 	return nil
 }
 
-// DeleteCustomTag removes a custom tag row. ErrNotFound when missing.
+// ErrNotFound when the row is already gone.
 func (s *Store) DeleteCustomTag(ctx context.Context, wid, id int64) error {
 	res, err := s.db.ExecContext(ctx,
 		`DELETE FROM site_custom_tags WHERE wid = ? AND id = ?`, wid, id)
@@ -113,7 +112,6 @@ func (s *Store) DeleteCustomTag(ctx context.Context, wid, id int64) error {
 	return nil
 }
 
-// CountCustomTags returns how many custom tags the weblog has.
 func (s *Store) CountCustomTags(ctx context.Context, wid int64) (int64, error) {
 	var n int64
 	if err := s.db.QueryRowContext(ctx,

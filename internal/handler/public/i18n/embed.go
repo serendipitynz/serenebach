@@ -9,7 +9,7 @@ import "embed"
 //go:embed *.json
 var files embed.FS
 
-// Catalogues returns locale-code → JSON bytes, ready for i18n.LoadBundle.
+// Keyed by locale code; each value is ready for i18n.LoadBundle as-is.
 func Catalogues() (map[string][]byte, error) {
 	out := map[string][]byte{}
 	entries, err := files.ReadDir(".")

@@ -376,7 +376,6 @@ type Link struct {
 	UpdatedAt   int64
 }
 
-// IsGroup returns true when this row is the container for other links.
 func (l Link) IsGroup() bool { return l.Kind == LinkKindGroup }
 
 // EntryStatus mirrors SB3's entry_stat convention: draft/published/closed.
@@ -537,7 +536,7 @@ type TemplateAsset struct {
 	UpdatedAt  time.Time
 }
 
-// CustomTag is a user-defined {custom_*} sbtemplate placeholder.
+// Backs the user-defined {custom_*} sbtemplate placeholders.
 type CustomTag struct {
 	ID        int64
 	WID       int64

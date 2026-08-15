@@ -19,7 +19,7 @@ const pageColumns = `id, wid, author_id, title, body, format, slug, template_id,
 // admin list query can join templates without ambiguity.
 const pageColumnsP = `p.id, p.wid, p.author_id, p.title, p.body, p.format, p.slug, p.template_id, p.sort_order, p.status, p.og_bg_image_path, p.summary, p.canonical_url, p.noindex, p.created_at, p.updated_at`
 
-// PageBySlug returns one page by its slug (including the leading "/").
+// The slug carries its leading "/". ErrNotFound on miss.
 func (s *Store) PageBySlug(ctx context.Context, wid int64, slug string) (*domain.Page, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT `+pageColumns+`
@@ -27,7 +27,6 @@ func (s *Store) PageBySlug(ctx context.Context, wid int64, slug string) (*domain
 	return scanPage(row)
 }
 
-// PageByID returns one page by id.
 func (s *Store) PageByID(ctx context.Context, wid, id int64) (*domain.Page, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT `+pageColumns+`
@@ -69,7 +68,7 @@ func (k PageSortKey) orderClause() string {
 	}
 }
 
-// String returns the URL-form name of the sort key.
+// The ?sort= query value; round-trips with ParsePageSortKey.
 func (k PageSortKey) String() string {
 	switch k {
 	case PageSortTitle:
@@ -198,7 +197,7 @@ func appendPagesFilters(b *strings.Builder, args *[]any, q ListPagesQuery) {
 	}
 }
 
-// PublishedPages returns only published pages, ordered by sort_order then id.
+// Drafts are excluded. Ordered by sort_order then id.
 func (s *Store) PublishedPages(ctx context.Context, wid int64) ([]domain.Page, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+pageColumns+`
@@ -210,7 +209,6 @@ func (s *Store) PublishedPages(ctx context.Context, wid int64) ([]domain.Page, e
 	return scanPages(rows)
 }
 
-// CreatePage inserts a new page and returns its id.
 func (s *Store) CreatePage(ctx context.Context, p domain.Page) (int64, error) {
 	now := time.Now().Unix()
 	res, err := s.db.ExecContext(ctx, `
@@ -254,7 +252,6 @@ func (s *Store) UpdatePage(ctx context.Context, p domain.Page) error {
 	return nil
 }
 
-// DeletePage removes a page by id.
 func (s *Store) DeletePage(ctx context.Context, wid, id int64) error {
 	res, err := s.db.ExecContext(ctx, `DELETE FROM pages WHERE wid = ? AND id = ?`, wid, id)
 	if err != nil {

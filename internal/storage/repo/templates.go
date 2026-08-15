@@ -48,7 +48,7 @@ func (s *Store) ActiveTemplate(ctx context.Context, wid int64) (*domain.Template
 	return t, nil
 }
 
-// TemplateByID fetches one template row by id. ErrNotFound on miss.
+// ErrNotFound on miss.
 func (s *Store) TemplateByID(ctx context.Context, wid, id int64) (*domain.Template, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT `+templateColumns+`
@@ -159,7 +159,7 @@ func (s *Store) ListTemplateAssets(ctx context.Context, templateID int64) ([]dom
 	return out, rows.Err()
 }
 
-// TemplateAssetByID fetches one row. ErrNotFound on miss.
+// ErrNotFound on miss.
 func (s *Store) TemplateAssetByID(ctx context.Context, id int64) (*domain.TemplateAsset, error) {
 	var a domain.TemplateAsset
 	var createdAt, updatedAt int64

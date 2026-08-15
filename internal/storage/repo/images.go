@@ -78,7 +78,7 @@ func (s *Store) CountImages(ctx context.Context, wid int64) (int64, error) {
 	return n, nil
 }
 
-// ImageByID returns one image row. ErrNotFound on miss.
+// ErrNotFound on miss.
 func (s *Store) ImageByID(ctx context.Context, wid, id int64) (*domain.Image, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT `+imageColumns+`

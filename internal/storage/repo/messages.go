@@ -219,7 +219,9 @@ func ParseMessageSortKey(s string) MessageSortKey {
 // with the natural "unset" default.
 type ListMessagesQuery struct {
 	// Filter, when non-nil, restricts to one MessageStatus (waiting /
-	// approved / hidden). nil = no status filter (all rows).
+	// approved / hidden). nil = no status filter (all rows). A non-nil
+	// value outside those three is ignored rather than rejected, so a
+	// malformed status can never collapse the list to zero rows.
 	Filter  *domain.MessageStatus
 	Search  string // matches author_name, body, author_email, ip_address
 	SortBy  MessageSortKey
@@ -228,9 +230,6 @@ type ListMessagesQuery struct {
 	Offset  int
 }
 
-// ListMessagesForAdmin returns comments matching q. The Filter field
-// is interpreted with the same sentinel rules as the previous
-// signature (anything outside waiting/approved/hidden = no filter).
 func (s *Store) ListMessagesForAdmin(ctx context.Context, wid int64, q ListMessagesQuery) ([]domain.Message, error) {
 	sqlText, args := buildMessagesListSQL(wid, q)
 	rows, err := s.db.QueryContext(ctx, sqlText, args...)
