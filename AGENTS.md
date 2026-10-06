@@ -95,6 +95,14 @@ Any change visible to operators (env vars / CLI flags / Task targets / URL route
 - **Do not amend or force-push to respond to PR review comments.** Add a new normal commit per round of review feedback so reviewers can diff before/after, and so the PR Conversation tab keeps the "this commit addresses that comment" linkage. Use `git commit --amend` only when the user explicitly asks ("混ぜて" / "amend で"). Never run `git push --force` or `git push --force-with-lease` without explicit approval.
 - Before a large change, summarize the intent and get agreement first.
 
+### Private task ledger (`backlog/`)
+
+The code is public; the roadmap and tasks are private by default (as of 2026-10). Whether any part of them goes public is the owner's call, case by case. `backlog/` is a Backlog.md ledger that is its own git repository, cloned from a private remote and ignored by this one (`/backlog/` in `.gitignore`).
+
+- **Never bring `backlog/` into this repository** — no `git add -f`, no submodule, no subtree. Ledger edits are committed inside the `backlog/` repository.
+- **Keep the ledger off everything published from here**: commit messages, branch names, PR titles, bodies, comments and review replies, `docs/`, and the READMEs. That covers task ids (`TASK-N`, and the bare number), `doc-N` / `decision-N` ids, task wording and milestone names. Justify a change by its diff and test results, not by the task it came from. A reviewer running in this working copy must not read or quote `backlog/` either.
+- A clone without `backlog/` is complete: nothing in this repository depends on the ledger.
+
 ### Verification
 
 If the work touches lint or tests, run them before finishing. If you cannot run them, state why explicitly.
