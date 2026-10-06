@@ -22,6 +22,7 @@ Thumbs.db
 `*.swp
 _base/
 _sandbox/
+/backlog/
 
 # VS Code: share workspace settings, hide personal overrides
 .vscode/*
