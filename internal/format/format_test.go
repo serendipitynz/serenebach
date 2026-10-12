@@ -94,3 +94,17 @@ func TestSupportedListExposesMarkdown(t *testing.T) {
 		t.Errorf("Supported should include Markdown so the admin UI can show it")
 	}
 }
+
+func TestMarkdownDefinitionList(t *testing.T) {
+	out := renderMarkdownT(t, "用語\n: 説明\n: 別の説明")
+	want := "<dl>\n<dt>用語</dt>\n<dd>説明</dd>\n<dd>別の説明</dd>\n</dl>"
+	if !strings.Contains(out, want) {
+		t.Errorf("want %q in output\n got: %q", want, out)
+	}
+
+	for _, in := range []string{"用語：説明", ": 説明だけ", "用語\n\n本文: 説明ではない"} {
+		if out := renderMarkdownT(t, in); strings.Contains(out, "<dl>") {
+			t.Errorf("%q should not become a definition list: %q", in, out)
+		}
+	}
+}
