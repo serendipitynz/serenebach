@@ -1,6 +1,8 @@
 package format
 
 import (
+	"regexp"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/yuin/goldmark"
@@ -146,17 +148,33 @@ const (
 	rubyCloseLen = len(rubyClose)
 )
 
-// findRubies scans one line of text left to right with the plugin's
-// leftmost-match semantics:
+// findRubies finds the notation in one line of text the way the plugin
+// does with emphasis enabled: a ruby pass over the whole line first, then
+// an emphasis pass over the text the rubies left. The order matters —
+// `｜x《《y》》` is ruby with the reading `《y》`, not emphasis.
+func findRubies(s []byte) []rubyMatch {
+	var out []rubyMatch
+	prev := 0
+	for _, m := range findReadings(s) {
+		out = append(out, findEmphasis(s, prev, m.start)...)
+		out = append(out, m)
+		prev = m.stop
+	}
+	return append(out, findEmphasis(s, prev, len(s))...)
+}
+
+// findReadings scans left to right with the plugin's leftmost-match
+// semantics:
 //
-//   - `《《x》》` is emphasis on x (x without `》`).
 //   - `｜base《ruby》`, and `|base《ruby》` where `|` is unescaped and not
 //     followed by whitespace, take everything back to the bar as base (base
 //     without bars or `《`).
-//   - otherwise `《ruby》` takes the kanji run directly before it as base.
+//   - otherwise `kanji《ruby》` takes the kanji run directly before `《` as
+//     base, and the reading must not start with `《`.
 //
-// ruby is non-empty and holds neither `《` nor `》`.
-func findRubies(s []byte) []rubyMatch {
+// A match is decided by its `《`: neither kind of base can contain one, so a
+// `《` that fails to match also ends any base a bar before it had started.
+func findReadings(s []byte) []rubyMatch {
 	var out []rubyMatch
 	lastEnd := 0
 	// opener is the byte offset of the bar that would start an explicit
@@ -168,17 +186,13 @@ func findRubies(s []byte) []rubyMatch {
 		case '｜':
 			opener, openerLen = i, size
 		case '|':
-			if isEscaped(s, i) || i+1 >= len(s) || isASCIISpace(s[i+1]) {
+			next, _ := utf8.DecodeRune(s[i+size:])
+			if isEscaped(s, i) || i+size >= len(s) || isJSSpace(next) {
 				opener = -1
 			} else {
 				opener, openerLen = i, size
 			}
 		case '《':
-			if m, ok := matchEmphasis(s, i); ok {
-				out = append(out, m)
-				i, lastEnd, opener = m.stop, m.stop, -1
-				continue
-			}
 			if m, ok := matchRuby(s, i, lastEnd, opener, openerLen); ok {
 				out = append(out, m)
 				i, lastEnd, opener = m.stop, m.stop, -1
@@ -191,28 +205,47 @@ func findRubies(s []byte) []rubyMatch {
 	return out
 }
 
-func matchEmphasis(s []byte, open int) (rubyMatch, bool) {
-	bodyStart := open + 2*rubyOpenLen
-	if !hasPrefixAt(s, open+rubyOpenLen, rubyOpen) {
-		return rubyMatch{}, false
+// findEmphasis finds the plugin's `《《(?<emphasis>[^》\r\n]+?)》》` in
+// s[from:to].
+func findEmphasis(s []byte, from, to int) []rubyMatch {
+	var out []rubyMatch
+	seg := s[:to]
+	for i := from; i < to; {
+		open := indexFrom(seg, i, rubyOpen+rubyOpen)
+		if open < 0 {
+			break
+		}
+		bodyStart := open + 2*rubyOpenLen
+		end := indexFrom(seg, bodyStart, rubyClose)
+		if end <= bodyStart || !hasPrefixAt(seg, end+rubyCloseLen, rubyClose) {
+			// The plugin's regex moves on one position and tries again.
+			i = open + rubyOpenLen
+			continue
+		}
+		out = append(out, rubyMatch{
+			start: open, stop: end + 2*rubyCloseLen,
+			baseStart: bodyStart, baseStop: end,
+			emphasis: true,
+		})
+		i = end + 2*rubyCloseLen
 	}
-	end := indexFrom(s, bodyStart, rubyClose)
-	if end <= bodyStart || !hasPrefixAt(s, end+rubyCloseLen, rubyClose) {
-		return rubyMatch{}, false
-	}
-	return rubyMatch{
-		start: open, stop: end + 2*rubyCloseLen,
-		baseStart: bodyStart, baseStop: end,
-		emphasis: true,
-	}, true
+	return out
 }
+
+// rubyReading is the plugin's reading pattern followed by the closing `》`.
+// Readings may hold `《…》` pairs, e.g. `かん《じ》`. Go's regexp picks the
+// match a backtracking engine would among the leftmost ones, which is what
+// the plugin's JavaScript regex does.
+var rubyReading = regexp.MustCompile(
+	`^(?:[^《》\r\n]+(?:《[^》\r\n]*》[^《》\r\n]*)*|《[^》\r\n]*》(?:[^《》\r\n]+《[^》\r\n]*》)*[^《》\r\n]*)》`)
 
 func matchRuby(s []byte, open, lastEnd, opener, openerLen int) (rubyMatch, bool) {
 	rubyStart := open + rubyOpenLen
-	end := indexFrom(s, rubyStart, rubyClose)
-	if end <= rubyStart || indexFrom(s[:end], rubyStart, rubyOpen) >= 0 {
+	loc := rubyReading.FindIndex(s[rubyStart:])
+	if loc == nil {
 		return rubyMatch{}, false
 	}
+	end := rubyStart + loc[1] - rubyCloseLen
 	m := rubyMatch{baseStop: open, rubyStart: rubyStart, rubyStop: end, stop: end + rubyCloseLen}
 	if opener >= 0 {
 		// A bar directly before `《` leaves an empty base, which matches
@@ -222,6 +255,9 @@ func matchRuby(s []byte, open, lastEnd, opener, openerLen int) (rubyMatch, bool)
 		}
 		m.start, m.baseStart = opener, opener+openerLen
 		return m, true
+	}
+	if hasPrefixAt(s, rubyStart, rubyOpen) {
+		return rubyMatch{}, false
 	}
 	baseStart := open
 	for baseStart > lastEnd {
@@ -254,8 +290,10 @@ func isEscaped(s []byte, i int) bool {
 	return n%2 == 1
 }
 
-func isASCIISpace(c byte) bool {
-	return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v'
+// isJSSpace is JavaScript's `\s`, which the plugin's `\|(?!\s)` tests: Go's
+// unicode.IsSpace less U+0085, plus U+FEFF.
+func isJSSpace(r rune) bool {
+	return (unicode.IsSpace(r) && r != '\u0085') || r == '\ufeff'
 }
 
 func hasPrefixAt(s []byte, i int, prefix string) bool {

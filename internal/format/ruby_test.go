@@ -26,6 +26,12 @@ func TestMarkdownRubyConverts(t *testing.T) {
 		{"line break after ruby is kept", "漢字《かんじ》\n次の行", ruby("漢字", "かんじ") + "\n次の行"},
 		{"inside emphasis and link text", "*漢字《かんじ》* [語《ご》](https://example.com/)", "<em>" + ruby("漢字", "かんじ") + `</em> <a href="https://example.com/">` + ruby("語", "ご") + "</a>"},
 		{"fullwidth bar inside a table", "| a |\n|---|\n| ｜漢字《かんじ》 |", "<td>" + ruby("漢字", "かんじ") + "</td>"},
+		{"reading with a bracket pair after a bar", "｜漢字《かん《じ》》", ruby("漢字", "かん《じ》")},
+		{"reading with a bracket pair without a bar", "漢字《かん《じ》》", ruby("漢字", "かん《じ》")},
+		{"bar before double brackets is ruby, not emphasis", "｜傍点《《・》》", ruby("傍点", "《・》")},
+		{"kanji before double brackets is emphasis", "漢字《《傍点》》", "漢字" + ruby("傍", "・") + ruby("点", "・")},
+		{"emphasis body may start with a bracket", "《《《x》》", ruby("《", "・") + ruby("x", "・")},
+		{"emphasis retries after a failed start", "《《a》b《《c》》", "《《a》b" + ruby("c", "・")},
 		{"reading is escaped", "｜a《1 < 2》", ruby("a", "1 &lt; 2")},
 	}
 	for _, c := range cases {
@@ -49,6 +55,9 @@ func TestMarkdownRubyLeavesText(t *testing.T) {
 		{"reading across lines", "漢字《かん\nじ》", "<p>漢字《かん\nじ》</p>"},
 		{"empty emphasis", "《《》》", "<p>《《》》</p>"},
 		{"halfwidth bar before a space is text", "| 漢字《かんじ》", "<p>| " + ruby("漢字", "かんじ") + "</p>"},
+		{"halfwidth bar before an ideographic space is text", "|　かな《よみ》", "<p>|　かな《よみ》</p>"},
+		{"halfwidth bar before a no-break space is text", "|\u00a0かな《よみ》", "<p>|\u00a0かな《よみ》</p>"},
+		{"ruby inside double brackets leaves no emphasis", "《《漢字《かんじ》》》", "<p>《《" + ruby("漢字", "かんじ") + "》》</p>"},
 		{"escaped halfwidth bar is text", `ab\|漢字《かんじ》`, "<p>ab|" + ruby("漢字", "かんじ") + "</p>"},
 		{"code span", "`漢字《かんじ》`", "<code>漢字《かんじ》</code>"},
 		{"code block", "    漢字《かんじ》", "<pre><code>漢字《かんじ》"},
