@@ -31,6 +31,10 @@ func TestMarkdownInlineHTMLAllowedTags(t *testing.T) {
 		{"mark", `<mark>重要</mark>`, `<mark>重要</mark>`},
 		{"ins and del", `<del datetime="2026-10-13" cite="https://example.com/">旧</del><ins datetime="2026-10-13">新</ins>`,
 			`<del datetime="2026-10-13" cite="https://example.com/">旧</del><ins datetime="2026-10-13">新</ins>`},
+		{"semicolonless reference before = stays literal", `<q cite="https://example.com/?a=1&copy=2">x</q>`, `<q cite="https://example.com/?a=1&amp;copy=2">x</q>`},
+		{"semicolonless reference before alphanumeric stays literal", `<abbr title="&notin &copyx">x</abbr>`, `<abbr title="&amp;notin &amp;copyx">x</abbr>`},
+		{"semicolonless reference at a boundary is decoded", `<abbr title="&copy 2026">x</abbr>`, `<abbr title="© 2026">x</abbr>`},
+		{"references with semicolons are decoded", `<abbr title="&copy;=&notin;&#169;">x</abbr>`, `<abbr title="©=∉©">x</abbr>`},
 		{"tag spanning lines", "<q\ncite=\"https://example.com/\">x</q>", `<q cite="https://example.com/">x</q>`},
 	}
 	for _, c := range cases {

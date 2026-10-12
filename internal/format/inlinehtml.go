@@ -160,9 +160,53 @@ func scanAttr(s string) (key, value, rest string, ok bool) {
 		if !ok {
 			return "", "", "", false
 		}
-		value = html.UnescapeString(raw)
+		value = unescapeAttrValue(raw)
 	}
 	return strings.ToLower(name), value, rest, true
+}
+
+// unescapeAttrValue decodes character references the way the HTML parser
+// does inside an attribute value, which differs from html.UnescapeString's
+// text-context rules in one respect: a named reference without its `;` that
+// is followed by `=` or an alphanumeric stays literal. Otherwise a query such
+// as `?a=1&copy=2` would come out as `?a=1©=2`.
+func unescapeAttrValue(s string) string {
+	var protected strings.Builder
+	for {
+		i := strings.IndexByte(s, '&')
+		if i < 0 {
+			protected.WriteString(s)
+			break
+		}
+		protected.WriteString(s[:i])
+		s = s[i+1:]
+		n := 0
+		for n < len(s) && (isASCIILetter(s[n]) || isASCIIDigit(s[n])) {
+			n++
+		}
+		name, next := s[:n], s[n:]
+		if n > 0 && !strings.HasPrefix(next, ";") && legacyRefStaysLiteral(name, next) {
+			protected.WriteString("&amp;")
+		} else {
+			protected.WriteString("&")
+		}
+	}
+	return html.UnescapeString(protected.String())
+}
+
+// legacyRefStaysLiteral reports whether `&name` (no `;`) followed by next is
+// left undecoded in an attribute. html.UnescapeString decodes the longest
+// legacy entity that prefixes name; when that prefix is shorter than name the
+// character after it is alphanumeric, and when it is all of name the
+// attribute rule then looks at next.
+func legacyRefStaysLiteral(name, next string) bool {
+	ref := "&" + name
+	decoded := html.UnescapeString(ref)
+	if decoded == ref {
+		return false
+	}
+	wholeName := decoded == html.UnescapeString(ref+";")
+	return !wholeName || strings.HasPrefix(next, "=")
 }
 
 // htmlSpace is CommonMark's whitespace inside a tag, which includes the line
