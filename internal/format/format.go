@@ -102,9 +102,12 @@ func Render(body, rawKind string) (string, error) {
 // concurrent use once constructed.
 var markdownRenderer = goldmark.New(
 	goldmark.WithExtensions(
-		extension.GFM,     // tables + strikethrough + task lists + autolink
-		extension.Linkify, // bare URL → <a>
+		extension.GFM,            // tables + strikethrough + task lists + autolink
+		extension.Linkify,        // bare URL → <a>
+		extension.DefinitionList, // term line + `: description` → <dl>
 		inlineHTMLAllowlist{},
+		rubyNotation{},
+		noteParagraphs{},
 	),
 	goldmark.WithRendererOptions(
 		// The default XHTML mode emits self-closing <br /> which is fine,
