@@ -18,6 +18,50 @@ Create entries from **New Entry** and edit them from **Entries**. You can leave 
 
 HTML is the most flexible but the markup you type ships straight to the public page. If you let untrusted contributors author entries, prefer Markdown.
 
+## Extra Markdown syntax
+
+Markdown entries support the following on top of standard Markdown.
+
+### Ruby (furigana)
+
+The notation common on Japanese novel sites, written the same way as in the Japanese Novel Ruby plugin for Obsidian.
+
+| Write | Result |
+|---|---|
+| `｜文章《ぶんしょう》` | "ぶんしょう" as ruby over "文章" |
+| `\|文章《ぶんしょう》` | The same with a half-width bar |
+| `長い文章《ぶんしょう》` | Without a bar, the ruby goes over the run of kanji right before `《` ("文章" here) |
+| `《《傍点》》` | Emphasis dots (・) over each character |
+
+- The base text runs from the bar to `《`. Use a bar whenever the base contains hiragana, katakana or other non-kanji characters.
+- The bar can be left out only when the base is all kanji (including `々` `〆` `〇` `ヶ`).
+- Inside a table a half-width `|` is a cell separator. **Use the full-width `｜` for ruby inside tables.**
+- A half-width `|` followed by a space, or written as `\|`, does not start ruby.
+- Readers without ruby support, such as many feed readers, show it as "文章（ぶんしょう）".
+
+### Definition lists
+
+Put a description on the line after a term, starting with `: `, to get a term/description list (`<dl>`).
+
+```
+Serene Bach
+: A weblog tool from the CGI era
+```
+
+A term can have several descriptions.
+
+### Notes
+
+A line starting with `// ` (`//` followed by a space) becomes a note paragraph (`<p class="note">`), which the `.note` style in SB3 templates picks up unchanged.
+
+```
+// Prices are as of October 2026.
+// They may change.
+```
+
+- Consecutive `// ` lines form one note, with a line break after each line.
+- A line such as `//example.com`, with no space after `//`, is not a note.
+
 ## HTML tags allowed in Markdown
 
 Markdown entries normally drop raw HTML (it is replaced with `<!-- raw HTML omitted -->`). The tags below are the exception: written inside running text, they are kept.
