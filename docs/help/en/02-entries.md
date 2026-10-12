@@ -18,6 +18,28 @@ Create entries from **New Entry** and edit them from **Entries**. You can leave 
 
 HTML is the most flexible but the markup you type ships straight to the public page. If you let untrusted contributors author entries, prefer Markdown.
 
+## HTML tags allowed in Markdown
+
+Markdown entries normally drop raw HTML (it is replaced with `<!-- raw HTML omitted -->`). The tags below are the exception: written inside running text, they are kept.
+
+| Tag | Use | Attributes kept |
+|---|---|---|
+| `<q>` | Short inline quotation | `cite` (URL of the source) |
+| `<cite>` | Title of a work or source | none |
+| `<abbr>` | Abbreviation | `title` (the expansion) |
+| `<dfn>` | Term being defined | `title` |
+| `<kbd>` | Keyboard input | none |
+| `<sub>` / `<sup>` | Subscript / superscript | none |
+| `<mark>` | Highlighted text | none |
+| `<ins>` / `<del>` | Inserted / deleted text | `cite`, `datetime` |
+
+Example: `She said <q cite="https://example.com/interview">keep going</q> at the end.`
+
+- Attributes not listed (`class`, `style`, `onclick`, …) are removed.
+- `cite` is kept only when it is a URL starting with `http://` or `https://`.
+- Other tags such as `<b>`, `<small>` and `<span>` are still dropped. Use Markdown's `**bold**` / `*italic*` instead.
+- A tag on a line by itself is treated as an HTML block rather than inline HTML, and is dropped. Write it inside a sentence.
+
 ## Body and "more"
 
 The body is the main content shown on the entry page and (in part) on listings.
