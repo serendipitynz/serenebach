@@ -40,8 +40,13 @@ type helpPageData struct {
 	FallbackNotice bool // page body is the default locale's because no translation exists
 }
 
+// helpIndex redirects rather than rendering the index in place: the help
+// Markdown links between pages by bare slug ("[...](design)"), which a
+// browser resolves against /admin/ when the URL has no trailing segment
+// under /admin/help/. StripSlashes folds /admin/help/ into this route too,
+// so a trailing slash cannot serve as that base.
 func (h *Handler) helpIndex(w http.ResponseWriter, r *http.Request) {
-	h.renderHelpPage(w, r, "index")
+	http.Redirect(w, r, root(r)+"/admin/help/index", http.StatusFound)
 }
 
 func (h *Handler) helpShow(w http.ResponseWriter, r *http.Request) {

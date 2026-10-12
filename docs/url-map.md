@@ -85,7 +85,7 @@ Every route the running server exposes, split between the public surface and the
 | `/admin/templates/{id}/assets` | Upload a template asset (multipart POST) |
 | `/admin/templates/{id}/assets/{assetID}/delete` | Remove a template asset + file (POST) |
 | `/admin/rebuild` | Static site rebuild trigger (GET status + POST to run) |
-| `/admin/help` | Embedded help. Pages live at `/admin/help/{slug}` |
+| `/admin/help` | Embedded help — redirects to the index at `/admin/help/index`. Pages live at `/admin/help/{slug}` |
 | `/admin/settings` | Settings root — redirects to 基本設定 for users who can manage design, otherwise to 画面設定 |
 | `/admin/settings/screen` | 画面設定 tab — per-user appearance + display-language preferences (browser localStorage). Visible to every logged-in user |
 | `/admin/settings/basic` | 基本設定 tab — weblog info (title / description / base URL / lang / llms.txt opt-in) + env-var snapshot. CanManageDesign only |
