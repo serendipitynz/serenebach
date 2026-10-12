@@ -36,6 +36,13 @@ func mainArea(body string) string {
 // can point output at a writable temp dir.
 func newTestApp(t *testing.T) *app.App {
 	t.Helper()
+	return newTestAppWith(t, nil)
+}
+
+// newTestAppWith is newTestApp with a hook to adjust the config before
+// app.New, for tests that need a non-default deployment shape.
+func newTestAppWith(t *testing.T, configure func(*config.Config)) *app.App {
+	t.Helper()
 	rebuildOut := os.Getenv("SB_REBUILD_OUT")
 	if rebuildOut == "" {
 		rebuildOut = filepath.Join(t.TempDir(), "public")
@@ -53,6 +60,9 @@ func newTestApp(t *testing.T) *app.App {
 		// (comment / like / stamp). Tests still need to set the Origin
 		// header explicitly — see helper publicSameOrigin().
 		PublicAllowedOrigins: []string{"http://example.com"},
+	}
+	if configure != nil {
+		configure(cfg)
 	}
 	a, err := app.New(cfg)
 	if err != nil {
