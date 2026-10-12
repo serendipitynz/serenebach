@@ -104,6 +104,7 @@ var markdownRenderer = goldmark.New(
 	goldmark.WithExtensions(
 		extension.GFM,     // tables + strikethrough + task lists + autolink
 		extension.Linkify, // bare URL → <a>
+		inlineHTMLAllowlist{},
 	),
 	goldmark.WithRendererOptions(
 		// The default XHTML mode emits self-closing <br /> which is fine,
@@ -111,6 +112,8 @@ var markdownRenderer = goldmark.New(
 		// will be escaped. We leave it off so user-submitted comments or
 		// sloppy drafts can't inject arbitrary markup; admin-authored
 		// entries that need literal HTML should store as Kind=HTML.
+		// Inline tags on the allowlist in inlinehtml.go are the one
+		// exception, rebuilt from their parsed parts rather than echoed.
 		html.WithXHTML(),
 	),
 )
