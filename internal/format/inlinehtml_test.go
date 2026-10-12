@@ -33,8 +33,9 @@ func TestMarkdownInlineHTMLAllowedTags(t *testing.T) {
 			`<del datetime="2026-10-13" cite="https://example.com/">旧</del><ins datetime="2026-10-13">新</ins>`},
 		{"semicolonless reference before = stays literal", `<q cite="https://example.com/?a=1&copy=2">x</q>`, `<q cite="https://example.com/?a=1&amp;copy=2">x</q>`},
 		{"semicolonless reference before alphanumeric stays literal", `<abbr title="&notin &copyx">x</abbr>`, `<abbr title="&amp;notin &amp;copyx">x</abbr>`},
+		{"unknown name with a legacy prefix and a semicolon stays literal", `<abbr title="&notit; &copyx; &ampx;">x</abbr>`, `<abbr title="&amp;notit; &amp;copyx; &amp;ampx;">x</abbr>`},
 		{"semicolonless reference at a boundary is decoded", `<abbr title="&copy 2026">x</abbr>`, `<abbr title="© 2026">x</abbr>`},
-		{"references with semicolons are decoded", `<abbr title="&copy;=&notin;&#169;">x</abbr>`, `<abbr title="©=∉©">x</abbr>`},
+		{"references with semicolons are decoded, a legacy one before = is not", `<abbr title="&copy;=&notin;&#169;&semi;&lt=">x</abbr>`, `<abbr title="©=∉©;&amp;lt=">x</abbr>`},
 		{"tag spanning lines", "<q\ncite=\"https://example.com/\">x</q>", `<q cite="https://example.com/">x</q>`},
 	}
 	for _, c := range cases {
