@@ -105,6 +105,7 @@ var markdownRenderer = goldmark.New(
 		extension.GFM,     // tables + strikethrough + task lists + autolink
 		extension.Linkify, // bare URL → <a>
 		inlineHTMLAllowlist{},
+		rubyNotation{},
 	),
 	goldmark.WithRendererOptions(
 		// The default XHTML mode emits self-closing <br /> which is fine,
