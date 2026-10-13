@@ -19,7 +19,7 @@ import (
 //
 //  1. Escape the whole body so HTML in the source is neutralised.
 //  2. Split into paragraphs on blank lines; inside each paragraph
-//     collapse newlines to `<br>` when autobreak is on, otherwise
+//     collapse newlines to `<br />` when autobreak is on, otherwise
 //     join with a single space.
 //  3. Apply URL autolink on the already-escaped text so we only
 //     touch what looks like a URL.
@@ -33,7 +33,7 @@ func renderSbtext(body string, autobreak, autolink bool) string {
 	paragraphs := splitParagraphs(escaped)
 	for i, p := range paragraphs {
 		if autobreak {
-			p = strings.ReplaceAll(p, "\n", "<br>\n")
+			p = strings.ReplaceAll(p, "\n", "<br />\n")
 		} else {
 			p = strings.ReplaceAll(p, "\n", " ")
 		}

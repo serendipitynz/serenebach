@@ -110,11 +110,17 @@ var markdownRenderer = goldmark.New(
 		noteParagraphs{},
 	),
 	goldmark.WithRendererOptions(
-		// The default XHTML mode emits self-closing <br /> which is fine,
-		// but html.WithUnsafe is off by default — raw HTML in the source
-		// will be escaped. We leave it off so user-submitted comments or
-		// sloppy drafts can't inject arbitrary markup; admin-authored
-		// entries that need literal HTML should store as Kind=HTML.
+		// goldmark writes void elements HTML-style (<br>) unless told
+		// otherwise. The body is spliced as-is into templates carried over
+		// from SB3 unmodified, and SB3's stock theme is XHTML 1.0
+		// Transitional: the self-closing <br /> form is well-formed there
+		// and still valid in an HTML5 page, while <br> breaks the former.
+		// sbtext emits <br /> for the same reason, as SB3's own parser did.
+		//
+		// html.WithUnsafe stays off, so raw HTML in the source is dropped
+		// and replaced by an `<!-- raw HTML omitted -->` comment — omitted,
+		// not escaped. That keeps sloppy drafts from injecting arbitrary
+		// markup; entries that need literal HTML should store as Kind=HTML.
 		// Inline tags on the allowlist in inlinehtml.go are the one
 		// exception, rebuilt from their parsed parts rather than echoed.
 		html.WithXHTML(),

@@ -26,7 +26,7 @@ func TestRenderSbtextParagraphsSplitOnBlankLine(t *testing.T) {
 	if !strings.Contains(out, "<p>") || strings.Count(out, "<p>") != 2 {
 		t.Errorf("expected two paragraphs, got: %q", out)
 	}
-	if !strings.Contains(out, "one<br>\ntwo") {
+	if !strings.Contains(out, "one<br />\ntwo") {
 		t.Errorf("expected autobreak within paragraph: %q", out)
 	}
 }
@@ -76,12 +76,33 @@ func TestRenderSbtextFormat1OnlyAutobreak(t *testing.T) {
 }
 
 func TestRenderSbtextFormat2OnlyAutolink(t *testing.T) {
-	// format=2 is SB3's "autolink only" mode — newlines don't become <br>.
+	// format=2 is SB3's "autolink only" mode — newlines don't become <br />.
 	out, err := Render("line one\nline two", "2")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out, "<br>") {
+	if strings.Contains(out, "<br") {
 		t.Errorf("format=2 should not autobreak: %q", out)
+	}
+}
+
+func TestRenderSbtextLineBreakMatchesMarkdown(t *testing.T) {
+	// Both formats land in the same templates, so they must agree on the
+	// XHTML-compatible self-closing form.
+	sb, err := Render("one\ntwo", "sbtext")
+	if err != nil {
+		t.Fatal(err)
+	}
+	md, err := Render("one  \ntwo", "markdown")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, out := range map[string]string{"sbtext": sb, "markdown": md} {
+		if !strings.Contains(out, "one<br />\ntwo") {
+			t.Errorf("%s: expected self-closing <br />: %q", name, out)
+		}
+		if strings.Contains(out, "<br>") {
+			t.Errorf("%s: unexpected HTML-style <br>: %q", name, out)
+		}
 	}
 }
