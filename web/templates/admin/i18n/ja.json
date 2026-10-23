@@ -89,6 +89,7 @@
   "login.errorBadCredentials": "ユーザー名またはパスワードが違います。",
   "login.errorEmpty": "ユーザー名とパスワードを入力してください。",
   "login.errorRateLimit": "ログイン試行が多すぎます。しばらく待ってから再送してください。",
+  "login.warnLogoutIncomplete": "ログアウトしましたが、サーバー側のセッションを無効にできませんでした。保存先のディスクの空き容量を確認してください。",
 
   "setup.title": "初期セットアップ",
   "setup.intro": "管理者ユーザを作成します。この画面は初回のみ表示されます。",

@@ -274,6 +274,7 @@ func serveEmbedded(name, contentType string) http.HandlerFunc {
 
 type loginData struct {
 	Error     string
+	Warning   string
 	Name      string
 	Next      string
 	CSRFToken string
@@ -284,10 +285,14 @@ func (h *Handler) loginForm(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, root(r)+safeNext(r.URL.Query().Get("next")), http.StatusFound)
 		return
 	}
-	renderLogin(w, r, loginData{
+	data := loginData{
 		Next:      safeNextQueryParam(r.URL.Query().Get("next")),
 		CSRFToken: csrf.Token(r.Context()),
-	})
+	}
+	if r.URL.Query().Get("logout") == "incomplete" {
+		data.Warning = tr(r, "login.warnLogoutIncomplete")
+	}
+	renderLogin(w, r, data)
 }
 
 func (h *Handler) loginSubmit(w http.ResponseWriter, r *http.Request) {
@@ -354,7 +359,13 @@ func (h *Handler) loginSubmit(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	if err := h.Sessions.Destroy(r.Context(), w, r); err != nil {
+		// The cookie is gone but the session row is not, so a copied token
+		// keeps working until it expires. Tell the user rather than
+		// accepting that silently: the usual cause is a full disk, which
+		// otherwise only shows up in the server log.
 		log.Printf("admin.logout: %v", err)
+		http.Redirect(w, r, root(r)+"/admin/login?logout=incomplete", http.StatusFound)
+		return
 	}
 	http.Redirect(w, r, root(r)+"/admin/login", http.StatusFound)
 }
