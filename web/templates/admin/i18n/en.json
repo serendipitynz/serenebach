@@ -89,6 +89,7 @@
   "login.errorBadCredentials": "Incorrect username or password.",
   "login.errorEmpty": "Please enter both username and password.",
   "login.errorRateLimit": "Too many sign-in attempts. Please wait a few minutes and try again.",
+  "login.warnLogoutIncomplete": "You have been signed out, but the server could not revoke the session. Check that the data disk has free space.",
 
   "setup.title": "Initial setup",
   "setup.intro": "Create the administrator account. This screen only appears once.",

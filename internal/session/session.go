@@ -52,16 +52,17 @@ func (m *Manager) Create(ctx context.Context, w http.ResponseWriter, r *http.Req
 
 // Destroy revokes the session identified by the cookie on r and clears the
 // cookie on w. Missing or already-destroyed sessions are silently ignored.
+// The cookie is cleared even when the DB delete fails (e.g. a full disk),
+// so this browser is signed out regardless; the returned error then means
+// the row stays valid until it expires, for anyone who already holds the
+// token.
 func (m *Manager) Destroy(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 	c, err := r.Cookie(CookieName)
 	if err != nil {
 		return nil //nolint:nilerr // missing cookie is the expected "no session to destroy" path.
 	}
-	if err := m.Store.DeleteSession(ctx, c.Value); err != nil {
-		return err
-	}
 	http.SetCookie(w, m.clearCookie(r))
-	return nil
+	return m.Store.DeleteSession(ctx, c.Value)
 }
 
 // UserFromRequest returns the user tied to the request's session cookie,

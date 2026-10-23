@@ -11,6 +11,7 @@
   <div class="login-card">
     <h1><img src="{{Root}}/admin/static/sb_logo_gray.svg" alt="{{T `app.name`}}"></h1>
     {{if .Error}}<p class="alert error">{{.Error}}</p>{{end}}
+    {{if .Warning}}<p class="alert warning">{{.Warning}}</p>{{end}}
     <form method="post" action="{{Root}}/admin/login{{if .Next}}?next={{.Next}}{{end}}">
       <label>{{T "login.name"}}
         <input type="text" name="name" value="{{.Name}}" autofocus required>
