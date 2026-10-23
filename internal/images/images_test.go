@@ -2,13 +2,17 @@ package images
 
 import (
 	"bytes"
+	"errors"
 	"image"
 	"image/color"
 	"image/jpeg"
 	"image/png"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -153,6 +157,99 @@ func TestSaveUploadRejectsUnsupportedMIME(t *testing.T) {
 	_, err := s.SaveUpload(strings.NewReader("..."), "file.zip", "application/zip", time.Now())
 	if err == nil {
 		t.Fatalf("want error for unsupported mime upload")
+	}
+}
+
+// fullDiskWriter passes the first `room` bytes through to the real file and
+// then fails with ENOSPC, so a partial file is genuinely left on disk for
+// the code under test to clean up.
+type fullDiskWriter struct {
+	f    *os.File
+	room int
+}
+
+func (w *fullDiskWriter) Write(p []byte) (int, error) {
+	if len(p) <= w.room {
+		w.room -= len(p)
+		return w.f.Write(p)
+	}
+	n, _ := w.f.Write(p[:w.room])
+	w.room = 0
+	return n, syscall.ENOSPC
+}
+
+func (w *fullDiskWriter) Close() error { return w.f.Close() }
+
+// fillDiskFor makes writes to paths matching `match` run out of space after
+// a few bytes, for the duration of the test.
+func fillDiskFor(t *testing.T, match func(path string) bool) {
+	t.Helper()
+	orig := createFile
+	t.Cleanup(func() { createFile = orig })
+	createFile = func(path string) (io.WriteCloser, error) {
+		wc, err := orig(path)
+		if err != nil || !match(path) {
+			return wc, err
+		}
+		return &fullDiskWriter{f: wc.(*os.File), room: 16}, nil
+	}
+}
+
+func listFiles(t *testing.T, root string) []string {
+	t.Helper()
+	var files []string
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			files = append(files, path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return files
+}
+
+func TestSaveUploadRemovesPartialFileWhenDiskFills(t *testing.T) {
+	root := t.TempDir()
+	s := NewStore(root)
+	fillDiskFor(t, func(string) bool { return true })
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, newTestImage(80, 80, color.RGBA{0, 0, 0, 255})); err != nil {
+		t.Fatal(err)
+	}
+	_, err := s.SaveUpload(&buf, "full.png", "image/png", time.Now())
+	if !errors.Is(err, syscall.ENOSPC) {
+		t.Fatalf("SaveUpload err = %v, want ENOSPC", err)
+	}
+	if files := listFiles(t, root); len(files) != 0 {
+		t.Errorf("partial files left behind: %v", files)
+	}
+}
+
+func TestSaveUploadRemovesPartialThumbnailWhenDiskFills(t *testing.T) {
+	root := t.TempDir()
+	s := NewStore(root)
+	fillDiskFor(t, func(path string) bool { return strings.HasSuffix(path, ".thumb.jpg") })
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, newTestImage(400, 300, color.RGBA{10, 20, 30, 255})); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := s.SaveUpload(&buf, "thumbless.png", "image/png", time.Now())
+	if err != nil {
+		t.Fatalf("SaveUpload: %v", err)
+	}
+	if stored.ThumbPath != "" {
+		t.Errorf("ThumbPath = %q, want empty after a failed thumbnail write", stored.ThumbPath)
+	}
+	want := filepath.Join(root, filepath.FromSlash(stored.StoredPath))
+	if files := listFiles(t, root); len(files) != 1 || files[0] != want {
+		t.Errorf("files = %v, want only the original %s", files, want)
 	}
 }
 

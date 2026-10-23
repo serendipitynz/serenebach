@@ -161,7 +161,10 @@ func (s *Store) SaveUpload(src io.Reader, originalName, mime string, now time.Ti
 		return nil, fmt.Errorf("images: read body: %w", err)
 	}
 
-	if err := os.WriteFile(absPath, buf.Bytes(), 0o644); err != nil {
+	if err := writeNewFile(absPath, func(w io.Writer) error {
+		_, err := w.Write(buf.Bytes())
+		return err
+	}); err != nil {
 		return nil, fmt.Errorf("images: write file: %w", err)
 	}
 
@@ -225,12 +228,37 @@ func writeThumbnail(src image.Image, dstPath string) error {
 }
 
 func encodeJPEG(img image.Image, path string) error {
-	f, err := os.Create(path)
+	return writeNewFile(path, func(w io.Writer) error {
+		return jpeg.Encode(w, img, &jpeg.Options{Quality: 82})
+	})
+}
+
+// createFile is swapped by tests to fail mid-write the way a full disk
+// does; ENOSPC cannot be provoked portably against a real filesystem.
+var createFile = func(path string) (io.WriteCloser, error) {
+	// O_EXCL so the cleanup in writeNewFile can only ever remove a file
+	// this call created, never one already sitting at the same path.
+	return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+}
+
+// writeNewFile creates path and fills it via write. On any failure,
+// including the Close that reports a deferred ENOSPC, the partial file
+// is removed: no DB row will ever reference it, so it would otherwise
+// sit in img/YYYY/MM/ forever.
+func writeNewFile(path string, write func(io.Writer) error) error {
+	f, err := createFile(path)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	return jpeg.Encode(f, img, &jpeg.Options{Quality: 82})
+	err = write(f)
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		_ = os.Remove(path)
+		return err
+	}
+	return nil
 }
 
 // scaleToMax returns the target dimensions when fitting (w, h) into a
