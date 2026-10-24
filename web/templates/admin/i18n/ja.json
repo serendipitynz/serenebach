@@ -532,6 +532,7 @@
   "js.ai.err.vision_unsupported": "このモデルは画像を受け付けません。",
   "js.ai.err.empty_response": "空の応答でした。もう一度試してください。",
   "js.ai.err.reasoning_exhausted": "思考型モデルが思考だけでトークン枠を使い切りました。Max Tokens を増やすか非思考モデルをお試しください。",
+  "js.ai.err.destination_blocked": "この接続先は使えません。管理ユーザー以外は、インターネット上の公開アドレスにある AI サービスだけに接続できます。",
   "js.ai.err.parse": "応答の解析に失敗しました。",
   "js.ai.err.selection_required": "テキストを選択してください。",
   "js.ai.err.context_required": "入力テキストがありません。",

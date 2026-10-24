@@ -532,6 +532,7 @@
   "js.ai.err.vision_unsupported": "This model doesn't accept images.",
   "js.ai.err.empty_response": "Empty response. Please try again.",
   "js.ai.err.reasoning_exhausted": "The reasoning model used the entire token budget on hidden chain-of-thought. Raise Max Tokens or pick a non-thinking model.",
+  "js.ai.err.destination_blocked": "This endpoint is not allowed. Only admins can connect to local or private addresses; other users can use AI services on public addresses only.",
   "js.ai.err.parse": "Couldn't parse the response.",
   "js.ai.err.selection_required": "Select some text first.",
   "js.ai.err.context_required": "No context to work with.",
