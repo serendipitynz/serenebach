@@ -250,7 +250,7 @@ func TestUserNotFoundErrors(t *testing.T) {
 		t.Errorf("expected ErrNotFound for UpdateUserAIConfig, got %v", err)
 	}
 
-	err = s.UpdateUserPassword(ctx, 9999, "hash")
+	err = s.UpdateUserPassword(ctx, 9999, "hash", nil)
 	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound for UpdateUserPassword, got %v", err)
 	}
@@ -324,7 +324,7 @@ func TestUserPassword(t *testing.T) {
 		Role: domain.RoleRegular,
 	}, "initial-hash")
 
-	err := s.UpdateUserPassword(ctx, id, "new-hash")
+	err := s.UpdateUserPassword(ctx, id, "new-hash", nil)
 	if err != nil {
 		t.Fatalf("UpdateUserPassword: %v", err)
 	}
@@ -445,5 +445,93 @@ func TestUserListVisibleDefault(t *testing.T) {
 	visible, _ := s.VisibleProfileUsers(ctx, 1)
 	if len(visible) != 1 || visible[0].ID != id {
 		t.Errorf("VisibleProfileUsers should contain the user")
+	}
+}
+
+func sessionCount(t *testing.T, s *Store, userID int64) int {
+	t.Helper()
+	var n int
+	if err := s.db.QueryRowContext(context.Background(),
+		`SELECT COUNT(*) FROM sessions WHERE user_id = ?`, userID).Scan(&n); err != nil {
+		t.Fatalf("count sessions: %v", err)
+	}
+	return n
+}
+
+func passwordHash(t *testing.T, s *Store, userID int64) string {
+	t.Helper()
+	var h string
+	if err := s.db.QueryRowContext(context.Background(),
+		`SELECT password_hash FROM users WHERE id = ?`, userID).Scan(&h); err != nil {
+		t.Fatalf("read password_hash: %v", err)
+	}
+	return h
+}
+
+func TestUpdateUserPasswordRevokesThatUsersSessions(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	exp := time.Now().Add(time.Hour).Unix()
+
+	alice, _ := s.CreateUser(ctx, domain.User{WID: 1, Name: "alice", DisplayName: "A", Email: "a@a.com", Role: domain.RoleRegular}, "old")
+	bob, _ := s.CreateUser(ctx, domain.User{WID: 1, Name: "bob", DisplayName: "B", Email: "b@b.com", Role: domain.RoleRegular}, "old")
+	for _, tok := range []string{"alice-1", "alice-2"} {
+		if err := s.CreateSession(ctx, tok, alice, exp); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.CreateSession(ctx, "bob-1", bob, exp); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.UpdateUserPassword(ctx, alice, "new", nil); err != nil {
+		t.Fatalf("UpdateUserPassword: %v", err)
+	}
+	if n := sessionCount(t, s, alice); n != 0 {
+		t.Errorf("alice sessions = %d, want 0", n)
+	}
+	if _, err := s.SessionUser(ctx, "bob-1"); err != nil {
+		t.Errorf("bob's session should survive alice's change: %v", err)
+	}
+
+	if err := s.UpdateUserPassword(ctx, bob, "new", &ReplacementSession{Token: "bob-2", ExpiresAt: exp}); err != nil {
+		t.Fatalf("UpdateUserPassword with replacement: %v", err)
+	}
+	if _, err := s.SessionUser(ctx, "bob-1"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("bob-1 after change: err = %v, want ErrNotFound", err)
+	}
+	if u, err := s.SessionUser(ctx, "bob-2"); err != nil || u.ID != bob {
+		t.Errorf("replacement session = %v, %v; want bob", u, err)
+	}
+}
+
+// A failure after the password write must roll the write back: a new
+// password with the old sessions intact is exactly the state the revocation
+// exists to prevent.
+func TestUpdateUserPasswordRollsBackWhenSessionsFail(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	exp := time.Now().Add(time.Hour).Unix()
+
+	alice, _ := s.CreateUser(ctx, domain.User{WID: 1, Name: "alice", DisplayName: "A", Email: "a@a.com", Role: domain.RoleRegular}, "old")
+	bob, _ := s.CreateUser(ctx, domain.User{WID: 1, Name: "bob", DisplayName: "B", Email: "b@b.com", Role: domain.RoleRegular}, "old")
+	if err := s.CreateSession(ctx, "alice-1", alice, exp); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreateSession(ctx, "taken", bob, exp); err != nil {
+		t.Fatal(err)
+	}
+
+	// The replacement collides with bob's token, so its INSERT fails after
+	// the password UPDATE and the session DELETE have both run.
+	err := s.UpdateUserPassword(ctx, alice, "new", &ReplacementSession{Token: "taken", ExpiresAt: exp})
+	if err == nil {
+		t.Fatal("UpdateUserPassword succeeded despite the token collision")
+	}
+	if h := passwordHash(t, s, alice); h != "old" {
+		t.Errorf("password_hash = %q, want the old hash kept", h)
+	}
+	if n := sessionCount(t, s, alice); n != 1 {
+		t.Errorf("alice sessions = %d, want 1 (delete rolled back)", n)
 	}
 }

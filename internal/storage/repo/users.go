@@ -173,20 +173,55 @@ func (s *Store) UpdateUserAIConfig(ctx context.Context, userID int64, u domain.U
 	return nil
 }
 
-// UpdateUserPassword writes a new bcrypt hash for one user. Keeping
-// this separate from UpdateUser matches the admin form's "leave
+// ReplacementSession is a session to issue in the same transaction that
+// revokes a user's existing ones.
+type ReplacementSession struct {
+	Token     string
+	ExpiresAt int64
+}
+
+// UpdateUserPassword writes a new bcrypt hash for one user and deletes
+// every session that user holds, in one transaction, so a session stolen
+// before the change cannot outlive it and neither half lands alone.
+// A non-nil replacement is inserted in the same transaction, keeping the
+// browser that made the change signed in on a token nobody else has seen.
+// Keeping this separate from UpdateUser matches the admin form's "leave
 // blank to keep" UX — the form handler only calls this when a new
 // password was actually entered.
-func (s *Store) UpdateUserPassword(ctx context.Context, userID int64, passwordHash string) error {
-	res, err := s.db.ExecContext(ctx, `
+func (s *Store) UpdateUserPassword(ctx context.Context, userID int64, passwordHash string, replacement *ReplacementSession) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("repo: UpdateUserPassword begin: %w", err)
+	}
+	defer func() {
+		if tx != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	now := time.Now().Unix()
+	res, err := tx.ExecContext(ctx, `
 		UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?`,
-		passwordHash, time.Now().Unix(), userID)
+		passwordHash, now, userID)
 	if err != nil {
 		return fmt.Errorf("repo: UpdateUserPassword: %w", err)
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, userID); err != nil {
+		return fmt.Errorf("repo: UpdateUserPassword sessions: %w", err)
+	}
+	if replacement != nil {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO sessions (token, user_id, expires_at, created_at)
+			VALUES (?, ?, ?, ?)`, replacement.Token, userID, replacement.ExpiresAt, now); err != nil {
+			return fmt.Errorf("repo: UpdateUserPassword replacement session: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repo: UpdateUserPassword commit: %w", err)
+	}
+	tx = nil
 	return nil
 }
 

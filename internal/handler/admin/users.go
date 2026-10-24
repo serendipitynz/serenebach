@@ -367,7 +367,12 @@ func (h *Handler) updateUserPasswordIfChanged(w http.ResponseWriter, r *http.Req
 		http.Error(w, "failed to hash password", http.StatusInternalServerError)
 		return false
 	}
-	if err := h.Store.UpdateUserPassword(r.Context(), id, hash); err != nil {
+	if actor := session.UserFrom(r.Context()); actor != nil && actor.ID == id {
+		err = h.Sessions.ChangeOwnPassword(r.Context(), w, r, id, hash)
+	} else {
+		err = h.Store.UpdateUserPassword(r.Context(), id, hash, nil)
+	}
+	if err != nil {
 		log.Printf("admin.userUpdate: password: %v", err)
 		http.Error(w, "failed to update password", http.StatusInternalServerError)
 		return false
