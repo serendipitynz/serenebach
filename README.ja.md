@@ -86,7 +86,7 @@ docker run -d -p 8080:8080 -v serenebach-data:/home/nonroot/data ghcr.io/serendi
 
 CI でも push / PR ごとに同じコマンドが走ります:
 
-- `task lint` — `.golangci.yml` を使って `golangci-lint` を実行 (`staticcheck` に加えて gocyclo (上限 15) などのプロジェクト lint セットを含む)。あわせて `//nolint:gocyclo` の存在を検出して失敗させる。この上限は lint の好みではなく設計上のルール (上限を超えた関数は抑制せず分割する) なので、箇所ごとの opt-out は禁止しています
+- `task lint` — `.golangci.yml` を使って `golangci-lint` を実行 (`staticcheck` に加えて gocyclo (上限 15) などのプロジェクト lint セットを含む)。あわせて `//nolint:gocyclo` の存在を検出して失敗させる。この上限は lint の好みではなく設計上のルール (上限を超えた関数は抑制せず分割する) なので、箇所ごとの opt-out は禁止しています。`PATH` 上の `golangci-lint` を使うので、v2.15.0 以上 (`.github/workflows/ci.yml` の固定版) が必要です。それより古いものは Go 1.27.3 の export data を読めず、全パッケージが `typecheck` エラーになります
 - `task lint:js` — `biome.json` を使って管理画面 JavaScript に `biome lint .` を実行。導入は `brew install biome`、または [biome のリリース](https://github.com/biomejs/biome/releases) からバイナリを取得。Rust 製の単一バイナリなので Node ランタイムも `node_modules` も不要です。有効にしているルールは `style/useBlockStatements` のみで、制御フローの本体に必ず波括弧を要求します。対象は `*.js` のみです。HTML テンプレート内の inline `<script>` は対象外で、これは biome の HTML パーサが `html/template` の `{{...}}` を解釈できないためです。CI は biome のバージョンを固定していますが、このターゲットは `PATH` 上の biome を使います。結果が食い違う場合は `biome --version` と `.github/workflows/ci.yml` の固定値を比べてください
 - `task test` — `go test ./...` を実行
 - `task cover` — パッケージ横断カバレッジ (`-coverpkg=./...`) 付きでテストを実行し合計を表示。`task cover:html` は HTML レポートをブラウザで開き、`task cover:html:file` はヘッドレス向けに `coverage.html` へ出力
