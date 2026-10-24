@@ -10,6 +10,8 @@ vars:
   PKG: ./cmd/serenebach
   OUT: bin/serenebach
   VERSION_FILE: internal/version/version.go
+  GO_TOOLCHAIN:
+    sh: awk '$1 == "go" {print "go" $2}' go.mod
 
 tasks:
   default:
@@ -106,7 +108,12 @@ tasks:
       GOOS: '{{.GOOS}}'
       GOARCH: '{{.GOARCH}}'
     cmds:
-      - go build -ldflags="-s -w" -o {{.OUT}}-{{.GOOS}}-{{.GOARCH}}{{if eq .GOOS "windows"}}.exe{{end}} {{.PKG}}
+      # Release binaries are built with exactly the Go named on go.mod's
+      # `go` line. Left to GOTOOLCHAIN=auto, the build would use whatever
+      # newer Go the machine has, so a release's Go version would depend on
+      # who ran it. Set on the command rather than under `env:` because Task
+      # lets a GOTOOLCHAIN already in the shell override `env:`.
+      - GOTOOLCHAIN={{.GO_TOOLCHAIN}} go build -ldflags="-s -w" -o {{.OUT}}-{{.GOOS}}-{{.GOARCH}}{{if eq .GOOS "windows"}}.exe{{end}} {{.PKG}}
 
   seed:
     desc: Create the initial weblog + admin user (idempotent)
@@ -318,6 +325,17 @@ tasks:
       - |
         set -euo pipefail
         TAG="{{.TAG}}"
+
+        echo "==> Checking every binary was built with {{.GO_TOOLCHAIN}}"
+        for target in {{.UNIX_TARGETS}} {{.WIN_TARGETS}}; do
+          bin="bin/serenebach-${target}"
+          case "$target" in windows-*) bin="${bin}.exe" ;; esac
+          built=$(go version "$bin" | awk '{print $NF}')
+          if [ "$built" != "{{.GO_TOOLCHAIN}}" ]; then
+            echo "ERROR: $bin was built with $built, not {{.GO_TOOLCHAIN}} from go.mod." >&2
+            exit 1
+          fi
+        done
 
         # macOS otherwise embeds AppleDouble sidecar files (._*) into the
         # archives, because cp/tar carry extended attributes (e.g.
