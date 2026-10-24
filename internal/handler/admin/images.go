@@ -210,6 +210,11 @@ func (h *Handler) imagesUpload(w http.ResponseWriter, r *http.Request) {
 
 	store := h.imageStore()
 	stored, err := store.SaveUpload(file, header.Filename, mime, time.Now())
+	if errors.Is(err, images.ErrImageTooLarge) {
+		respondUpload(w, wantsJSON, http.StatusRequestEntityTooLarge,
+			trf(r, "common.error.imageDimensionsTooLarge", images.MaxImageEdge, images.MaxImagePixels/1_000_000), root(r))
+		return
+	}
 	if err != nil {
 		log.Printf("admin.imagesUpload: save: %v", err)
 		respondUpload(w, wantsJSON, http.StatusInternalServerError, tr(r, "common.error.fileSaveFailed"), root(r))
