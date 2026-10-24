@@ -213,8 +213,8 @@ func (s *Store) UpdateUserPassword(ctx context.Context, userID int64, passwordHa
 	}
 	if replacement != nil {
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO sessions (token, user_id, expires_at, created_at)
-			VALUES (?, ?, ?, ?)`, replacement.Token, userID, replacement.ExpiresAt, now); err != nil {
+			INSERT INTO sessions (token_hash, user_id, expires_at, created_at)
+			VALUES (?, ?, ?, ?)`, sessionDigest(replacement.Token), userID, replacement.ExpiresAt, now); err != nil {
 			return fmt.Errorf("repo: UpdateUserPassword replacement session: %w", err)
 		}
 	}

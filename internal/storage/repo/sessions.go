@@ -2,7 +2,9 @@ package repo
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -10,12 +12,21 @@ import (
 	"github.com/serendipitynz/serenebach/internal/domain"
 )
 
-// CreateSession persists a new session and returns its db id.
+// sessionDigest is what the sessions table stores and is queried by in
+// place of the cookie value, so a leaked database or backup holds nothing
+// a browser can present. A plain SHA-256 is enough: the token is 32 random
+// bytes, leaving nothing for a slow hash to protect against guessing.
+func sessionDigest(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
+
+// CreateSession persists a new session under the digest of token.
 func (s *Store) CreateSession(ctx context.Context, token string, userID, expiresAt int64) error {
 	now := time.Now().Unix()
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO sessions (token, user_id, expires_at, created_at)
-		VALUES (?, ?, ?, ?)`, token, userID, expiresAt, now)
+		INSERT INTO sessions (token_hash, user_id, expires_at, created_at)
+		VALUES (?, ?, ?, ?)`, sessionDigest(token), userID, expiresAt, now)
 	if err != nil {
 		return fmt.Errorf("repo: CreateSession: %w", err)
 	}
@@ -34,7 +45,7 @@ func (s *Store) SessionUser(ctx context.Context, token string) (*domain.User, er
 		       u.ai_kind, u.ai_base_url, u.ai_model, u.ai_api_key_enc, u.ai_auto_alt, u.ai_timeout_seconds,
 		       s.expires_at
 		FROM sessions s JOIN users u ON u.id = s.user_id
-		WHERE s.token = ?`, token).Scan(
+		WHERE s.token_hash = ?`, sessionDigest(token)).Scan(
 		&u.ID, &u.WID, &u.Name, &u.DisplayName, &u.Email, &u.Role,
 		&u.Description, &u.DescriptionFormat, &listVis, &u.SortOrder,
 		&u.AIKind, &u.AIBaseURL, &u.AIModel, &u.AIAPIKeyEnc, &autoAlt, &u.AITimeoutSeconds,
@@ -55,7 +66,7 @@ func (s *Store) SessionUser(ctx context.Context, token string) (*domain.User, er
 
 // Idempotent: an unknown token is not an error.
 func (s *Store) DeleteSession(ctx context.Context, token string) error {
-	if _, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE token = ?`, token); err != nil {
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE token_hash = ?`, sessionDigest(token)); err != nil {
 		return fmt.Errorf("repo: DeleteSession: %w", err)
 	}
 	return nil
