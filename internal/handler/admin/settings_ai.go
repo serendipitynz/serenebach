@@ -426,6 +426,10 @@ func (h *Handler) settingsAITest(w http.ResponseWriter, r *http.Request) {
 		MaxTokens:   10,
 		Temperature: 0,
 	})
+	if errors.Is(err, ai.ErrDestinationBlocked) {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": tr(r, "js.ai.err.destination_blocked")})
+		return
+	}
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": err.Error()})
 		return
@@ -445,6 +449,13 @@ func (h *Handler) settingsAITest(w http.ResponseWriter, r *http.Request) {
 // Provider ready for Complete(). Returns ErrUnconfigured when the
 // row has no AIKind set so callers can distinguish "user disabled
 // AI" from "AI failed".
+//
+// Every author can set their own base URL, so for anyone but an admin
+// the provider is confined to public addresses; otherwise the
+// connection test alone would let an author probe the server's internal
+// network or a cloud metadata endpoint. Admins keep an unrestricted
+// client because they already control the server's configuration, and
+// a local LM Studio / Ollama on 127.0.0.1 is the setup they choose.
 func providerForUser(u domain.User) (ai.Provider, error) {
 	if u.AIKind == "" {
 		return nil, ai.ErrUnconfigured
@@ -456,12 +467,16 @@ func providerForUser(u domain.User) (ai.Provider, error) {
 	if err != nil {
 		return nil, err
 	}
+	var client *http.Client
+	if u.Role != domain.RoleAdmin {
+		client = ai.PublicOnlyClient()
+	}
 	return ai.New(ai.Config{
 		Kind:    ai.Kind(u.AIKind),
 		BaseURL: u.AIBaseURL,
 		Model:   u.AIModel,
 		APIKey:  apiKey,
-	}, nil)
+	}, client)
 }
 
 // aiFlashRedirect rewrites the Location back to /admin/settings/ai

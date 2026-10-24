@@ -154,6 +154,8 @@ func classifyAIError(err error) string {
 		return "empty_response"
 	case errors.Is(err, ai.ErrReasoningExhausted):
 		return "reasoning_exhausted"
+	case errors.Is(err, ai.ErrDestinationBlocked):
+		return "destination_blocked"
 	}
 	return "provider_error"
 }

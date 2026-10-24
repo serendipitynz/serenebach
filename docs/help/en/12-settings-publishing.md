@@ -51,6 +51,8 @@ The AI Settings tab covers the in-admin AI writing assist plus MCP access tokens
 
 The writing assist requires `SB_AI_SECRET` on the server. Each user can then register a provider and API key for themselves.
 
+Only admin users can point the assist at a local or private address, such as LM Studio or Ollama on `127.0.0.1`. Other users can connect only to AI services on public internet addresses, so an author cannot make the server send requests into its own network. The rule applies to the address the hostname resolves to, and to redirects as well.
+
 Admin users can also issue and revoke MCP access tokens from this screen. See [AI integration and MCP](mcp) for details.
 
 ## Related pages
