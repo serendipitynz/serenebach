@@ -239,6 +239,12 @@ Other targets are available too: `build-freebsd-amd64`, `build-freebsd-arm64`, `
 
 For CGI hosting, copy the appropriate binary to the host and rename it (typically to `serenebach.cgi`) to match the web server's CGI configuration.
 
+### Login attempt limit in CGI mode
+
+The admin login allows 5 failed attempts per client IP and login name within 15 minutes, then refuses further attempts for that pair until the oldest failure is 15 minutes old. Failures are kept in the database (`login_failures`), not in process memory, so the limit holds in CGI mode, where every request is a new process, exactly as it does for the persistent server, and it survives a restart. Failures older than the window are deleted as new ones are recorded, so the table stays small. Each stored key is a SHA-256 of the IP and the submitted name; the name as typed is not kept, since it may be a password entered into the wrong field.
+
+Behind a reverse proxy, set `SB_TRUSTED_PROXIES` so the limit sees the visitor's IP rather than the proxy's; otherwise every visitor shares one IP and a burst of failures for a name blocks it for everyone.
+
 ### Speeding up admin static assets in CGI mode
 
 In CGI mode every request starts a new process. Admin assets (`admin.css`, `admin.js`, logos) therefore pay the binary-load + goose-check overhead on every page load. Two mitigations are built in:

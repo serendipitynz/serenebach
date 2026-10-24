@@ -1,8 +1,11 @@
 package admin
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"log"
 	"net/http"
-	"sync"
 	"time"
 )
 
@@ -21,123 +24,89 @@ import (
 const (
 	loginMaxFailures  = 5
 	loginWindowPeriod = 15 * time.Minute
-	// loginTrackerGCEvery is how often the tracker sweeps old entries.
-	// Keeps the map from growing unboundedly on a long-running server.
-	loginTrackerGCEvery = 1024
 )
 
-type loginAttempt struct {
-	failures []time.Time
+// loginFailureStore is the slice of repo.Store the limiter needs.
+type loginFailureStore interface {
+	LoginFailuresSince(ctx context.Context, key string, since int64) (int, int64, error)
+	RecordLoginFailure(ctx context.Context, key string, at, pruneBefore int64) error
+	ClearLoginFailures(ctx context.Context, key string) error
 }
 
+// loginLimiter keeps its failures in the database rather than in memory:
+// under CGI every request is a new process, so an in-memory counter
+// restarted from zero on each attempt and limited nothing. One write per
+// failed login is negligible next to the bcrypt check it guards, and a
+// single path keeps the persistent server and CGI behaving alike (the
+// counter now also survives a restart).
+//
+// A store error fails open, with a log line: the limiter must not lock
+// every user out of a server whose database hiccupped, and the password
+// check itself still runs.
 type loginLimiter struct {
-	mu    sync.Mutex
-	hits  map[string]*loginAttempt
-	ops   int
+	store loginFailureStore
 	clock func() time.Time
 }
 
-// newLoginLimiter returns a tracker ready for concurrent use. The
-// clock indirection lets tests run without sleeping.
-func newLoginLimiter() *loginLimiter {
-	return &loginLimiter{
-		hits:  map[string]*loginAttempt{},
-		clock: time.Now,
-	}
+func newLoginLimiter(store loginFailureStore) *loginLimiter {
+	return &loginLimiter{store: store, clock: time.Now}
 }
-
-// shared instance used by loginSubmit. Keeping it package-scope
-// rather than on *Handler so a single binary doesn't accidentally
-// reset the counter by recreating the handler struct.
-var defaultLoginLimiter = newLoginLimiter()
 
 // allow reports whether a login attempt is permitted right now.
 // Callers invoke this with the candidate identity BEFORE verifying
 // the password. When the caller subsequently learns the attempt
-// failed, it must call recordFailure(key) so future attempts count
-// toward the threshold. On success, recordSuccess(key) clears the
-// counter.
-func (l *loginLimiter) allow(ip, user string) (bool, time.Duration) {
-	key := limitKey(ip, user)
-	l.mu.Lock()
-	defer l.mu.Unlock()
+// failed, it must call recordFailure so future attempts count toward
+// the threshold. On success, recordSuccess clears the counter.
+func (l *loginLimiter) allow(ctx context.Context, ip, user string) (bool, time.Duration) {
 	now := l.clock()
-	l.maybeGC(now)
-	att := l.hits[key]
-	if att == nil {
+	count, oldest, err := l.store.LoginFailuresSince(ctx, limitKey(ip, user), now.Add(-loginWindowPeriod).Unix())
+	if err != nil {
+		log.Printf("admin.loginLimiter: allow: %v", err)
 		return true, 0
 	}
-	l.pruneOldFailures(att, now)
-	if len(att.failures) >= loginMaxFailures {
-		// Blocked until the oldest failure slides out of the window.
-		retry := att.failures[0].Add(loginWindowPeriod).Sub(now)
-		if retry < 0 {
-			retry = 0
-		}
-		return false, retry
+	if count < loginMaxFailures {
+		return true, 0
 	}
-	return true, 0
+	// Blocked until the oldest failure slides out of the window.
+	retry := time.Unix(oldest, 0).Add(loginWindowPeriod).Sub(now)
+	if retry < 0 {
+		retry = 0
+	}
+	return false, retry
 }
 
-func (l *loginLimiter) recordFailure(ip, user string) {
-	key := limitKey(ip, user)
-	l.mu.Lock()
-	defer l.mu.Unlock()
+// loginRecordTimeout bounds the writes below, which run detached from
+// the request's cancellation.
+const loginRecordTimeout = 5 * time.Second
+
+// recordFailure writes on a context detached from the request: a client
+// that disconnects while bcrypt runs cancels the request context, and a
+// write bound to it would be dropped, letting an attacker who hangs up
+// after every guess make unlimited, uncounted attempts.
+func (l *loginLimiter) recordFailure(ctx context.Context, ip, user string) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), loginRecordTimeout)
+	defer cancel()
 	now := l.clock()
-	l.ops++
-	att := l.hits[key]
-	if att == nil {
-		att = &loginAttempt{}
-		l.hits[key] = att
-	}
-	l.pruneOldFailures(att, now)
-	att.failures = append(att.failures, now)
-}
-
-func (l *loginLimiter) recordSuccess(ip, user string) {
-	key := limitKey(ip, user)
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	delete(l.hits, key)
-}
-
-// pruneOldFailures drops timestamps that have slipped out of the
-// window. Called under l.mu.
-func (l *loginLimiter) pruneOldFailures(att *loginAttempt, now time.Time) {
-	cutoff := now.Add(-loginWindowPeriod)
-	keep := att.failures[:0]
-	for _, t := range att.failures {
-		if t.After(cutoff) {
-			keep = append(keep, t)
-		}
-	}
-	att.failures = keep
-}
-
-// maybeGC walks the map every N operations and drops keys whose
-// window has lapsed. O(map size) but amortised to near-zero since
-// the login endpoint is low-traffic and GC fires rarely.
-func (l *loginLimiter) maybeGC(now time.Time) {
-	if l.ops < loginTrackerGCEvery {
-		return
-	}
-	l.ops = 0
-	cutoff := now.Add(-loginWindowPeriod)
-	for k, att := range l.hits {
-		alive := false
-		for _, t := range att.failures {
-			if t.After(cutoff) {
-				alive = true
-				break
-			}
-		}
-		if !alive {
-			delete(l.hits, k)
-		}
+	if err := l.store.RecordLoginFailure(ctx, limitKey(ip, user), now.Unix(), now.Add(-loginWindowPeriod).Unix()); err != nil {
+		log.Printf("admin.loginLimiter: record failure: %v", err)
 	}
 }
 
-func limitKey(ip, user string) string { return ip + "|" + user }
+func (l *loginLimiter) recordSuccess(ctx context.Context, ip, user string) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), loginRecordTimeout)
+	defer cancel()
+	if err := l.store.ClearLoginFailures(ctx, limitKey(ip, user)); err != nil {
+		log.Printf("admin.loginLimiter: clear: %v", err)
+	}
+}
+
+// limitKey is stored, so it is hashed: the submitted name can be a
+// password typed into the wrong field. The NUL separator keeps
+// ("1.2.3.4", "x|y") and ("1.2.3.4|x", "y") apart.
+func limitKey(ip, user string) string {
+	sum := sha256.Sum256([]byte(ip + "\x00" + user))
+	return hex.EncodeToString(sum[:])
+}
 
 // loginRemoteIP resolves the rate-limit IP key through the handler's
 // trusted-proxy list. Forwarded headers are honoured only when the

@@ -317,7 +317,8 @@ func (h *Handler) loginSubmit(w http.ResponseWriter, r *http.Request) {
 	// determined attacker can still run ~4 guesses / sec, which makes
 	// dictionary attacks against a weak password feasible over a day.
 	ip := h.loginRemoteIP(r)
-	if ok, retry := defaultLoginLimiter.allow(ip, name); !ok {
+	limiter := newLoginLimiter(h.Store)
+	if ok, retry := limiter.allow(r.Context(), ip, name); !ok {
 		if retry > 0 {
 			w.Header().Set("Retry-After", strconv.Itoa(int(retry.Seconds())+1))
 		}
@@ -330,7 +331,7 @@ func (h *Handler) loginSubmit(w http.ResponseWriter, r *http.Request) {
 	user, hash, err := h.Store.UserByName(r.Context(), name)
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
-			defaultLoginLimiter.recordFailure(ip, name)
+			limiter.recordFailure(r.Context(), ip, name)
 			renderLogin(w, r, loginData{
 				Error: tr(r, "login.errorBadCredentials"), Name: name, Next: safeNextQueryParam(nextParam), CSRFToken: token,
 			})
@@ -341,14 +342,14 @@ func (h *Handler) loginSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := auth.VerifyPassword(hash, pw); err != nil {
-		defaultLoginLimiter.recordFailure(ip, name)
+		limiter.recordFailure(r.Context(), ip, name)
 		renderLogin(w, r, loginData{
 			Error: tr(r, "login.errorBadCredentials"), Name: name, Next: safeNextQueryParam(nextParam), CSRFToken: token,
 		})
 		return
 	}
 
-	defaultLoginLimiter.recordSuccess(ip, name)
+	limiter.recordSuccess(r.Context(), ip, name)
 	if _, err := h.Sessions.Create(r.Context(), w, r, user.ID); err != nil {
 		log.Printf("admin.login: create session: %v", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
