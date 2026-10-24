@@ -70,6 +70,49 @@ func TestSaveUploadWritesFileAndThumbnail(t *testing.T) {
 	}
 }
 
+// The WebP fixtures are checked-in files because neither the standard
+// library nor golang.org/x/image can encode WebP. Both are a 400x300 solid
+// rgb(10,20,30) made with libwebp's cwebp (-q 80, and -lossless), so the
+// VP8 and VP8L decoders are each exercised.
+func TestSaveUploadDecodesWebP(t *testing.T) {
+	for _, fixture := range []string{"400x300.lossy.webp", "400x300.lossless.webp"} {
+		t.Run(fixture, func(t *testing.T) {
+			data, err := os.ReadFile(filepath.Join("testdata", fixture))
+			if err != nil {
+				t.Fatal(err)
+			}
+			root := t.TempDir()
+			s := NewStore(root)
+
+			stored, err := s.SaveUpload(bytes.NewReader(data), fixture, "image/webp", time.Now())
+			if err != nil {
+				t.Fatalf("SaveUpload: %v", err)
+			}
+			if !strings.HasSuffix(stored.StoredPath, ".webp") {
+				t.Errorf("StoredPath = %q, want .webp suffix", stored.StoredPath)
+			}
+			if stored.Width != 400 || stored.Height != 300 {
+				t.Errorf("dims = %dx%d, want 400x300", stored.Width, stored.Height)
+			}
+			if stored.ThumbPath == "" {
+				t.Fatalf("ThumbPath empty; the WebP did not decode")
+			}
+			thumb, err := os.Open(filepath.Join(root, filepath.FromSlash(stored.ThumbPath)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer thumb.Close()
+			decoded, err := jpeg.Decode(thumb)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := decoded.Bounds(); got.Dx() != ThumbMaxEdge || got.Dy() != 180 {
+				t.Errorf("thumb = %dx%d, want %dx180", got.Dx(), got.Dy(), ThumbMaxEdge)
+			}
+		})
+	}
+}
+
 func TestSaveUploadThumbnailDownsizesLongestEdge(t *testing.T) {
 	root := t.TempDir()
 	s := NewStore(root)
