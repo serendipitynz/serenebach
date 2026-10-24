@@ -1,0 +1,60 @@
+name: govulncheck
+
+# Kept apart from ci.yml so the weekly schedule re-runs only the
+# vulnerability scan. New reports are published while the code stands
+# still, and a scheduled ci.yml would also re-run lint and tests that
+# cannot have changed.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 18 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    runs-on: ubuntu-latest
+    # Fails only on Symbol Results (govulncheck's default exit status):
+    # a reported function the code actually reaches. Package and Module
+    # Results stay informational, since nothing calls them.
+    #
+    # The scan is narrowed to the eight targets `task build-all` ships so
+    # that reports for platforms nobody receives — 32-bit ones above all —
+    # cannot stop CI. Windows / darwin / freebsd stay in because their
+    # binaries are released too, and a report limited to one of them still
+    # reaches the people running it.
+    #
+    # A failed scheduled run is reported by GitHub's own failure mail to
+    # whoever last edited the cron line. Opening an issue automatically was
+    # rejected: the repository is public, and the issue would announce a
+    # reachable vulnerability before the fix exists.
+    strategy:
+      fail-fast: false
+      matrix:
+        goos: [linux, freebsd, windows, darwin]
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Installed before GOOS / GOARCH are set: the tool itself must be
+      # built for the runner, while the scan analyses the target.
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+
+      - name: govulncheck ${{ matrix.goos }}/${{ matrix.goarch }}
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: govulncheck ./...
