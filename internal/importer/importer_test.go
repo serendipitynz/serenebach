@@ -554,6 +554,34 @@ func TestImportSB3CategoryParentZero(t *testing.T) {
 	}
 }
 
+// TestImportRejectsUnsafeSchemaInSource pins the source connection's
+// trusted_schema=OFF: a view in a crafted file may not reach a pragma
+// table-valued function, which an untrusted connection would evaluate.
+func TestImportRejectsUnsafeSchemaInSource(t *testing.T) {
+	path := buildSB3Fixture(t)
+	db, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	for _, s := range []string{
+		`DROP TABLE sb_weblog`,
+		`CREATE VIEW sb_weblog AS SELECT 0 AS weblog_id, name AS weblog_title, '' AS weblog_text FROM pragma_table_info('sb_entry')`,
+	} {
+		if _, err := db.Exec(s); err != nil {
+			t.Fatalf("craft source: %v", err)
+		}
+	}
+
+	a := destApp(t)
+	_, err = importer.Import(context.Background(), a.DB, path, importer.Options{
+		TargetWID: 1, AuthorID: 1, OnlyPublished: true,
+	})
+	if err == nil || !strings.Contains(err.Error(), "unsafe use of virtual table") {
+		t.Fatalf("Import err = %v, want an unsafe-use rejection", err)
+	}
+}
+
 func TestImportAgainstRealSB3IfAvailable(t *testing.T) {
 	// Opportunistic check: if SB_TEST_SB3_DB points at a real SB3
 	// SQLite, run the import against it. Skips otherwise so a normal
