@@ -118,7 +118,7 @@ func (h *Handler) profileSave(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "failed to hash password", http.StatusInternalServerError)
 			return
 		}
-		if err := h.Store.UpdateUserPassword(r.Context(), actor.ID, hash); err != nil {
+		if err := h.Sessions.ChangeOwnPassword(r.Context(), w, r, actor.ID, hash); err != nil {
 			log.Printf("admin.profileSave: password: %v", err)
 			http.Error(w, "failed to update password", http.StatusInternalServerError)
 			return

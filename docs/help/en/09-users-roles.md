@@ -33,6 +33,13 @@ What you can do:
 
 If you need to rename someone's login name, recreate the user rather than editing in place.
 
+## Changing a password
+
+Changing a password signs that user out of every other browser and device. If you suspect a session cookie was stolen, changing the password locks the stolen sign-in out too.
+
+- When you change your own password, the browser you changed it from stays signed in (on a new session)
+- When an admin changes another user's password, that user is sent back to the login screen on their next action
+
 ## Protecting the admin role
 
 To keep the admin UI usable, Serene Bach refuses these operations:

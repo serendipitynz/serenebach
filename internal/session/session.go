@@ -50,6 +50,26 @@ func (m *Manager) Create(ctx context.Context, w http.ResponseWriter, r *http.Req
 	return token, nil
 }
 
+// ChangeOwnPassword sets a new password hash for the user signed in on r
+// and replaces every session they hold with a fresh one for this browser,
+// atomically with the password write. The current token is deliberately
+// not kept: a stolen cookie is a copy of the very token the owner is using,
+// so keeping it would leave the thief signed in after the change. On error
+// nothing has changed and no cookie is written.
+func (m *Manager) ChangeOwnPassword(ctx context.Context, w http.ResponseWriter, r *http.Request, userID int64, passwordHash string) error {
+	token, err := newToken()
+	if err != nil {
+		return err
+	}
+	expires := time.Now().Add(m.MaxAge)
+	if err := m.Store.UpdateUserPassword(ctx, userID, passwordHash,
+		&repo.ReplacementSession{Token: token, ExpiresAt: expires.Unix()}); err != nil {
+		return err
+	}
+	http.SetCookie(w, m.cookie(r, token, expires))
+	return nil
+}
+
 // Destroy revokes the session identified by the cookie on r and clears the
 // cookie on w. Missing or already-destroyed sessions are silently ignored.
 // The cookie is cleared even when the DB delete fails (e.g. a full disk),
