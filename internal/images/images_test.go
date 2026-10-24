@@ -13,6 +13,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -415,5 +416,48 @@ func TestDecodeReplaysHeaderAfterCheck(t *testing.T) {
 
 	if _, err := Decode(bytes.NewReader(pngHeader(MaxImageEdge+1, 1))); !errors.Is(err, ErrImageTooLarge) {
 		t.Errorf("Decode oversized err = %v, want ErrImageTooLarge", err)
+	}
+}
+
+func riffChunk(fourCC string, data []byte) []byte {
+	out := []byte(fourCC)
+	out = binary.LittleEndian.AppendUint32(out, uint32(len(data)))
+	out = append(out, data...)
+	if len(data)%2 == 1 {
+		out = append(out, 0)
+	}
+	return out
+}
+
+// A WebP's VP8X header can declare a 1×1 canvas — which is all
+// DecodeConfig reports, so the dimension check passes — while the VP8
+// frame inside declares 16383×16383. The check relies on x/image refusing
+// that mismatch before it allocates the frame (fixed in v0.43.0). This pins
+// that behaviour, so a dependency change that reopened the gap fails here
+// rather than in production.
+func TestDecodeRefusesWebPFrameLargerThanCanvas(t *testing.T) {
+	frame := []byte{0x10, 0x02, 0x00, 0x9d, 0x01, 0x2a} // key frame tag + start code
+	frame = binary.LittleEndian.AppendUint16(frame, 16383)
+	frame = binary.LittleEndian.AppendUint16(frame, 16383)
+	frame = append(frame, make([]byte, 20)...)
+	body := append([]byte("WEBP"), riffChunk("VP8X", make([]byte, 10))...)
+	body = append(body, riffChunk("VP8 ", frame)...)
+	data := riffChunk("RIFF", body)
+
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil || cfg.Width != 1 || cfg.Height != 1 {
+		t.Fatalf("DecodeConfig = %+v, %v; want the 1×1 canvas (fixture is malformed otherwise)", cfg, err)
+	}
+
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+	_, err = Decode(bytes.NewReader(data))
+	runtime.ReadMemStats(&after)
+	if err == nil {
+		t.Fatal("Decode accepted a VP8 frame larger than its VP8X canvas")
+	}
+	if grew := after.TotalAlloc - before.TotalAlloc; grew > 64<<20 {
+		t.Errorf("Decode allocated %d MiB before refusing the frame", grew>>20)
 	}
 }
