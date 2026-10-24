@@ -30,7 +30,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.12.2
+          version: v2.15.0
 
       # The gocyclo cap is a design rule — complex functions get split,
       # not excused — so the one linter whose //nolint golangci-lint
