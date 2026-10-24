@@ -75,7 +75,17 @@ func (l *loginLimiter) allow(ctx context.Context, ip, user string) (bool, time.D
 	return false, retry
 }
 
+// loginRecordTimeout bounds the writes below, which run detached from
+// the request's cancellation.
+const loginRecordTimeout = 5 * time.Second
+
+// recordFailure writes on a context detached from the request: a client
+// that disconnects while bcrypt runs cancels the request context, and a
+// write bound to it would be dropped, letting an attacker who hangs up
+// after every guess make unlimited, uncounted attempts.
 func (l *loginLimiter) recordFailure(ctx context.Context, ip, user string) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), loginRecordTimeout)
+	defer cancel()
 	now := l.clock()
 	if err := l.store.RecordLoginFailure(ctx, limitKey(ip, user), now.Unix(), now.Add(-loginWindowPeriod).Unix()); err != nil {
 		log.Printf("admin.loginLimiter: record failure: %v", err)
@@ -83,6 +93,8 @@ func (l *loginLimiter) recordFailure(ctx context.Context, ip, user string) {
 }
 
 func (l *loginLimiter) recordSuccess(ctx context.Context, ip, user string) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), loginRecordTimeout)
+	defer cancel()
 	if err := l.store.ClearLoginFailures(ctx, limitKey(ip, user)); err != nil {
 		log.Printf("admin.loginLimiter: clear: %v", err)
 	}

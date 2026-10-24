@@ -175,3 +175,19 @@ func TestLoginLimiterStoresNoRawIdentity(t *testing.T) {
 		t.Errorf("key_hash = %q carries the submitted identity verbatim", key)
 	}
 }
+
+// A client that hangs up while bcrypt runs cancels the request context
+// before the failure is recorded. The failure must still count, or
+// disconnecting after each guess would bypass the limit.
+func TestLoginLimiterCountsFailuresAfterClientDisconnect(t *testing.T) {
+	l, _ := newLimiterAt(t, time.Now())
+	canceled, cancel := context.WithCancel(bg)
+	cancel()
+
+	for i := 0; i < loginMaxFailures; i++ {
+		l.recordFailure(canceled, "1.2.3.4", "alice")
+	}
+	if ok, _ := l.allow(bg, "1.2.3.4", "alice"); ok {
+		t.Errorf("failures recorded on a canceled request context were dropped")
+	}
+}
