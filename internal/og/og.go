@@ -24,6 +24,8 @@ import (
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
+
+	"github.com/serendipitynz/serenebach/internal/images"
 )
 
 // Noto Sans JP (Medium) is (c) 2014, 2015 Adobe Systems Incorporated and is
@@ -283,11 +285,7 @@ func loadBG(path string) (image.Image, error) {
 		return nil, err
 	}
 	defer f.Close()
-	img, _, err := image.Decode(f)
-	if err != nil {
-		return nil, err
-	}
-	return img, nil
+	return images.Decode(f)
 }
 
 // drawString lays text onto img using a font.Drawer — straight copy of

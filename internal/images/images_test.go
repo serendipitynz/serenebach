@@ -2,7 +2,9 @@ package images
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
+	"hash/crc32"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -339,5 +341,79 @@ func TestScaleToMaxPreservesAspect(t *testing.T) {
 	tw, th = scaleToMax(500, 1000, 240)
 	if tw != 120 || th != 240 {
 		t.Errorf("500x1000 → %dx%d, want 120x240", tw, th)
+	}
+}
+
+// pngHeader is a PNG that carries nothing but a valid IHDR declaring w×h.
+// It is a few dozen bytes, yet a full decode would try to allocate w*h
+// pixels — exactly the shape the dimension check exists to refuse.
+func pngHeader(w, h uint32) []byte {
+	ihdr := make([]byte, 0, 17)
+	ihdr = append(ihdr, "IHDR"...)
+	ihdr = binary.BigEndian.AppendUint32(ihdr, w)
+	ihdr = binary.BigEndian.AppendUint32(ihdr, h)
+	ihdr = append(ihdr, 8, 6, 0, 0, 0) // 8-bit RGBA, no interlace
+	out := []byte("\x89PNG\r\n\x1a\n")
+	out = binary.BigEndian.AppendUint32(out, uint32(len(ihdr)-4))
+	out = append(out, ihdr...)
+	return binary.BigEndian.AppendUint32(out, crc32.ChecksumIEEE(ihdr))
+}
+
+func TestSaveUploadRejectsOversizedImageWithoutWriting(t *testing.T) {
+	root := t.TempDir()
+	s := NewStore(root)
+
+	data := pngHeader(30000, 30000)
+	_, err := s.SaveUpload(bytes.NewReader(data), "huge.png", "image/png", time.Now())
+	if !errors.Is(err, ErrImageTooLarge) {
+		t.Fatalf("SaveUpload err = %v, want ErrImageTooLarge", err)
+	}
+	if !strings.Contains(err.Error(), "30000×30000") {
+		t.Errorf("err = %q, want the declared dimensions in it", err)
+	}
+	if files := listFiles(t, root); len(files) != 0 {
+		t.Errorf("oversized upload left files behind: %v", files)
+	}
+}
+
+func TestCheckDimensionsBoundaries(t *testing.T) {
+	cases := []struct {
+		w, h int
+		ok   bool
+	}{
+		{8064, 6048, true}, // 48 MP phone photo at full resolution
+		{MaxImageEdge, MaxImagePixels / MaxImageEdge, true},
+		{MaxImageEdge + 1, 1, false},
+		{1, MaxImageEdge + 1, false},
+		{10000, MaxImagePixels/10000 + 1, false},
+	}
+	for _, c := range cases {
+		err := checkDimensions(c.w, c.h)
+		if got := err == nil; got != c.ok {
+			t.Errorf("checkDimensions(%d, %d) = %v, want ok=%v", c.w, c.h, err, c.ok)
+		}
+		if err != nil && !errors.Is(err, ErrImageTooLarge) {
+			t.Errorf("checkDimensions(%d, %d) = %v, want ErrImageTooLarge", c.w, c.h, err)
+		}
+	}
+}
+
+func TestDecodeReplaysHeaderAfterCheck(t *testing.T) {
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, newTestImage(37, 21, color.RGBA{1, 2, 3, 255})); err != nil {
+		t.Fatal(err)
+	}
+	// A plain io.Reader (not a bytes.Reader) so nothing can seek back: the
+	// header DecodeConfig consumed has to be replayed for Decode.
+	img, err := Decode(io.MultiReader(&buf))
+	if err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	if b := img.Bounds(); b.Dx() != 37 || b.Dy() != 21 {
+		t.Errorf("bounds = %v, want 37×21", b)
+	}
+
+	if _, err := Decode(bytes.NewReader(pngHeader(MaxImageEdge+1, 1))); !errors.Is(err, ErrImageTooLarge) {
+		t.Errorf("Decode oversized err = %v, want ErrImageTooLarge", err)
 	}
 }

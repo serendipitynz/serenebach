@@ -11,9 +11,9 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"image/gif"
+	_ "image/gif"
 	"image/jpeg"
-	"image/png"
+	_ "image/png"
 	"io"
 	"os"
 	"path/filepath"
@@ -24,6 +24,27 @@ import (
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/webp"
 )
+
+// Upper bounds on an image's decoded size, read from its header before any
+// pixel is decoded. The upload byte cap only limits the compressed size: a
+// 30000×30000 single-colour PNG is tens of KB yet decodes to about 3.6 GB
+// of RGBA, enough to kill a process on shared hosting.
+//
+// 50 megapixels admits the largest photos a blog realistically carries — a
+// 48 MP phone shot at full resolution (8064×6048) — while capping a decode
+// at about 200 MB for 8-bit RGBA (75 MB for a typical 4:2:0 JPEG; a 16-bit
+// PNG, rare on a blog, doubles RGBA to 400 MB). The per-side cap stops a
+// strip-shaped image from slipping under the pixel count with a single
+// enormous edge, while leaving room for phone panoramas.
+const (
+	MaxImageEdge   = 20000
+	MaxImagePixels = 50_000_000
+)
+
+// ErrImageTooLarge is returned, wrapped with the image's dimensions, when an
+// image exceeds MaxImageEdge or MaxImagePixels. Nothing has been decoded or
+// written by then.
+var ErrImageTooLarge = errors.New("images: image dimensions exceed the limit")
 
 // ThumbMaxEdge is the longest-edge cap for generated thumbnails. 240px fits
 // comfortably in the admin gallery grid without blocking a mobile column.
@@ -135,6 +156,23 @@ func (s *Store) SaveUpload(src io.Reader, originalName, mime string, now time.Ti
 
 	kind := KindFor(mime)
 
+	// Buffer the upload so we can both persist it and decode for thumbnails
+	// without re-reading from the request body. Upload sizes are capped by
+	// the handler well below memory pressure thresholds.
+	var buf bytes.Buffer
+	size, err := io.Copy(&buf, src)
+	if err != nil {
+		return nil, fmt.Errorf("images: read body: %w", err)
+	}
+
+	// Rejected before anything touches disk, so an oversized image leaves
+	// no file for the gallery to list without dimensions or a thumbnail.
+	if kind == "image" {
+		if err := rejectOversized(buf.Bytes()); err != nil {
+			return nil, err
+		}
+	}
+
 	yearMonth := filepath.Join(fmt.Sprintf("%04d", now.Year()), fmt.Sprintf("%02d", int(now.Month())))
 	absDir := filepath.Join(s.Root, yearMonth)
 	if err := os.MkdirAll(absDir, 0o755); err != nil {
@@ -151,15 +189,6 @@ func (s *Store) SaveUpload(src io.Reader, originalName, mime string, now time.Ti
 	}
 	baseName := fmt.Sprintf("%s-%s.%s", slug, short, ext)
 	absPath := filepath.Join(absDir, baseName)
-
-	// Buffer the upload so we can both persist it and decode for thumbnails
-	// without re-reading from the request body. Upload sizes are capped by
-	// the handler well below memory pressure thresholds.
-	var buf bytes.Buffer
-	size, err := io.Copy(&buf, src)
-	if err != nil {
-		return nil, fmt.Errorf("images: read body: %w", err)
-	}
 
 	if err := writeNewFile(absPath, func(w io.Writer) error {
 		_, err := w.Write(buf.Bytes())
@@ -182,7 +211,7 @@ func (s *Store) SaveUpload(src io.Reader, originalName, mime string, now time.Ti
 		return stored, nil
 	}
 
-	img, _, decodeErr := image.Decode(bytes.NewReader(buf.Bytes()))
+	img, decodeErr := Decode(bytes.NewReader(buf.Bytes()))
 	if decodeErr != nil {
 		// Keep the file — it passed the MIME check — but skip thumbnailing.
 		// The admin UI falls back to the original for its preview.
@@ -318,30 +347,43 @@ func shortID() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// ---- decoding helpers (used by tests and uploads) ----------------------
+// ---- decoding helpers --------------------------------------------------
 
-// DecodeHeader reads just enough of src to determine image dimensions and
-// verify it decodes. The returned image is the fully-decoded frame —
-// callers that only want metadata can discard it. Returns ErrUnsupported
-// when the mime type isn't in AllowedMIMEs.
-func DecodeHeader(mime string, src io.Reader) (image.Image, error) {
-	if !AllowedMIMEs[mime] {
-		return nil, ErrUnsupported
+// Decode decodes any registered format after checking the header's
+// dimensions against MaxImageEdge / MaxImagePixels, returning
+// ErrImageTooLarge instead of allocating the pixels. Every decode of an
+// image that did not ship inside the binary goes through here.
+func Decode(r io.Reader) (image.Image, error) {
+	// The header bytes DecodeConfig consumes are replayed ahead of the rest
+	// of r, so the check works on a plain stream without seeking.
+	var head bytes.Buffer
+	cfg, _, err := image.DecodeConfig(io.TeeReader(r, &head))
+	if err != nil {
+		return nil, err
 	}
-	switch mime {
-	case "image/jpeg":
-		return jpeg.Decode(src)
-	case "image/png":
-		return png.Decode(src)
-	case "image/gif":
-		return gif.Decode(src)
-	case "image/webp":
-		img, _, err := image.Decode(src)
-		return img, err
+	if err := checkDimensions(cfg.Width, cfg.Height); err != nil {
+		return nil, err
 	}
-	return nil, ErrUnsupported
+	img, _, err := image.Decode(io.MultiReader(&head, r))
+	return img, err
 }
 
-// ErrUnsupported is returned by DecodeHeader when the mime type isn't in
-// the allowlist.
-var ErrUnsupported = errors.New("images: unsupported mime type")
+// rejectOversized reports ErrImageTooLarge for data whose header declares
+// dimensions over the limits. An unreadable header is not its concern: the
+// upload keeps such a file without a thumbnail, as it always has.
+func rejectOversized(data []byte) error {
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return nil //nolint:nilerr // an undecodable image is stored as-is; only a readable oversized header is rejected.
+	}
+	return checkDimensions(cfg.Width, cfg.Height)
+}
+
+func checkDimensions(w, h int) error {
+	// Compared in int64 so the product cannot overflow on a 32-bit build.
+	if w > MaxImageEdge || h > MaxImageEdge || int64(w)*int64(h) > MaxImagePixels {
+		return fmt.Errorf("%w: %d×%d px (limit: %d px per side, %d pixels in total)",
+			ErrImageTooLarge, w, h, MaxImageEdge, MaxImagePixels)
+	}
+	return nil
+}
