@@ -13,7 +13,7 @@ The "how it works under the hood" reference. Useful for contributors, operators 
 
 ## Requirements
 
-- Go 1.22 or newer (1.26 is what is currently tested)
+- Go 1.27.3 or newer — the version on `go.mod`'s `go` line. CI, the Docker image and `task release` all build with exactly that version
 - SQLite CLI (`sqlite3`) — only for peeking at the database; not a runtime dependency
 - Optional: `task` (go-task) if you want the shorthand commands
 - Optional: Python 3 — only if you want to serve the static build locally
