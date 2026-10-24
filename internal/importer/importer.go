@@ -208,10 +208,13 @@ func importSB3(ctx context.Context, dest *sql.DB, sourcePath string, opts Option
 // pings it. Returned *sql.DB is the caller's responsibility to Close.
 //
 // The file comes from outside this installation, so its schema is not
-// trusted: defensive mode and trusted_schema=OFF stop views and triggers
-// in it from reaching pragma table-valued functions and other features
-// SQLite flags as unsafe in a schema. SB3 itself creates plain tables
-// only, so a genuine source is unaffected.
+// trusted. trusted_schema=OFF is what stops views and triggers in it
+// from reaching pragma table-valued functions and other features SQLite
+// flags as unsafe in a schema; SB3 itself creates plain tables only, so
+// a genuine source is unaffected. Defensive mode adds nothing observable
+// while mode=ro and query_only hold, which is why no test pins it: it is
+// kept so that dropping either of those does not reopen writes to the
+// schema or to shadow tables.
 func openSB3Source(ctx context.Context, absPath string) (*sql.DB, error) {
 	src, err := sql.Open("sqlite", "file:"+absPath+"?mode=ro&_defensive=1&_pragma=trusted_schema(0)&_pragma=query_only(true)")
 	if err != nil {
