@@ -2,14 +2,19 @@ package og
 
 import (
 	"bytes"
+	"errors"
 	"image"
 	"image/color"
 	"image/png"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
+
+	"github.com/serendipitynz/serenebach/internal/images"
 )
 
 // parseHexColor accepts 7- and 9-char hex literals; anything else —
@@ -168,5 +173,18 @@ func TestWrapJapaneseSplitsAtCharBoundary(t *testing.T) {
 	lines := wrapJapanese(face, "はるかむかしのむかしがありました", 600, 4)
 	if len(lines) < 2 {
 		t.Errorf("expected at least 2 lines; got %d: %v", len(lines), lines)
+	}
+}
+
+// A GIF header declaring 30000×30000 is 13 bytes on disk; decoding it in
+// full would allocate close to a gigabyte, so loadBG has to refuse it from
+// the header alone.
+func TestLoadBGRejectsOversizedImage(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "huge.gif")
+	if err := os.WriteFile(path, []byte("GIF89a\x30\x75\x30\x75\x00\x00\x00"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadBG(path); !errors.Is(err, images.ErrImageTooLarge) {
+		t.Fatalf("loadBG err = %v, want images.ErrImageTooLarge", err)
 	}
 }

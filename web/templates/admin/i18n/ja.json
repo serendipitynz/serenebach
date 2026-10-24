@@ -56,6 +56,7 @@
   "common.error.fileMissing": "ファイルが添付されていません。",
   "common.error.fileTooLarge": "ファイルサイズが大きすぎます",
   "common.error.fileTooLargeWithLimit": "ファイルサイズが大きすぎます (上限: %dMB)",
+  "common.error.imageDimensionsTooLarge": "画像の縦横が大きすぎます (上限: 一辺 %d ピクセル、合計 %d メガピクセル)。縮小してからアップロードしてください。",
   "common.error.unsupportedImage": "対応していない画像形式です (JPEG / PNG / GIF / WebP)。",
   "common.error.unsupportedMime": "対応していないファイル形式です: %s",
   "common.error.invalidFilename": "ファイル名が不正です",

@@ -6,10 +6,12 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
 	"image/png"
+	"strings"
 	"testing"
 	"time"
 
@@ -458,6 +460,28 @@ func TestToolUploadImageSuccessAndAudit(t *testing.T) {
 
 	imageID := uploadImageCallToolReturnsID(t, ctx, srv)
 	uploadImageAssertAuditRow(t, ctx, mainDB, imageID)
+}
+
+func TestToolUploadImageRejectsOversizedImage(t *testing.T) {
+	mainDB, srv := uploadImageNewServer(t)
+	ctx := WithAuth(context.Background(), domain.MCPScopeWrite, 7, 13)
+
+	// 13-byte GIF header declaring 30000×30000.
+	data := base64.StdEncoding.EncodeToString([]byte("GIF89a\x30\x75\x30\x75\x00\x00\x00"))
+	_, err := srv.toolUploadImage(ctx, json.RawMessage(fmt.Sprintf(`{"data":"%s","filename":"huge.gif"}`, data)))
+	if !errors.Is(err, images.ErrImageTooLarge) {
+		t.Fatalf("toolUploadImage err = %v, want images.ErrImageTooLarge", err)
+	}
+	if !strings.Contains(err.Error(), "30000×30000") {
+		t.Errorf("err = %q, want the declared dimensions in it", err)
+	}
+	var n int
+	if err := mainDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM images`).Scan(&n); err != nil {
+		t.Fatalf("count images: %v", err)
+	}
+	if n != 0 {
+		t.Errorf("images rows = %d, want 0 after a rejected upload", n)
+	}
 }
 
 // uploadImageNewServer wires a single-row weblog, an on-disk image
